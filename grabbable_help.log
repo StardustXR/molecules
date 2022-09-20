@@ -1,0 +1,13 @@
+[2022-09-20T01:35:03.751463189-04:00][STARDUST][SIGNAL][/:subscribeLogicStep] 
+[2022-09-20T01:35:03.752276664-04:00][STARDUST][SIGNAL][/:setBasePrefixes] ["/run/media/nova/MEDIA/xr/stardust/stardust-xr-molecules/res"]
+[2022-09-20T01:35:03.752606713-04:00][STARDUST][SIGNAL][/field:createSphereField] ["SphereField", "/", [0, 0, 0], 0.10000000149011612]
+[2022-09-20T01:35:03.752907927-04:00][STARDUST][SIGNAL][/input:createInputHandler] ["InputHandler", "/", [0, 0, 0], [0, 0, 0, 1], "/field/SphereField"]
+[2022-09-20T01:35:03.753230852-04:00][STARDUST][SIGNAL][/spatial:createSpatial] ["GrabbableRoot", "/input/handler/InputHandler", [0, 0, 0], [0, 0, 0, 1], [1, 1, 1], false]
+[2022-09-20T01:35:03.753555982-04:00][STARDUST][SIGNAL][/spatial:createSpatial] ["GrabbableContentParent", "/input/handler/InputHandler", [0, 0, 0], [0, 0, 0, 1], [1, 1, 1], false]
+[2022-09-20T01:35:03.754033597-04:00][STARDUST][SIGNAL][/drawable:createModelFromResource] ["gNipok2RWU", "/spatial/spatial/GrabbableContentParent", "molecules", "urchin.glb", [0, 0, 0], [0, 0, 0, 1], [0.20000000298023224, 0.20000000298023224, 0.20000000298023224]]
+[2022-09-20T01:35:03.754250785-04:00][STARDUST][SIGNAL][/field/SphereField:setSpatialParent] "/spatial/spatial/GrabbableContentParent"
+[2022-09-20T01:35:03.754382492-04:00][STARDUST][SIGNAL][/spatial/spatial/GrabbableRoot:destroy] 
+[2022-09-20T01:35:03.754497838-04:00][STARDUST][SIGNAL][/spatial/spatial/GrabbableContentParent:destroy] 
+[2022-09-20T01:35:03.754619356-04:00][STARDUST][SIGNAL][/input/handler/InputHandler:destroy] 
+[2022-09-20T01:35:03.754747947-04:00][STARDUST][SIGNAL][/field/SphereField:destroy] 
+[2022-09-20T01:35:03.754856410-04:00][STARDUST][SIGNAL][/drawable/model/gNipok2RWU:destroy] 

@@ -1,0 +1,18 @@
+[package]
+name = "stardust-xr-molecules"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+glam = { version = "0.21.3", features = ["mint"] }
+mint = "0.5.9"
+
+[dependencies.stardust-xr-fusion]
+version = "0.9.0"
+path = "../stardust-xr/fusion"
+
+[dev-dependencies]
+anyhow = "1.0.60"
+lazy_static = "1.4.0"
+manifest-dir-macros = "0.1.16"
+tokio = { version = "1.20.1", features = ["full"] }
