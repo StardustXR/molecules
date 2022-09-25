@@ -3,13 +3,16 @@ name = "stardust-xr-molecules"
 version = "0.1.0"
 edition = "2021"
 
+authors = ["Nova King <technobaboo@proton.me>"]
+description = "Widget library for Stardust XR, built on top of Fusion"
+license = "MIT"
+repository = "https://github.com/StardustXR/stardust-xr-molecules/"
+homepage = "https://stardustxr.org"
+
 [dependencies]
 glam = { version = "0.21.3", features = ["mint"] }
 mint = "0.5.9"
-
-[dependencies.stardust-xr-fusion]
-version = "0.9.0"
-path = "../stardust-xr/fusion"
+stardust-xr-fusion = "0.10.1"
 
 [dev-dependencies]
 anyhow = "1.0.60"
