@@ -19,7 +19,7 @@ lazy_static! {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> anyhow::Result<()> {
 	let (client, event_loop) = Client::connect_with_async_loop().await?;
-	client.set_base_prefixes(&[directory_relative_path!("res")])?;
+	client.set_base_prefixes(&[directory_relative_path!("res")]);
 
 	let _wrapped_root = client.wrap_root(GrabbableDemo::new(&client)?);
 
