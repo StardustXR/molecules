@@ -756,9 +756,9 @@ dependencies = [
 
 [[package]]
 name = "stardust-xr"
-version = "0.2.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c420007bd1f45c38c1e2356d6c8c7ef195d6ebb8455818e30593ea4586a146d"
+checksum = "2170ee26edf0a71e8baebe600cd08614fee4d84c2c183d541fad3e14a8f14e49"
 dependencies = [
  "anyhow",
  "chrono",
@@ -777,9 +777,9 @@ dependencies = [
 
 [[package]]
 name = "stardust-xr-fusion"
-version = "0.10.1"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "731536cf03bb35b2e45f53cad3e6d22a5eaaebdb1724779f1db0990e531a1bad"
+checksum = "53c12c6bca2cccddc6cd2a67b62fe93ce5061479d1f08136d4029c9016b327a2"
 dependencies = [
  "anyhow",
  "buildstructor",
