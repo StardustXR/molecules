@@ -8,12 +8,13 @@ use stardust_xr_fusion::{
 	drawable::Model,
 	fields::SphereField,
 	node::NodeError,
-	resource::Resource,
+	resource::NamespacedResource,
 };
 use stardust_xr_molecules::Grabbable;
 
 lazy_static! {
-	static ref ICON_RESOURCE: Resource = Resource::new("molecules", "urchin.glb");
+	static ref ICON_RESOURCE: NamespacedResource =
+		NamespacedResource::new("molecules", "urchin.glb");
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -41,9 +42,9 @@ impl GrabbableDemo {
 			.radius(0.1)
 			.build()?;
 		let grabbable = Grabbable::new(client.get_root(), &field)?;
-		let model = Model::resource_builder()
+		let model = Model::builder()
 			.spatial_parent(grabbable.content_parent())
-			.resource(&ICON_RESOURCE)
+			.resource(&*ICON_RESOURCE)
 			.scale(vec3(0.1, 0.1, 0.1))
 			.build()?;
 		field.set_spatial_parent(grabbable.content_parent())?;
