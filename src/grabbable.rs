@@ -15,12 +15,27 @@ use stardust_xr_fusion::{
 pub struct Grabbable {
 	root: Spatial,
 	content_parent: Spatial,
+	global_action: BaseInputAction<()>,
 	condition_action: BaseInputAction<()>,
 	grab_action: SingleActorAction<()>,
 	input_handler: HandlerWrapper<InputHandler, InputActionHandler<()>>,
+	min_distance: f32,
 }
 impl Grabbable {
 	pub fn new(parent: &Spatial, field: &Field) -> Result<Self, NodeError> {
+		let global_action = BaseInputAction::new(false, |_, _| true);
+		let condition_action = BaseInputAction::new(false, |data, _| data.distance < 0.05);
+		let grab_action = SingleActorAction::new(
+			true,
+			|data, _| {
+				data.datamap.with_data(|datamap| match &data.input {
+					InputDataType::Pointer(_) => datamap.idx("grab").as_bool(),
+					InputDataType::Hand(_) => (datamap.idx("pinchStrength").as_f32() > 0.99),
+					InputDataType::Tip(_) => (datamap.idx("grab").as_f32() > 0.99),
+				})
+			},
+			false,
+		);
 		let input_handler =
 			InputHandler::create(
 				parent,
@@ -41,28 +56,20 @@ impl Grabbable {
 		Ok(Grabbable {
 			root,
 			content_parent,
-			condition_action: BaseInputAction::new(false, |data, _| data.distance < 0.05),
-			grab_action: SingleActorAction::new(
-				true,
-				|data, _| {
-					data.datamap.with_data(|datamap| match &data.input {
-						InputDataType::Pointer(_) => datamap.idx("grab").as_bool(),
-						InputDataType::Hand(_) => (datamap.idx("pinchStrength").as_f32() > 0.99),
-					})
-				},
-				false,
-			),
+			global_action,
+			condition_action,
+			grab_action,
 			input_handler,
+			min_distance: f32::MAX,
 		})
 	}
 	pub fn update(&mut self) {
 		self.input_handler.lock_inner().update_actions([
+			self.global_action.type_erase(),
 			self.condition_action.type_erase(),
 			self.grab_action.type_erase(),
 		]);
 		self.grab_action.update(&mut self.condition_action);
-		// dbg!(&self.condition_action.actively_acting.len());
-		// dbg!(&self.grab_action.actor().is_some());
 
 		if self.grab_action.actor_acting() {
 			match &self.grab_action.actor().unwrap().input {
@@ -71,7 +78,7 @@ impl Grabbable {
 					let thumb_tip_pos: Vec3 = thumb_tip_pos.into();
 					let index_tip_pos: Vector3<f32> = h.index.tip.position.clone().into();
 					let index_tip_pos: Vec3 = index_tip_pos.into();
-					let pinch_pos = (thumb_tip_pos + index_tip_pos) * 0.5;
+					let pinch_pos = thumb_tip_pos.lerp(index_tip_pos, 0.5);
 					self.root
 						.set_transform(
 							Some(self.input_handler.node()),
@@ -82,6 +89,16 @@ impl Grabbable {
 						.unwrap();
 				}
 				InputDataType::Pointer(_p) => (),
+				InputDataType::Tip(t) => {
+					self.root
+						.set_transform(
+							Some(self.input_handler.node()),
+							Some(t.origin.into()),
+							Some(t.orientation.into()),
+							None,
+						)
+						.unwrap();
+				}
 			}
 		}
 		if self.grab_action.actor_started() {
@@ -94,11 +111,22 @@ impl Grabbable {
 				.set_spatial_parent_in_place(self.input_handler.node())
 				.unwrap();
 		}
+
+		self.min_distance = self
+			.global_action
+			.actively_acting
+			.iter()
+			.map(|data| data.distance)
+			.reduce(|a, b| a.min(b))
+			.unwrap_or(f32::MAX);
 	}
 	pub fn grab_action(&self) -> &SingleActorAction<()> {
 		&self.grab_action
 	}
 	pub fn content_parent(&self) -> &Spatial {
 		&self.content_parent
+	}
+	pub fn min_distance(&self) -> f32 {
+		self.min_distance
 	}
 }

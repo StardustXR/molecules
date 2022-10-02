@@ -777,9 +777,9 @@ dependencies = [
 
 [[package]]
 name = "stardust-xr-fusion"
-version = "0.14.1"
+version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef2a8f731e9b78c2e7800e83b60f7dbe72c7aad01dec6da6350d7b0a51734d87"
+checksum = "3d844061681ba4981d057aec2d9e0bd08362bd3133ba04b1225648b9ca135862"
 dependencies = [
  "anyhow",
  "buildstructor",
