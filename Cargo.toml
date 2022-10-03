@@ -1,6 +1,6 @@
 [package]
 name = "stardust-xr-molecules"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2021"
 
 authors = ["Nova King <technobaboo@proton.me>"]
@@ -12,7 +12,7 @@ homepage = "https://stardustxr.org"
 [dependencies]
 glam = { version = "0.21.3", features = ["mint"] }
 mint = "0.5.9"
-stardust-xr-fusion = "0.14.3"
+stardust-xr-fusion = "0.15.1"
 
 [dev-dependencies]
 anyhow = "1.0.60"

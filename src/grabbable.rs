@@ -1,6 +1,5 @@
 use crate::single_actor_action::SingleActorAction;
 use glam::Vec3;
-use mint::Vector3;
 use stardust_xr_fusion::{
 	fields::Field,
 	input::{
@@ -29,9 +28,12 @@ impl Grabbable {
 			true,
 			|data, _| {
 				data.datamap.with_data(|datamap| match &data.input {
+					InputDataType::Hand(h) => {
+						Vec3::from(h.thumb.tip.position).distance(Vec3::from(h.index.tip.position))
+							> 0.01
+					}
 					InputDataType::Pointer(_) => datamap.idx("grab").as_bool(),
-					InputDataType::Hand(_) => (datamap.idx("pinchStrength").as_f32() > 0.99),
-					InputDataType::Tip(_) => (datamap.idx("grab").as_f32() > 0.99),
+					InputDataType::Tip(_) => (datamap.idx("grab").as_f32() > 0.90),
 				})
 			},
 			false,
@@ -74,10 +76,8 @@ impl Grabbable {
 		if self.grab_action.actor_acting() {
 			match &self.grab_action.actor().unwrap().input {
 				InputDataType::Hand(h) => {
-					let thumb_tip_pos: Vector3<f32> = h.thumb.tip.position.clone().into();
-					let thumb_tip_pos: Vec3 = thumb_tip_pos.into();
-					let index_tip_pos: Vector3<f32> = h.index.tip.position.clone().into();
-					let index_tip_pos: Vec3 = index_tip_pos.into();
+					let thumb_tip_pos: Vec3 = h.thumb.tip.position.into();
+					let index_tip_pos: Vec3 = h.index.tip.position.into();
 					let pinch_pos = thumb_tip_pos.lerp(index_tip_pos, 0.5);
 					self.root
 						.set_transform(
@@ -88,7 +88,16 @@ impl Grabbable {
 						)
 						.unwrap();
 				}
-				InputDataType::Pointer(_p) => (),
+				InputDataType::Pointer(p) => {
+					self.root
+						.set_transform(
+							Some(self.input_handler.node()),
+							Some(p.origin().into()),
+							Some(p.orientation().into()),
+							None,
+						)
+						.unwrap();
+				}
 				InputDataType::Tip(t) => {
 					self.root
 						.set_transform(
