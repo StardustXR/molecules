@@ -420,6 +420,9 @@ name = "mint"
 version = "0.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e53debba6bda7a793e5f99b8dacf19e626084f525f7829104ba9898f367d85ff"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "mio"
@@ -696,15 +699,29 @@ checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
 
 [[package]]
 name = "serde"
-version = "1.0.144"
+version = "1.0.145"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f747710de3dcd43b88c9168773254e809d8ddbdf9653b84e2554ab219f17860"
+checksum = "728eb6351430bccb993660dfffc5a72f91ccc1295abaa8ce19b27ebe4f75568b"
+dependencies = [
+ "serde_derive",
+]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.144"
+version = "1.0.145"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94ed3a816fb1d101812f83e789f888322c34e291f894f19590dc310963e87a00"
+checksum = "81fa1584d3d1bcacd84c277a0dfe21f5b0f6accf4a23d04d4c6d61f1af522b4c"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "serde_repr"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fe39d9fbb0ebf5eb2c7cb7e2a47e4f462fad1379f1166b8ae49ad9eae89a7ca"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -756,9 +773,7 @@ dependencies = [
 
 [[package]]
 name = "stardust-xr"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38d4316db13cde2a154e6619c795abf7c5d65dc77fc5385d4cad0dba5f6db908"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -768,6 +783,7 @@ dependencies = [
  "flexbuffers",
  "mint",
  "parking_lot",
+ "serde",
  "slotmap",
  "stardust-xr-schemas",
  "thiserror",
@@ -777,9 +793,7 @@ dependencies = [
 
 [[package]]
 name = "stardust-xr-fusion"
-version = "0.15.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d8894d0e577b48d72a1f532aaf491b475e4d3374018d1e1989e55fe895244ff"
+version = "0.17.0"
 dependencies = [
  "anyhow",
  "buildstructor",
@@ -795,12 +809,12 @@ dependencies = [
  "mint",
  "nanoid",
  "once_cell",
- "ouroboros",
  "parking_lot",
  "rustc-hash",
+ "serde",
+ "serde_repr",
  "slotmap",
  "stardust-xr",
- "stardust-xr-schemas",
  "thiserror",
  "tokio",
  "uds",
@@ -810,7 +824,7 @@ dependencies = [
 
 [[package]]
 name = "stardust-xr-molecules"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "glam",
@@ -823,12 +837,16 @@ dependencies = [
 
 [[package]]
 name = "stardust-xr-schemas"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c136c6bd6b107c6d19863704c1d54784fe8322a4e96311da9327ecd242beedab"
+version = "1.1.0"
 dependencies = [
+ "anyhow",
  "flatbuffers",
+ "flexbuffers",
+ "glam",
  "mint",
+ "ouroboros",
+ "serde",
+ "thiserror",
 ]
 
 [[package]]
@@ -854,18 +872,18 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.35"
+version = "1.0.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c53f98874615aea268107765aa1ed8f6116782501d18e53d08b471733bea6c85"
+checksum = "10deb33631e3c9018b9baf9dcbbc4f737320d2b576bac10f6aefa048fa407e3e"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.35"
+version = "1.0.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8b463991b4eab2d801e724172285ec4195c650e8ec79b149e6c2a8e6dd3f783"
+checksum = "982d17546b47146b28f7c22e3d08465f6b8903d0ea13c1660d9d84a6e7adcdbb"
 dependencies = [
  "proc-macro2",
  "quote",

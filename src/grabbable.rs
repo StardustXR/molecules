@@ -92,8 +92,8 @@ impl Grabbable {
 					self.root
 						.set_transform(
 							Some(self.input_handler.node()),
-							Some(p.origin().into()),
-							Some(p.orientation().into()),
+							Some(p.origin),
+							Some(p.orientation),
 							None,
 						)
 						.unwrap();
