@@ -824,7 +824,7 @@ dependencies = [
 
 [[package]]
 name = "stardust-xr-molecules"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "glam",
