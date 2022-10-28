@@ -33,7 +33,7 @@ impl Grabbable {
 							< 0.01
 					}
 					InputDataType::Pointer(_) => datamap.idx("grab").as_bool(),
-					InputDataType::Tip(_) => (datamap.idx("grab").as_f32() > 0.90),
+					InputDataType::Tip(_) => datamap.idx("grab").as_f32() > 0.90,
 				})
 			},
 			false,

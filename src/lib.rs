@@ -1,4 +1,5 @@
 mod grabbable;
+pub mod keyboard;
 mod single_actor_action;
 
 pub use grabbable::Grabbable;

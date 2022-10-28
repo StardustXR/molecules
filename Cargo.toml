@@ -10,12 +10,15 @@ repository = "https://github.com/StardustXR/stardust-xr-molecules/"
 homepage = "https://stardustxr.org"
 
 [dependencies]
-glam = { version = "0.21.3", features = ["mint"] }
+flexbuffers = { version = "2.0.0", features = ["serialize_human_readable", "deserialize_human_readable"] }
+glam = { version = "0.22.0", features = ["mint"] }
+lazy_static = "1.4.0"
 mint = "0.5.9"
-stardust-xr-fusion = {version = "0.17.0", path = "../stardust-xr/fusion"}
+serde = { version = "1.0.147", features = ["derive"] }
+stardust-xr-fusion = "0.17.6"
+xkbcommon = { version = "0.5.0", default-features = false, features = []}
 
 [dev-dependencies]
-anyhow = "1.0.60"
-lazy_static = "1.4.0"
+anyhow = "1.0.66"
 manifest-dir-macros = "0.1.16"
-tokio = { version = "1.20.1", features = ["full"] }
+tokio = { version = "1.21.2", features = ["full"] }
