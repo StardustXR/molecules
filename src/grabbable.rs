@@ -6,7 +6,7 @@ use stardust_xr_fusion::{
 		action::{BaseInputAction, InputAction, InputActionHandler},
 		InputDataType, InputHandler,
 	},
-	node::NodeError,
+	node::{ClientOwned, NodeError},
 	spatial::Spatial,
 	HandlerWrapper,
 };
@@ -21,7 +21,7 @@ pub struct Grabbable {
 	min_distance: f32,
 }
 impl Grabbable {
-	pub fn new(parent: &Spatial, field: &Field) -> Result<Self, NodeError> {
+	pub fn new<Fi: Field + ClientOwned>(parent: &Spatial, field: &Fi) -> Result<Self, NodeError> {
 		let global_action = BaseInputAction::new(false, |_, _| true);
 		let condition_action = BaseInputAction::new(false, |data, _| data.distance < 0.05);
 		let grab_action = SingleActorAction::new(
