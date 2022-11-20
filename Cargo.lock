@@ -712,15 +712,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "slotmap"
-version = "1.0.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1e08e261d0e8f5c43123b7adf3e4ca1690d655377ac93a03b2c9d3e98de1342"
-dependencies = [
- "version_check",
-]
-
-[[package]]
 name = "smallvec"
 version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -760,13 +751,12 @@ dependencies = [
 
 [[package]]
 name = "stardust-xr-fusion"
-version = "0.20.0"
+version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "028509709db4e967c658041335edcbbce805ea220077e2db3893afd08a30046a"
+checksum = "7a31bdda71422609625f0e4caba5cc6cb067802be78a1b86b7d92838c0ce3ade"
 dependencies = [
  "anyhow",
  "buildstructor",
- "cluFlock",
  "color-rs",
  "flagset",
  "flexbuffers",
@@ -777,17 +767,15 @@ dependencies = [
  "rustc-hash",
  "serde",
  "serde_repr",
- "slotmap",
  "stardust-xr",
  "thiserror",
  "tokio",
- "xdg",
  "xkbcommon",
 ]
 
 [[package]]
 name = "stardust-xr-molecules"
-version = "0.3.6"
+version = "0.3.7"
 dependencies = [
  "anyhow",
  "flexbuffers",
