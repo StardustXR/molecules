@@ -1,6 +1,6 @@
 [package]
 name = "stardust-xr-molecules"
-version = "0.3.6"
+version = "0.3.7"
 edition = "2021"
 
 authors = ["Nova King <technobaboo@proton.me>"]
@@ -15,7 +15,7 @@ glam = { version = "0.22.0", features = ["mint"] }
 lazy_static = "1.4.0"
 mint = "0.5.9"
 serde = { version = "1.0.147", features = ["derive"] }
-stardust-xr-fusion = "0.20.0"
+stardust-xr-fusion = "0.20.1"
 xkbcommon = { version = "0.5.0", default-features = false, features = []}
 
 [dev-dependencies]
