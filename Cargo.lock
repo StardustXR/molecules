@@ -10,9 +10,9 @@ checksum = "fe438c63458706e03479442743baae6c88256498e6431708f6dfc520a26515d3"
 
 [[package]]
 name = "aho-corasick"
-version = "0.7.19"
+version = "0.7.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4f55bd91a0978cbfd91c457a164bab8b4001c833b7f323132c0a4e1922dd44e"
+checksum = "cc936419f96fa211c1b9166887b38e5e40b19958e5b895be7c1f93adec7071ac"
 dependencies = [
  "memchr",
 ]
@@ -751,9 +751,9 @@ dependencies = [
 
 [[package]]
 name = "stardust-xr-fusion"
-version = "0.21.0"
+version = "0.21.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58c5e484e58ab9ddc6cf88d8d33538700a5ae2de00c30b20a67091a4f7f10579"
+checksum = "cd63282fffe75c9523a440a89fb0ad6f2ff87f37b286fd6b6193b3a64f9e4646"
 dependencies = [
  "anyhow",
  "buildstructor",
@@ -775,7 +775,7 @@ dependencies = [
 
 [[package]]
 name = "stardust-xr-molecules"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "color-rs",
@@ -784,6 +784,7 @@ dependencies = [
  "lazy_static",
  "manifest-dir-macros",
  "mint",
+ "rustc-hash",
  "serde",
  "stardust-xr-fusion",
  "tokio",

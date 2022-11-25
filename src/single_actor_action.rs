@@ -1,3 +1,4 @@
+use rustc_hash::FxHashSet;
 use stardust_xr_fusion::input::{
 	action::{ActiveCondition, BaseInputAction, InputAction, InputActionState},
 	InputData,
@@ -46,10 +47,16 @@ impl<S: InputActionState> SingleActorAction<S> {
 			}
 		}
 		if self.change_actor || self.actor.is_none() {
+			let condition_acting = condition_action
+				.base()
+				.actively_acting
+				.difference(&condition_action.base().started_acting)
+				.cloned()
+				.collect::<FxHashSet<_>>();
 			let started_acting = self
 				.base_action
 				.started_acting
-				.intersection(&condition_action.base().actively_acting)
+				.intersection(&condition_acting)
 				.next();
 			if let Some(started_acting) = started_acting {
 				self.actor = Some(started_acting.clone());
@@ -98,7 +105,10 @@ impl<S: InputActionState> SingleActorAction<S> {
 	}
 }
 impl<S: InputActionState> InputAction<S> for SingleActorAction<S> {
-	fn base(&mut self) -> &mut BaseInputAction<S> {
+	fn base(&self) -> &BaseInputAction<S> {
+		&self.base_action
+	}
+	fn base_mut(&mut self) -> &mut BaseInputAction<S> {
 		&mut self.base_action
 	}
 }

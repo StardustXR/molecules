@@ -52,7 +52,7 @@ impl Grabbable {
 			.build()?;
 		let content_parent = Spatial::builder()
 			.spatial_parent(&input_handler.node())
-			.zoneable(false)
+			.zoneable(true)
 			.build()?;
 
 		Ok(Grabbable {
@@ -111,6 +111,7 @@ impl Grabbable {
 			}
 		}
 		if self.grab_action.actor_started() {
+			self.content_parent.set_zoneable(false).unwrap();
 			self.content_parent
 				.set_spatial_parent_in_place(&self.root)
 				.unwrap();
@@ -119,6 +120,7 @@ impl Grabbable {
 			self.content_parent
 				.set_spatial_parent_in_place(self.input_handler.node())
 				.unwrap();
+			self.content_parent.set_zoneable(true).unwrap();
 		}
 
 		self.min_distance = self
