@@ -751,9 +751,9 @@ dependencies = [
 
 [[package]]
 name = "stardust-xr-fusion"
-version = "0.21.2"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd63282fffe75c9523a440a89fb0ad6f2ff87f37b286fd6b6193b3a64f9e4646"
+checksum = "ce1305463319add3ce6f9bd2864d79a3a836c752929f052743b8a1e90f3d62d8"
 dependencies = [
  "anyhow",
  "buildstructor",
@@ -775,7 +775,7 @@ dependencies = [
 
 [[package]]
 name = "stardust-xr-molecules"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "color-rs",

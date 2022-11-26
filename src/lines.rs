@@ -1,10 +1,10 @@
-use color::{Color, Rgba, ToRgba};
+use color::{Color, Rgba};
 use glam::Vec3;
 use mint::Vector3;
 use stardust_xr_fusion::drawable::LinePoint;
 use std::f32::consts::TAU;
 
-pub fn square(width: f32, height: f32, thickness: f32, color: Rgba<u8>) -> Vec<LinePoint> {
+pub fn square(width: f32, height: f32, thickness: f32, color: Rgba<f32>) -> Vec<LinePoint> {
 	let half_width = width * 0.5;
 	let half_height = height * 0.5;
 
@@ -48,7 +48,7 @@ pub fn square(width: f32, height: f32, thickness: f32, color: Rgba<u8>) -> Vec<L
 	]
 }
 
-pub fn circle(segments: usize, radius: f32, thickness: f32, color: Rgba<u8>) -> Vec<LinePoint> {
+pub fn circle(segments: usize, radius: f32, thickness: f32, color: Rgba<f32>) -> Vec<LinePoint> {
 	arc(segments, TAU, radius, thickness, color)
 }
 
@@ -57,7 +57,7 @@ pub fn arc(
 	angle: f32,
 	radius: f32,
 	thickness: f32,
-	color: Rgba<u8>,
+	color: Rgba<f32>,
 ) -> Vec<LinePoint> {
 	(0..segments)
 		.map(|s| (s as f32) / (segments as f32) * angle)
@@ -118,9 +118,7 @@ pub fn trace(t: f32, mut points: Vec<LinePoint>, cyclic: bool) -> Vec<LinePoint>
 	let segment_t = (t - segment_start_t) / (segment_end_t - segment_start_t);
 	last.color = segment_start_point
 		.color
-		.to_rgba::<f32>()
-		.mix(segment_end_point.color.to_rgba::<f32>(), segment_t)
-		.to_rgba::<u8>();
+		.mix(segment_end_point.color, segment_t);
 	last.thickness = (segment_start_point.thickness * segment_t)
 		+ (segment_end_point.thickness * (1.0 - segment_t));
 	last.point = Vector3::from([
