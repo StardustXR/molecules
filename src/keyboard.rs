@@ -12,7 +12,7 @@ use xkbcommon::xkb::{
 };
 
 lazy_static::lazy_static! {
-	static ref KEYBOARD_MASK: Vec<u8> = {
+	pub static ref KEYBOARD_MASK: Vec<u8> = {
 		let mut fbb = flexbuffers::Builder::default();
 		let mut map = fbb.start_map();
 		map.push("keyboard", "xkbv1");
