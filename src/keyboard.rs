@@ -64,32 +64,29 @@ impl KeyboardEvent {
 		}
 	}
 
-	pub fn update_xkb_state(&self, receiver_key_state: State) -> State {
-		let mut state = self
-			.keymap
-			.as_ref()
-			.and_then(|k| {
-				let ctx = Context::new(CONTEXT_NO_FLAGS);
-				let keymap = Keymap::new_from_string(
-					&ctx,
-					k.clone(),
-					KEYMAP_FORMAT_TEXT_V1,
-					KEYMAP_COMPILE_NO_FLAGS,
-				)?;
-				Some(State::new(&keymap))
-			})
-			.unwrap_or(receiver_key_state);
+	pub fn update_xkb_state(&self, receiver_key_state: &mut State) {
+		if let Some(state) = self.keymap.as_ref().and_then(|k| {
+			let ctx = Context::new(CONTEXT_NO_FLAGS);
+			let keymap = Keymap::new_from_string(
+				&ctx,
+				k.clone(),
+				KEYMAP_FORMAT_TEXT_V1,
+				KEYMAP_COMPILE_NO_FLAGS,
+			)?;
+			Some(State::new(&keymap))
+		}) {
+			*receiver_key_state = state;
+		};
 		if let Some(keys_up) = &self.keys_up {
 			for key_up in keys_up {
-				state.update_key(*key_up, KeyDirection::Up);
+				receiver_key_state.update_key(*key_up, KeyDirection::Up);
 			}
 		}
 		if let Some(keys_down) = &self.keys_down {
 			for key_down in keys_down {
-				state.update_key(*key_down, KeyDirection::Down);
+				receiver_key_state.update_key(*key_down, KeyDirection::Down);
 			}
 		}
-		state
 	}
 
 	pub fn send_to_panel(&self, panel: &PanelItem) -> Result<(), NodeError> {
@@ -120,89 +117,105 @@ impl KeyboardEvent {
 	}
 }
 
-// #[test]
-// fn keyboard_events() {
-// 	let runtime = tokio::runtime::Builder::new_current_thread()
-// 		.build()
-// 		.unwrap();
-// 	runtime.block_on(async move {
-// 		let (client, event_loop) = stardust_xr_fusion::client::Client::connect_with_async_loop()
-// 			.await
-// 			.unwrap();
-// 		use stardust_xr_fusion::node::NodeType;
+#[tokio::test]
+async fn keyboard_events() {
+	let (client, event_loop) = stardust_xr_fusion::client::Client::connect_with_async_loop()
+		.await
+		.unwrap();
+	use stardust_xr_fusion::node::NodeType;
 
-// 		struct PulseReceiverTest(std::sync::Arc<stardust_xr_fusion::client::Client>);
-// 		impl stardust_xr_fusion::data::PulseReceiverHandler for PulseReceiverTest {
-// 			fn data(
-// 				&mut self,
-// 				uid: &str,
-// 				data: &[u8],
-// 				_data_reader: flexbuffers::MapReader<&[u8]>,
-// 			) {
-// 				println!(
-// 					"Pulse sender {} sent {}",
-// 					uid,
-// 					flexbuffers::Reader::get_root(data).unwrap()
-// 				);
-// 				self.0.stop_loop();
-// 			}
-// 		}
-// 		struct PulseSenderTest {
-// 			data: Vec<u8>,
-// 			node: stardust_xr_fusion::WeakNodeRef<PulseSender>,
-// 		}
-// 		impl stardust_xr_fusion::data::PulseSenderHandler for PulseSenderTest {
-// 			fn new_receiver(
-// 				&mut self,
-// 				receiver: &PulseReceiver,
-// 				field: &stardust_xr_fusion::fields::UnknownField,
-// 				info: stardust_xr_fusion::data::NewReceiverInfo,
-// 			) {
-// 				println!(
-// 					"New pulse receiver {:?} with field {:?} and info {:?}",
-// 					receiver.node().get_path(),
-// 					field.node().get_path(),
-// 					info
-// 				);
-// 				self.node
-// 					.with_node(|sender| sender.send_data(receiver, &self.data));
-// 			}
-// 			fn drop_receiver(&mut self, uid: &str) {
-// 				println!("Pulse receiver {} dropped", uid);
-// 			}
-// 		}
+	struct PulseReceiverTest {
+		client: std::sync::Arc<stardust_xr_fusion::client::Client>,
+		state: xkb::State,
+	}
+	unsafe impl Send for PulseReceiverTest {}
+	unsafe impl Sync for PulseReceiverTest {}
+	impl stardust_xr_fusion::data::PulseReceiverHandler for PulseReceiverTest {
+		fn data(&mut self, uid: &str, data: &[u8], _data_reader: flexbuffers::MapReader<&[u8]>) {
+			let keyboard_event = KeyboardEvent::from_pulse_data(data).unwrap();
+			println!("Pulse sender {} sent {:#?}", uid, keyboard_event);
+			keyboard_event.update_xkb_state(&mut self.state);
+			self.client.stop_loop();
+		}
+	}
+	struct PulseSenderTest {
+		data: Vec<u8>,
+		node: stardust_xr_fusion::WeakNodeRef<PulseSender>,
+	}
+	impl stardust_xr_fusion::data::PulseSenderHandler for PulseSenderTest {
+		fn new_receiver(
+			&mut self,
+			receiver: &PulseReceiver,
+			field: &stardust_xr_fusion::fields::UnknownField,
+			info: stardust_xr_fusion::data::NewReceiverInfo,
+		) {
+			println!(
+				"New pulse receiver {:?} with field {:?} and info {:?}",
+				receiver.node().get_path(),
+				field.node().get_path(),
+				info
+			);
+			self.node
+				.with_node(|sender| sender.send_data(receiver, &self.data));
+		}
+		fn drop_receiver(&mut self, uid: &str) {
+			println!("Pulse receiver {} dropped", uid);
+		}
+	}
 
-// 		let field = stardust_xr_fusion::fields::SphereField::builder()
-// 			.spatial_parent(client.get_root())
-// 			.radius(0.1)
-// 			.build()
-// 			.unwrap();
+	let field = stardust_xr_fusion::fields::SphereField::builder()
+		.spatial_parent(client.get_root())
+		.radius(0.1)
+		.build()
+		.unwrap();
 
-// 		let mut mask = flexbuffers::Builder::default();
-// 		let mut map = mask.start_map();
-// 		map.push("test", true);
-// 		map.end_map();
-// 		let _pulse_sender = PulseSender::create(
-// 			client.get_root(),
-// 			None,
-// 			None,
-// 			mask.view().to_vec(),
-// 			|node, _| PulseSenderTest {
-// 				data: mask.view().to_vec(),
-// 				node,
-// 			},
-// 		)
-// 		.unwrap();
-// 		let _pulse_receiver = PulseReceiver::create(
-// 			client.get_root(),
-// 			None,
-// 			None,
-// 			&field,
-// 			mask.take_buffer(),
-// 			|_, _| PulseReceiverTest(client.clone()),
-// 		)
-// 		.unwrap();
+	let keymap = xkb::Keymap::new_from_names(
+		&Context::new(0),
+		"",
+		"",
+		"",
+		"",
+		None,
+		xkb::ffi::XKB_KEYMAP_COMPILE_NO_FLAGS,
+	)
+	.unwrap();
+	let mut keyboard_event_serializer = flexbuffers::FlexbufferSerializer::new();
+	let keyboard_event = KeyboardEvent {
+		keyboard: "xkbv1".to_string(),
+		keymap: Some(keymap.get_as_string(xkb::ffi::XKB_KEYMAP_FORMAT_TEXT_V1)),
+		keys_up: None,
+		keys_down: Some(vec![1]),
+	};
+	keyboard_event
+		.serialize(&mut keyboard_event_serializer)
+		.unwrap();
+	let _pulse_sender = PulseSender::create(
+		client.get_root(),
+		None,
+		None,
+		KEYBOARD_MASK.clone(),
+		|node, _| PulseSenderTest {
+			data: keyboard_event_serializer.take_buffer(),
+			node,
+		},
+	)
+	.unwrap();
+	let _pulse_receiver = PulseReceiver::create(
+		client.get_root(),
+		None,
+		None,
+		&field,
+		KEYBOARD_MASK.clone(),
+		|_, _| PulseReceiverTest {
+			client: client.clone(),
+			state: State::new(&keymap),
+		},
+	)
+	.unwrap();
 
-// 		event_loop.await.unwrap();
-// 	});
-// }
+	tokio::select! {
+		_ = tokio::time::sleep(core::time::Duration::from_secs(60)) => Err(anyhow::anyhow!("Timed Out")),
+		_ = event_loop => Ok(()),
+	}
+	.unwrap();
+}
