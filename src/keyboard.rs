@@ -214,8 +214,7 @@ async fn keyboard_events() {
 	.unwrap();
 
 	tokio::select! {
-		_ = tokio::time::sleep(core::time::Duration::from_secs(60)) => Err(anyhow::anyhow!("Timed Out")),
-		_ = event_loop => Ok(()),
+		_ = tokio::time::sleep(core::time::Duration::from_secs(60)) => panic!("Timed Out"),
+		e = event_loop => e.unwrap().unwrap(),
 	}
-	.unwrap();
 }
