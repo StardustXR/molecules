@@ -30,7 +30,7 @@ pub struct KeyboardEvent {
 }
 impl KeyboardEvent {
 	pub fn new(
-		keymap: Option<Keymap>,
+		keymap: Option<&Keymap>,
 		keys_up: Option<Vec<u32>>,
 		keys_down: Option<Vec<u32>>,
 	) -> Self {
@@ -125,7 +125,7 @@ async fn keyboard_events() {
 	use stardust_xr_fusion::node::NodeType;
 
 	struct PulseReceiverTest {
-		client: std::sync::Arc<stardust_xr_fusion::client::Client>,
+		_client: std::sync::Arc<stardust_xr_fusion::client::Client>,
 		state: xkb::State,
 	}
 	unsafe impl Send for PulseReceiverTest {}
@@ -135,7 +135,7 @@ async fn keyboard_events() {
 			let keyboard_event = KeyboardEvent::from_pulse_data(data).unwrap();
 			println!("Pulse sender {} sent {:#?}", uid, keyboard_event);
 			keyboard_event.update_xkb_state(&mut self.state);
-			self.client.stop_loop();
+			// self.client.stop_loop();
 		}
 	}
 	struct PulseSenderTest {
@@ -207,7 +207,7 @@ async fn keyboard_events() {
 		&field,
 		KEYBOARD_MASK.clone(),
 		|_, _| PulseReceiverTest {
-			client: client.clone(),
+			_client: client.clone(),
 			state: State::new(&keymap),
 		},
 	)
