@@ -73,8 +73,8 @@ impl Grabbable {
 		]);
 		self.grab_action.update(&mut self.condition_action);
 
-		if self.grab_action.actor_acting() {
-			match &self.grab_action.actor().unwrap().input {
+		if let Some(actor) = self.grab_action.actor() {
+			match &actor.input {
 				InputDataType::Hand(h) => {
 					let thumb_tip_pos: Vec3 = h.thumb.tip.position.into();
 					let index_tip_pos: Vec3 = h.index.tip.position.into();
