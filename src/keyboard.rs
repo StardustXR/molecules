@@ -1,11 +1,10 @@
-pub use xkbcommon::xkb;
-
 use serde::{Deserialize, Serialize};
 use stardust_xr_fusion::{
 	data::{PulseReceiver, PulseSender},
 	items::panel::PanelItem,
 	node::NodeError,
 };
+pub use xkbcommon::xkb;
 use xkbcommon::xkb::{
 	Context, KeyDirection, Keymap, State, CONTEXT_NO_FLAGS, KEYMAP_COMPILE_NO_FLAGS,
 	KEYMAP_FORMAT_TEXT_V1,
@@ -123,6 +122,7 @@ async fn keyboard_events() {
 		.await
 		.unwrap();
 	use stardust_xr_fusion::node::NodeType;
+	use std::sync::Arc;
 
 	struct PulseReceiverTest {
 		_client: std::sync::Arc<stardust_xr_fusion::client::Client>,
@@ -140,7 +140,7 @@ async fn keyboard_events() {
 	}
 	struct PulseSenderTest {
 		data: Vec<u8>,
-		node: stardust_xr_fusion::WeakNodeRef<PulseSender>,
+		node: Arc<PulseSender>,
 	}
 	impl stardust_xr_fusion::data::PulseSenderHandler for PulseSenderTest {
 		fn new_receiver(
@@ -155,8 +155,7 @@ async fn keyboard_events() {
 				field.node().get_path(),
 				info
 			);
-			self.node
-				.with_node(|sender| sender.send_data(receiver, &self.data));
+			self.node.send_data(receiver, &self.data).unwrap();
 		}
 		fn drop_receiver(&mut self, uid: &str) {
 			println!("Pulse receiver {} dropped", uid);
@@ -194,9 +193,9 @@ async fn keyboard_events() {
 		None,
 		None,
 		KEYBOARD_MASK.clone(),
-		|node, _| PulseSenderTest {
+		|node| PulseSenderTest {
 			data: keyboard_event_serializer.take_buffer(),
-			node,
+			node: node.clone(),
 		},
 	)
 	.unwrap();
@@ -206,7 +205,7 @@ async fn keyboard_events() {
 		None,
 		&field,
 		KEYBOARD_MASK.clone(),
-		|_, _| PulseReceiverTest {
+		|_| PulseReceiverTest {
 			_client: client.clone(),
 			state: State::new(&keymap),
 		},

@@ -39,13 +39,7 @@ impl Grabbable {
 			false,
 		);
 		let input_handler =
-			InputHandler::create(
-				parent,
-				None,
-				None,
-				field,
-				|_, _| InputActionHandler::new(()),
-			)?;
+			InputHandler::create(parent, None, None, field, |_| InputActionHandler::new(()))?;
 		let root = Spatial::builder()
 			.spatial_parent(input_handler.node())
 			.zoneable(false)
