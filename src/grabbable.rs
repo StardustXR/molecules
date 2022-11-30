@@ -39,7 +39,7 @@ impl Grabbable {
 			false,
 		);
 		let input_handler =
-			InputHandler::create(parent, None, None, field, |_| InputActionHandler::new(()))?;
+			InputHandler::create(parent, None, None, field)?.wrap(InputActionHandler::new(()))?;
 		let root = Spatial::builder()
 			.spatial_parent(input_handler.node())
 			.zoneable(false)
@@ -60,7 +60,7 @@ impl Grabbable {
 		})
 	}
 	pub fn update(&mut self) {
-		self.input_handler.lock_inner().update_actions([
+		self.input_handler.lock_wrapped().update_actions([
 			self.global_action.type_erase(),
 			self.condition_action.type_erase(),
 			self.grab_action.type_erase(),

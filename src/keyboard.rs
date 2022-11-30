@@ -122,7 +122,6 @@ async fn keyboard_events() {
 		.await
 		.unwrap();
 	use stardust_xr_fusion::node::NodeType;
-	use std::sync::Arc;
 
 	struct PulseReceiverTest {
 		_client: std::sync::Arc<stardust_xr_fusion::client::Client>,
@@ -140,14 +139,14 @@ async fn keyboard_events() {
 	}
 	struct PulseSenderTest {
 		data: Vec<u8>,
-		node: Arc<PulseSender>,
+		node: PulseSender,
 	}
 	impl stardust_xr_fusion::data::PulseSenderHandler for PulseSenderTest {
 		fn new_receiver(
 			&mut self,
-			receiver: &PulseReceiver,
-			field: &stardust_xr_fusion::fields::UnknownField,
 			info: stardust_xr_fusion::data::NewReceiverInfo,
+			receiver: PulseReceiver,
+			field: stardust_xr_fusion::fields::UnknownField,
 		) {
 			println!(
 				"New pulse receiver {:?} with field {:?} and info {:?}",
@@ -155,7 +154,7 @@ async fn keyboard_events() {
 				field.node().get_path(),
 				info
 			);
-			self.node.send_data(receiver, &self.data).unwrap();
+			self.node.send_data(&receiver, &self.data).unwrap();
 		}
 		fn drop_receiver(&mut self, uid: &str) {
 			println!("Pulse receiver {} dropped", uid);
@@ -188,29 +187,20 @@ async fn keyboard_events() {
 	keyboard_event
 		.serialize(&mut keyboard_event_serializer)
 		.unwrap();
-	let _pulse_sender = PulseSender::create(
-		client.get_root(),
-		None,
-		None,
-		KEYBOARD_MASK.clone(),
-		|node| PulseSenderTest {
-			data: keyboard_event_serializer.take_buffer(),
-			node: node.clone(),
-		},
-	)
-	.unwrap();
-	let _pulse_receiver = PulseReceiver::create(
-		client.get_root(),
-		None,
-		None,
-		&field,
-		KEYBOARD_MASK.clone(),
-		|_| PulseReceiverTest {
-			_client: client.clone(),
-			state: State::new(&keymap),
-		},
-	)
-	.unwrap();
+	let pulse_sender =
+		PulseSender::create(client.get_root(), None, None, KEYBOARD_MASK.clone()).unwrap();
+	let pulse_sender_test = PulseSenderTest {
+		data: keyboard_event_serializer.take_buffer(),
+		node: pulse_sender.alias(),
+	};
+	let _pulse_sender = pulse_sender.wrap(pulse_sender_test).unwrap();
+	let _pulse_receiver =
+		PulseReceiver::create(client.get_root(), None, None, &field, KEYBOARD_MASK.clone())
+			.unwrap()
+			.wrap(PulseReceiverTest {
+				_client: client.clone(),
+				state: State::new(&keymap),
+			});
 
 	tokio::select! {
 		_ = tokio::time::sleep(core::time::Duration::from_secs(60)) => panic!("Timed Out"),
