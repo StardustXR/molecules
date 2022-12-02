@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use color_eyre::eyre::Result;
 use glam::vec3;
 use lazy_static::lazy_static;
 use manifest_dir_macros::directory_relative_path;
@@ -18,16 +19,18 @@ lazy_static! {
 }
 
 #[tokio::main(flavor = "current_thread")]
-async fn main() {
-	let (client, event_loop) = Client::connect_with_async_loop().await.unwrap();
+async fn main() -> Result<()> {
+	color_eyre::install()?;
+	let (client, event_loop) = Client::connect_with_async_loop().await?;
 	client.set_base_prefixes(&[directory_relative_path!("res")]);
 
-	let _wrapped_root = client.wrap_root(GrabbableDemo::new(&client).unwrap());
+	let _wrapped_root = client.wrap_root(GrabbableDemo::new(&client)?);
 
 	tokio::select! {
 		_ = tokio::signal::ctrl_c() => (),
-		e = event_loop => e.unwrap().unwrap(),
+		e = event_loop => e??,
 	}
+	Ok(())
 }
 
 struct GrabbableDemo {
