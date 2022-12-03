@@ -18,12 +18,12 @@ lazy_static::lazy_static! {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MouseEvent {
-	mouse: String,
-	delta: Option<Vector2<f32>>,
-	scroll_distance: Option<Vector2<f32>>,
-	scroll_steps: Option<Vector2<f32>>,
-	buttons_up: Option<Vec<u32>>,
-	buttons_down: Option<Vec<u32>>,
+	pub mouse: String,
+	pub delta: Option<Vector2<f32>>,
+	pub scroll_distance: Option<Vector2<f32>>,
+	pub scroll_steps: Option<Vector2<f32>>,
+	pub buttons_up: Option<Vec<u32>>,
+	pub buttons_down: Option<Vec<u32>>,
 }
 impl MouseEvent {
 	pub fn new(

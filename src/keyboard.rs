@@ -22,10 +22,10 @@ lazy_static::lazy_static! {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct KeyboardEvent {
-	keyboard: String,
-	keymap: Option<String>,
-	keys_up: Option<Vec<u32>>,
-	keys_down: Option<Vec<u32>>,
+	pub keyboard: String,
+	pub keymap: Option<String>,
+	pub keys_up: Option<Vec<u32>>,
+	pub keys_down: Option<Vec<u32>>,
 }
 impl KeyboardEvent {
 	pub fn new(
