@@ -45,6 +45,13 @@ impl KeyboardEvent {
 		flexbuffers::Reader::get_root(data)
 			.ok()
 			.and_then(|r| KeyboardEvent::deserialize(r).ok())
+			.and_then(|ev| {
+				if &ev.keyboard == "xkbv1" {
+					Some(ev)
+				} else {
+					None
+				}
+			})
 	}
 
 	pub fn serialize_pulse_data(&self) -> Vec<u8> {
