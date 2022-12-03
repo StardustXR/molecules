@@ -28,12 +28,8 @@ impl Grabbable {
 			true,
 			|data, _| {
 				data.datamap.with_data(|datamap| match &data.input {
-					InputDataType::Hand(h) => {
-						Vec3::from(h.thumb.tip.position).distance(Vec3::from(h.index.tip.position))
-							< 0.01
-					}
-					InputDataType::Pointer(_) => datamap.idx("grab").as_bool(),
-					InputDataType::Tip(_) => datamap.idx("grab").as_f32() > 0.90,
+					InputDataType::Hand(_) => datamap.idx("pinch_strength").as_f32() > 0.90,
+					_ => datamap.idx("grab").as_f32() > 0.90,
 				})
 			},
 			false,
