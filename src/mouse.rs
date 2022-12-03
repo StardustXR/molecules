@@ -71,7 +71,14 @@ impl MouseEvent {
 		}
 	}
 
+	/// Does not handle delta
 	pub fn send_to_panel(&self, panel: &PanelItem) -> Result<(), NodeError> {
+		if let Some(scroll_distance) = &self.scroll_distance {
+			panel.pointer_scroll(*scroll_distance, Vector2::from([0.0; 2]))?;
+		}
+		if let Some(scroll_steps) = &self.scroll_steps {
+			panel.pointer_scroll(Vector2::from([0.0; 2]), *scroll_steps)?;
+		}
 		if let Some(buttons_up) = &self.buttons_up {
 			for button in buttons_up {
 				panel.pointer_button(*button, 0)?;
