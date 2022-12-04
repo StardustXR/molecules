@@ -44,7 +44,7 @@ impl GrabbableDemo {
 			.spatial_parent(client.get_root())
 			.radius(0.1)
 			.build()?;
-		let grabbable = Grabbable::new(client.get_root(), &field)?;
+		let grabbable = Grabbable::new(client.get_root(), &field, 0.05)?;
 		let model = Model::builder()
 			.spatial_parent(grabbable.content_parent())
 			.resource(&*ICON_RESOURCE)

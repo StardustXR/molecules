@@ -11,19 +11,30 @@ use stardust_xr_fusion::{
 	HandlerWrapper,
 };
 
+#[derive(Debug, Clone)]
+pub struct GrabData {
+	max_distance: f32,
+}
+
 pub struct Grabbable {
 	root: Spatial,
 	content_parent: Spatial,
-	global_action: BaseInputAction<()>,
-	condition_action: BaseInputAction<()>,
-	grab_action: SingleActorAction<()>,
-	input_handler: HandlerWrapper<InputHandler, InputActionHandler<()>>,
+	global_action: BaseInputAction<GrabData>,
+	condition_action: BaseInputAction<GrabData>,
+	grab_action: SingleActorAction<GrabData>,
+	input_handler: HandlerWrapper<InputHandler, InputActionHandler<GrabData>>,
 	min_distance: f32,
 }
 impl Grabbable {
-	pub fn new<Fi: Field + ClientOwned>(parent: &Spatial, field: &Fi) -> Result<Self, NodeError> {
+	pub fn new<Fi: Field + ClientOwned>(
+		parent: &Spatial,
+		field: &Fi,
+		max_distance: f32,
+	) -> Result<Self, NodeError> {
 		let global_action = BaseInputAction::new(false, |_, _| true);
-		let condition_action = BaseInputAction::new(false, |data, _| data.distance < 0.05);
+		let condition_action = BaseInputAction::new(false, |input, data: &GrabData| {
+			input.distance < data.max_distance
+		});
 		let grab_action = SingleActorAction::new(
 			true,
 			|data, _| {
@@ -34,8 +45,8 @@ impl Grabbable {
 			},
 			false,
 		);
-		let input_handler =
-			InputHandler::create(parent, None, None, field)?.wrap(InputActionHandler::new(()))?;
+		let input_handler = InputHandler::create(parent, None, None, field)?
+			.wrap(InputActionHandler::new(GrabData { max_distance }))?;
 		let root = Spatial::builder()
 			.spatial_parent(input_handler.node())
 			.zoneable(false)
@@ -121,7 +132,7 @@ impl Grabbable {
 			.reduce(|a, b| a.min(b))
 			.unwrap_or(f32::MAX);
 	}
-	pub fn grab_action(&self) -> &SingleActorAction<()> {
+	pub fn grab_action(&self) -> &SingleActorAction<GrabData> {
 		&self.grab_action
 	}
 	pub fn content_parent(&self) -> &Spatial {
