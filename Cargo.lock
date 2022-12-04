@@ -870,7 +870,7 @@ dependencies = [
 
 [[package]]
 name = "stardust-xr-molecules"
-version = "0.7.3"
+version = "0.7.4"
 dependencies = [
  "color-eyre",
  "color-rs",
