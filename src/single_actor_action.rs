@@ -46,24 +46,21 @@ impl<S: InputActionState> SingleActorAction<S> {
 				self.base_action.capture_on_trigger = false;
 			}
 		}
-		if self.change_actor || self.actor.is_none() {
-			let condition_acting = condition_action
-				.base()
-				.actively_acting
-				.difference(&condition_action.base().started_acting)
-				.cloned()
-				.collect::<FxHashSet<_>>();
-			let started_acting = self
-				.base_action
-				.started_acting
-				.intersection(&condition_acting)
-				.next();
-			if let Some(started_acting) = started_acting {
-				self.actor = Some(started_acting.clone());
-				self.base_action.capture_on_trigger = self.capture_on_trigger;
-			}
-		}
-		if let Some(actor) = &self.actor {
+		let condition_acting = condition_action
+			.base()
+			.actively_acting
+			.difference(&condition_action.base().started_acting)
+			.cloned()
+			.collect::<FxHashSet<_>>();
+		let started_acting = self
+			.base_action
+			.started_acting
+			.intersection(&condition_acting)
+			.next();
+		if let Some(started_acting) = started_acting {
+			self.actor = Some(started_acting.clone());
+			self.base_action.capture_on_trigger = self.capture_on_trigger;
+		} else if let Some(actor) = &self.actor {
 			if let Some(actor) = self.base_action.actively_acting.get(actor) {
 				self.actor = Some(actor.clone());
 			}
