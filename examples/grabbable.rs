@@ -14,8 +14,7 @@ use stardust_xr_fusion::{
 use stardust_xr_molecules::Grabbable;
 
 lazy_static! {
-	static ref ICON_RESOURCE: NamespacedResource =
-		NamespacedResource::new("molecules", "urchin.glb");
+	static ref ICON_RESOURCE: NamespacedResource = NamespacedResource::new("molecules", "urchin");
 }
 
 #[tokio::main(flavor = "current_thread")]
