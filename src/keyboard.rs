@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use stardust_xr_fusion::{
 	data::{PulseReceiver, PulseSender},
-	items::panel::PanelItem,
+	items::PanelItem,
 	node::NodeError,
 };
 pub use xkbcommon::xkb;
@@ -128,7 +128,7 @@ async fn keyboard_events() {
 	let (client, event_loop) = stardust_xr_fusion::client::Client::connect_with_async_loop()
 		.await
 		.unwrap();
-	use stardust_xr_fusion::node::NodeType;
+	use stardust_xr_fusion::{core::values::Transform, node::NodeType};
 
 	struct PulseReceiverTest {
 		_client: std::sync::Arc<stardust_xr_fusion::client::Client>,
@@ -168,11 +168,12 @@ async fn keyboard_events() {
 		}
 	}
 
-	let field = stardust_xr_fusion::fields::SphereField::builder()
-		.spatial_parent(client.get_root())
-		.radius(0.1)
-		.build()
-		.unwrap();
+	let field = stardust_xr_fusion::fields::SphereField::create(
+		client.get_root(),
+		mint::Vector3::from([0.0; 3]),
+		0.1,
+	)
+	.unwrap();
 
 	let keymap = xkb::Keymap::new_from_names(
 		&Context::new(0),
@@ -195,19 +196,23 @@ async fn keyboard_events() {
 		.serialize(&mut keyboard_event_serializer)
 		.unwrap();
 	let pulse_sender =
-		PulseSender::create(client.get_root(), None, None, KEYBOARD_MASK.clone()).unwrap();
+		PulseSender::create(client.get_root(), Transform::default(), &KEYBOARD_MASK).unwrap();
 	let pulse_sender_test = PulseSenderTest {
 		data: keyboard_event_serializer.take_buffer(),
 		node: pulse_sender.alias(),
 	};
 	let _pulse_sender = pulse_sender.wrap(pulse_sender_test).unwrap();
-	let _pulse_receiver =
-		PulseReceiver::create(client.get_root(), None, None, &field, KEYBOARD_MASK.clone())
-			.unwrap()
-			.wrap(PulseReceiverTest {
-				_client: client.clone(),
-				state: State::new(&keymap),
-			});
+	let _pulse_receiver = PulseReceiver::create(
+		client.get_root(),
+		Transform::default(),
+		&field,
+		&KEYBOARD_MASK,
+	)
+	.unwrap()
+	.wrap(PulseReceiverTest {
+		_client: client.clone(),
+		state: State::new(&keymap),
+	});
 
 	tokio::select! {
 		_ = tokio::time::sleep(core::time::Duration::from_secs(60)) => panic!("Timed Out"),

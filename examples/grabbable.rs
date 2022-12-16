@@ -1,11 +1,12 @@
 #![allow(dead_code)]
 
 use color_eyre::eyre::Result;
-use glam::vec3;
 use lazy_static::lazy_static;
 use manifest_dir_macros::directory_relative_path;
+use mint::Vector3;
 use stardust_xr_fusion::{
 	client::{Client, LifeCycleHandler},
+	core::values::Transform,
 	drawable::Model,
 	fields::SphereField,
 	node::NodeError,
@@ -39,16 +40,16 @@ struct GrabbableDemo {
 }
 impl GrabbableDemo {
 	fn new(client: &Client) -> Result<Self, NodeError> {
-		let field = SphereField::builder()
-			.spatial_parent(client.get_root())
-			.radius(0.1)
-			.build()?;
+		let field = SphereField::create(client.get_root(), mint::Vector3::from([0.0; 3]), 0.1)?;
 		let grabbable = Grabbable::new(client.get_root(), &field, 0.05)?;
-		let model = Model::builder()
-			.spatial_parent(grabbable.content_parent())
-			.resource(&*ICON_RESOURCE)
-			.scale(vec3(0.1, 0.1, 0.1))
-			.build()?;
+		let model = Model::create(
+			grabbable.content_parent(),
+			Transform {
+				scale: Vector3::from([0.1; 3]),
+				..Default::default()
+			},
+			&*ICON_RESOURCE,
+		)?;
 		field.set_spatial_parent(grabbable.content_parent())?;
 
 		Ok(GrabbableDemo {
