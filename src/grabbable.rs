@@ -7,14 +7,14 @@ use stardust_xr_fusion::{
 		action::{BaseInputAction, InputAction, InputActionHandler},
 		InputDataType, InputHandler,
 	},
-	node::NodeError,
+	node::{NodeError, NodeType},
 	spatial::Spatial,
 	HandlerWrapper,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct GrabData {
-	max_distance: f32,
+	pub max_distance: f32,
 }
 
 pub struct Grabbable {
@@ -28,9 +28,10 @@ pub struct Grabbable {
 }
 impl Grabbable {
 	pub fn new<Fi: Field>(
-		parent: &Spatial,
+		content_space: &Spatial,
+		content_transform: Transform,
 		field: &Fi,
-		max_distance: f32,
+		settings: GrabData,
 	) -> Result<Self, NodeError> {
 		let global_action = BaseInputAction::new(false, |_, _| true);
 		let condition_action = BaseInputAction::new(false, |input, data: &GrabData| {
@@ -46,10 +47,15 @@ impl Grabbable {
 			},
 			false,
 		);
-		let input_handler = InputHandler::create(parent, Transform::default(), field)?
-			.wrap(InputActionHandler::new(GrabData { max_distance }))?;
+		let input_handler = InputHandler::create(
+			content_space.client()?.get_root(),
+			Transform::default(),
+			field,
+		)?
+		.wrap(InputActionHandler::new(settings))?;
 		let root = Spatial::create(input_handler.node(), Transform::default(), false)?;
 		let content_parent = Spatial::create(input_handler.node(), Transform::default(), true)?;
+		content_parent.set_transform(Some(content_space), content_transform)?;
 
 		Ok(Grabbable {
 			root,

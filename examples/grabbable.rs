@@ -12,7 +12,7 @@ use stardust_xr_fusion::{
 	node::NodeError,
 	resource::NamespacedResource,
 };
-use stardust_xr_molecules::Grabbable;
+use stardust_xr_molecules::{GrabData, Grabbable};
 
 lazy_static! {
 	static ref ICON_RESOURCE: NamespacedResource = NamespacedResource::new("molecules", "urchin");
@@ -41,7 +41,12 @@ struct GrabbableDemo {
 impl GrabbableDemo {
 	fn new(client: &Client) -> Result<Self, NodeError> {
 		let field = SphereField::create(client.get_root(), mint::Vector3::from([0.0; 3]), 0.1)?;
-		let grabbable = Grabbable::new(client.get_root(), &field, 0.05)?;
+		let grabbable = Grabbable::new(
+			client.get_root(),
+			Transform::default(),
+			&field,
+			GrabData { max_distance: 0.05 },
+		)?;
 		let model = Model::create(
 			grabbable.content_parent(),
 			Transform {
