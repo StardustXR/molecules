@@ -49,10 +49,7 @@ impl GrabbableDemo {
 		)?;
 		let model = Model::create(
 			grabbable.content_parent(),
-			Transform {
-				scale: Vector3::from([0.1; 3]),
-				..Default::default()
-			},
+			Transform::from_scale(Vector3::from([0.1; 3])),
 			&*ICON_RESOURCE,
 		)?;
 		field.set_spatial_parent(grabbable.content_parent())?;

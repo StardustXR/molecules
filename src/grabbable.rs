@@ -77,23 +77,14 @@ impl Grabbable {
 
 		if let Some(actor) = self.grab_action.actor() {
 			let transform = match &actor.input {
-				InputDataType::Hand(h) => Transform {
-					position: Vec3::from(h.thumb.tip.position)
-						.lerp(Vec3::from(h.index.tip.position), 0.5)
-						.into(),
-					rotation: h.palm.rotation.clone().into(),
-					..Default::default()
-				},
-				InputDataType::Pointer(p) => Transform {
-					position: p.origin,
-					rotation: p.orientation,
-					..Default::default()
-				},
-				InputDataType::Tip(t) => Transform {
-					position: t.origin,
-					rotation: t.orientation,
-					..Default::default()
-				},
+				InputDataType::Hand(h) => Transform::from_position_rotation(
+					Vec3::from(h.thumb.tip.position).lerp(Vec3::from(h.index.tip.position), 0.5),
+					h.palm.rotation,
+				),
+				InputDataType::Pointer(p) => {
+					Transform::from_position_rotation(p.origin, p.orientation)
+				}
+				InputDataType::Tip(t) => Transform::from_position_rotation(t.origin, t.orientation),
 			};
 
 			self.root

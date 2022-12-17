@@ -759,18 +759,18 @@ checksum = "9c8132065adcfd6e02db789d9285a0deb2f3fcb04002865ab67d5fb103533898"
 
 [[package]]
 name = "serde"
-version = "1.0.150"
+version = "1.0.151"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e326c9ec8042f1b5da33252c8a37e9ffbd2c9bef0155215b6e6c80c790e05f91"
+checksum = "97fed41fc1a24994d044e6db6935e69511a1153b52c15eb42493b26fa87feba0"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.150"
+version = "1.0.151"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42a3df25b0713732468deadad63ab9da1f1fd75a48a15024b50363f128db627e"
+checksum = "255abe9a125a985c05190d687b320c12f9b1f0b99445e608c21ba0782c719ad8"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -815,9 +815,9 @@ dependencies = [
 
 [[package]]
 name = "stardust-xr"
-version = "0.9.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80780cd08fefcb6a67da0a92672fdd90f92873311940b5ca1c88b5132eaa70f7"
+checksum = "2dd05e0962751e904acb73a3c96d09311b88658c186f6a15ced1786e059bb3eb"
 dependencies = [
  "chrono",
  "cluFlock",
@@ -835,9 +835,9 @@ dependencies = [
 
 [[package]]
 name = "stardust-xr-fusion"
-version = "0.28.0"
+version = "0.28.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "009583e25bc59823abd97460f5823f4d91eb9b863665d61e3acaa91d404f02d3"
+checksum = "1c12936fdb0f2a15e69e96e89dca15ef5aad5e43046ba58fa4697b562894395f"
 dependencies = [
  "anyhow",
  "buildstructor",
@@ -859,7 +859,7 @@ dependencies = [
 
 [[package]]
 name = "stardust-xr-molecules"
-version = "0.10.0"
+version = "0.10.1"
 dependencies = [
  "color-eyre",
  "color-rs",
