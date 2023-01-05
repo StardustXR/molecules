@@ -1,6 +1,6 @@
 [package]
 name = "stardust-xr-molecules"
-version = "0.11.0"
+version = "0.12.0"
 edition = "2021"
 
 authors = ["Nova King <technobaboo@proton.me>"]
@@ -20,10 +20,13 @@ lazy_static = "1.4.0"
 mint = "0.5.9"
 rustc-hash = "1.1.0"
 serde = { version = "1.0.147", features = ["derive"] }
-stardust-xr-fusion = "0.29.0"
+stardust-xr-fusion = "0.30.0"
 tokio = { version = "1.21.2", features = ["full"] }
 xkbcommon = { version = "0.5.0", default-features = false, features = []}
 
 [dev-dependencies]
 color-eyre = { version = "0.6.2", default-features = false }
 manifest-dir-macros = "0.1.16"
+
+[patch.crates-io]
+stardust-xr-fusion = { path = "../core/fusion" }

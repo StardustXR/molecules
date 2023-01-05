@@ -2,7 +2,7 @@ use mint::Vector2;
 use serde::{Deserialize, Serialize};
 use stardust_xr_fusion::{
 	data::{PulseReceiver, PulseSender},
-	items::PanelItem,
+	items::panel::PanelItem,
 	node::NodeError,
 };
 
