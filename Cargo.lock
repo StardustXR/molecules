@@ -833,7 +833,7 @@ dependencies = [
 
 [[package]]
 name = "stardust-xr-fusion"
-version = "0.30.0"
+version = "0.31.0"
 dependencies = [
  "anyhow",
  "buildstructor",
@@ -855,7 +855,7 @@ dependencies = [
 
 [[package]]
 name = "stardust-xr-molecules"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "color-eyre",
  "color-rs",
