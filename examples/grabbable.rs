@@ -7,15 +7,14 @@ use mint::Vector3;
 use stardust_xr_fusion::{
 	client::{Client, LifeCycleHandler},
 	core::values::Transform,
-	drawable::Model,
+	drawable::{Model, ResourceID},
 	fields::SphereField,
 	node::NodeError,
-	resource::NamespacedResource,
 };
 use stardust_xr_molecules::{GrabData, Grabbable};
 
 lazy_static! {
-	static ref ICON_RESOURCE: NamespacedResource = NamespacedResource::new("molecules", "urchin");
+	static ref ICON_RESOURCE: ResourceID = ResourceID::new_namespaced("molecules", "urchin");
 }
 
 #[tokio::main(flavor = "current_thread")]

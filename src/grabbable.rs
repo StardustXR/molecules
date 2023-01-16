@@ -11,6 +11,7 @@ use stardust_xr_fusion::{
 	spatial::Spatial,
 	HandlerWrapper,
 };
+use tracing::debug;
 
 #[derive(Debug, Clone, Copy)]
 pub struct GrabData {
@@ -87,17 +88,24 @@ impl Grabbable {
 				InputDataType::Tip(t) => Transform::from_position_rotation(t.origin, t.orientation),
 			};
 
+			debug!(?transform, uid = actor.uid, "Currently grabbing");
+
 			self.root
 				.set_transform(Some(self.input_handler.node()), transform)
 				.unwrap();
 		}
 		if self.grab_action.actor_started() {
+			debug!(
+				uid = self.grab_action.actor().as_ref().unwrap().uid,
+				"Started grabbing"
+			);
 			self.content_parent.set_zoneable(false).unwrap();
 			self.content_parent
 				.set_spatial_parent_in_place(&self.root)
 				.unwrap();
 		}
 		if self.grab_action.actor_stopped() {
+			debug!("Stopped grabbing");
 			self.content_parent
 				.set_spatial_parent_in_place(self.input_handler.node())
 				.unwrap();
