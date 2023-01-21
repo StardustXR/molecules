@@ -105,18 +105,17 @@ impl KeyboardEvent {
 				KEYMAP_COMPILE_NO_FLAGS,
 			);
 			if xkb_keymap.is_some() {
-				panel.keyboard_deactivate()?;
-				panel.keyboard_activate(&keymap)?;
+				panel.keyboard_set_keymap(&keymap)?;
 			}
 		}
 		if let Some(keys_up) = &self.keys_up {
 			for key in keys_up {
-				panel.keyboard_key_state(*key, false)?;
+				panel.keyboard_key(*key, false)?;
 			}
 		}
 		if let Some(keys_down) = &self.keys_down {
 			for key in keys_down {
-				panel.keyboard_key_state(*key, true)?;
+				panel.keyboard_key(*key, true)?;
 			}
 		}
 		Ok(())
