@@ -26,6 +26,7 @@ pub struct Grabbable {
 	grab_action: SingleActorAction<GrabData>,
 	input_handler: HandlerWrapper<InputHandler, InputActionHandler<GrabData>>,
 	min_distance: f32,
+	linear_velocity: Option<Vec3>,
 }
 impl Grabbable {
 	pub fn new<Fi: Field>(
@@ -66,6 +67,7 @@ impl Grabbable {
 			grab_action,
 			input_handler,
 			min_distance: f32::MAX,
+			linear_velocity: Some(Vec3::default()),
 		})
 	}
 	pub fn update(&mut self) {
@@ -93,6 +95,15 @@ impl Grabbable {
 			self.root
 				.set_transform(Some(self.input_handler.node()), transform)
 				.unwrap();
+
+			self.linear_velocity = Some(transform.position.unwrap().into());
+		} else if let Some(v) = self.linear_velocity {
+			if v.length() > 0.1 {
+				self.root.set_position(Some(&self.root), v).unwrap();
+				self.linear_velocity = Some(v);
+			} else {
+				self.linear_velocity = None;
+			}
 		}
 		if self.grab_action.actor_started() {
 			debug!(
