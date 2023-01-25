@@ -26,6 +26,7 @@ pub struct Grabbable {
 	grab_action: SingleActorAction<GrabData>,
 	input_handler: HandlerWrapper<InputHandler, InputActionHandler<GrabData>>,
 	min_distance: f32,
+	previous_position: Vec3,
 	linear_velocity: Option<Vec3>,
 }
 impl Grabbable {
@@ -67,7 +68,8 @@ impl Grabbable {
 			grab_action,
 			input_handler,
 			min_distance: f32::MAX,
-			linear_velocity: Some(Vec3::default()),
+			previous_position: Vec3::default(),
+			linear_velocity: None,
 		})
 	}
 	pub fn update(&mut self) {
@@ -96,11 +98,15 @@ impl Grabbable {
 				.set_transform(Some(self.input_handler.node()), transform)
 				.unwrap();
 
-			self.linear_velocity = Some(transform.position.unwrap().into());
+			self.linear_velocity =
+				Some(Vec3::from(transform.position.unwrap()) - self.previous_position);
+			self.previous_position = transform.position.unwrap().into();
 		} else if let Some(v) = self.linear_velocity {
-			if v.length() > 0.1 {
-				self.root.set_position(Some(&self.root), v).unwrap();
-				self.linear_velocity = Some(v);
+			if v.length() > 0.001 {
+				self.linear_velocity = Some(v * 0.01);
+				self.content_parent
+					.set_position(Some(&self.content_parent), v)
+					.unwrap();
 			} else {
 				self.linear_velocity = None;
 			}
@@ -130,6 +136,9 @@ impl Grabbable {
 			.map(|data| data.distance)
 			.reduce(|a, b| a.min(b))
 			.unwrap_or(f32::MAX);
+
+		println!("linear_velocity: {:?}", self.linear_velocity);
+		println!("previous_position: {:?}", self.previous_position);
 	}
 	pub fn grab_action(&self) -> &SingleActorAction<GrabData> {
 		&self.grab_action
