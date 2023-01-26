@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 use manifest_dir_macros::directory_relative_path;
 use mint::Vector3;
 use stardust_xr_fusion::{
-	client::{Client, LifeCycleHandler},
+	client::{Client, FrameInfo, RootHandler},
 	core::values::Transform,
 	drawable::{Model, ResourceID},
 	fields::SphereField,
@@ -23,7 +23,7 @@ async fn main() -> Result<()> {
 	let (client, event_loop) = Client::connect_with_async_loop().await?;
 	client.set_base_prefixes(&[directory_relative_path!("res")]);
 
-	let _wrapped_root = client.wrap_root(GrabbableDemo::new(&client)?);
+	let _wrapped_root = client.wrap_root(GrabbableDemo::new(&client)?)?;
 
 	tokio::select! {
 		_ = tokio::signal::ctrl_c() => (),
@@ -60,8 +60,8 @@ impl GrabbableDemo {
 		})
 	}
 }
-impl LifeCycleHandler for GrabbableDemo {
-	fn logic_step(&mut self, _info: stardust_xr_fusion::client::LogicStepInfo) {
+impl RootHandler for GrabbableDemo {
+	fn frame(&mut self, _info: FrameInfo) {
 		self.grabbable.update();
 	}
 }
