@@ -27,9 +27,10 @@ pub struct Grabbable {
 	input_handler: HandlerWrapper<InputHandler, InputActionHandler<GrabData>>,
 	min_distance: f32,
 	prev_position: Vec3,
-	// prev_rotation: Quat,
+	prev_rotation: Quat,
+	current_rotation: (Vec3, f32),
 	linear_velocity: Option<Vec3>,
-	// angular_velocity: Option<(Vec3, f32)>,
+	angular_velocity: Option<(Vec3, f32)>,
 }
 impl Grabbable {
 	pub fn new<Fi: Field>(
@@ -71,9 +72,10 @@ impl Grabbable {
 			input_handler,
 			min_distance: f32::MAX,
 			prev_position: Vec3::default(),
-			// prev_rotation: Quat::default(),
+			prev_rotation: Quat::default(),
+			current_rotation: (Vec3::default(), 0.),
 			linear_velocity: None,
-			// angular_velocity: None,
+			angular_velocity: None,
 		})
 	}
 	pub fn update(&mut self) {
@@ -104,41 +106,57 @@ impl Grabbable {
 
 			self.linear_velocity =
 				Some(Vec3::from(transform.position.unwrap()) - self.prev_position);
-			// self.angular_velocity = Some(
-			// 	(std::convert::Into::<Quat>::into(transform.rotation.unwrap())
-			// 		* self.prev_rotation.conjugate())
-			// 	.to_axis_angle(),
-			// );
+			self.angular_velocity = Some(
+				(std::convert::Into::<Quat>::into(transform.rotation.unwrap())
+					* self.prev_rotation.conjugate())
+				.to_axis_angle(),
+			);
 
 			self.prev_position = transform.position.unwrap().into();
-		// self.prev_rotation = transform.rotation.unwrap().into();
+			self.prev_rotation = transform.rotation.unwrap().into();
 		} else {
 			if let Some(lv) = self.linear_velocity {
 				if lv.length() > 0.0001 {
 					self.linear_velocity = Some(lv * 0.95);
 
 					self.content_parent
+						.set_rotation(Some(&self.content_parent), self.prev_rotation)
+						.unwrap();
+
+					self.content_parent
 						.set_position(Some(&self.content_parent), lv)
+						.unwrap();
+
+					self.content_parent
+						.set_rotation(
+							Some(&self.content_parent),
+							Quat::from_axis_angle(self.current_rotation.0, self.current_rotation.1),
+						)
 						.unwrap();
 				} else {
 					self.linear_velocity = None;
 				}
 			}
 
-			// if let Some(av) = self.angular_velocity {
-			// 	if av.1 > 0.001 {
-			// 		self.angular_velocity = Some((av.0, av.1 * 0.95));
+			if let Some(av) = self.angular_velocity {
+				if av.1 > 0.001 {
+					self.angular_velocity = Some((av.0, av.1 * 0.95));
 
-			// 		self.content_parent
-			// 			.set_rotation(
-			// 				Some(&self.content_parent),
-			// 				Quat::from_axis_angle(av.0, av.1),
-			// 			)
-			// 			.unwrap();
-			// 	} else {
-			// 		self.angular_velocity = None;
-			// 	}
-			// }
+					self.current_rotation = (
+						av.0,
+						self.current_rotation.1 * self.angular_velocity.unwrap().1,
+					);
+
+					self.content_parent
+						.set_rotation(
+							Some(&self.content_parent),
+							Quat::from_axis_angle(self.current_rotation.0, self.current_rotation.1),
+						)
+						.unwrap();
+				} else {
+					self.angular_velocity = None;
+				}
+			}
 		}
 
 		if self.grab_action.actor_started() {
@@ -168,9 +186,9 @@ impl Grabbable {
 			.unwrap_or(f32::MAX);
 
 		println!("linear_velocity: {:?}", self.linear_velocity);
-		// println!("angular_velocity: {:?}", self.angular_velocity);
+		println!("angular_velocity: {:?}", self.angular_velocity);
 		println!("prev_position: {:?}", self.prev_position);
-		// println!("prev_rotation: {:?}", self.prev_rotation);
+		println!("prev_rotation: {:?}", self.prev_rotation);
 		println!();
 	}
 	pub fn grab_action(&self) -> &SingleActorAction<GrabData> {
