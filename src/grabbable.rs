@@ -181,7 +181,7 @@ impl Grabbable {
 		let Some(velocity) = &mut self.linear_velocity else {return};
 		let delta = info.delta as f32;
 		let linear_drag = self.settings.linear_drag;
-		if velocity.length_squared() < 0.001 {
+		if velocity.length_squared() < 0.0001 {
 			self.linear_velocity.take();
 		} else {
 			*velocity *= (1.0 - linear_drag * delta).clamp(0.0, 1.0);
