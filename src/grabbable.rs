@@ -1,3 +1,5 @@
+use std::f32::consts::TAU;
+
 use crate::single_actor_action::SingleActorAction;
 use glam::{vec3, Quat, Vec3};
 use stardust_xr_fusion::{
@@ -16,7 +18,24 @@ use tracing::debug;
 
 #[derive(Debug, Clone, Copy)]
 pub struct GrabData {
+	/// Max distance that you can be to start grabbing
 	pub max_distance: f32,
+	/// Should the object drift a bit after being let go?
+	pub momentum: bool,
+	/// Linear drag in m/s^2 for momentum
+	pub linear_drag: f32,
+	/// Angular drag in rad/s^2 for momentum
+	pub angular_drag: f32,
+}
+impl Default for GrabData {
+	fn default() -> Self {
+		Self {
+			max_distance: 0.05,
+			momentum: true,
+			linear_drag: 8.0,
+			angular_drag: 15.0,
+		}
+	}
 }
 
 pub struct Grabbable {
@@ -27,6 +46,7 @@ pub struct Grabbable {
 	grab_action: SingleActorAction<GrabData>,
 	input_handler: HandlerWrapper<InputHandler, InputActionHandler<GrabData>>,
 	min_distance: f32,
+	settings: GrabData,
 	prev_pose: (Vec3, Quat),
 	pose: (Vec3, Quat),
 	linear_velocity: Option<Vec3>,
@@ -71,6 +91,7 @@ impl Grabbable {
 			grab_action,
 			input_handler,
 			min_distance: f32::MAX,
+			settings,
 			prev_pose: (vec3(0.0, 0.0, 0.0), Quat::IDENTITY),
 			pose: (vec3(0.0, 0.0, 0.0), Quat::IDENTITY),
 			linear_velocity: None,
@@ -102,15 +123,17 @@ impl Grabbable {
 				)
 				.unwrap();
 
-			self.prev_pose = self.pose;
-			self.pose = (position, rotation);
+			if self.settings.momentum {
+				self.prev_pose = self.pose;
+				self.pose = (position, rotation);
 
-			let delta = info.delta as f32;
-			self.linear_velocity
-				.replace((self.pose.0 - self.prev_pose.0) / delta);
+				let delta = info.delta as f32;
+				let linear_velocity = self.pose.0 - self.prev_pose.0;
+				self.linear_velocity.replace(linear_velocity / delta);
 
-			let (axis, angle) = (self.pose.1 * self.prev_pose.1.inverse()).to_axis_angle();
-			self.angular_velocity = Some((axis, angle / delta));
+				let (axis, angle) = (self.pose.1 * self.prev_pose.1.inverse()).to_axis_angle();
+				self.angular_velocity = Some((axis, angle / delta));
+			}
 		}
 
 		if self.grab_action.actor_started() {
@@ -155,29 +178,26 @@ impl Grabbable {
 		println!();
 	}
 	fn apply_linear_momentum(&mut self, info: &FrameInfo) {
-		let Some(lv) = self.linear_velocity else {return};
-		if lv.length() < 0.0001 {
-			self.linear_velocity.take();
-			return;
-		}
-
+		let Some(velocity) = &mut self.linear_velocity else {return};
 		let delta = info.delta as f32;
-		self.linear_velocity = Some(lv * 0.95);
-		self.pose.0 += self.linear_velocity.unwrap() * delta;
+		let linear_drag = self.settings.linear_drag;
+		if velocity.length_squared() < 0.001 {
+			self.linear_velocity.take();
+		} else {
+			*velocity *= (1.0 - linear_drag * delta).clamp(0.0, 1.0);
+			self.pose.0 += *velocity * delta;
+		}
 	}
 	fn apply_angular_momentum(&mut self, info: &FrameInfo) {
-		let Some(av) = self.angular_velocity else {return};
-		if av.1 < 0.001 {
-			self.angular_velocity.take();
-			return;
-		}
-
+		let Some((axis, angle)) = &mut self.angular_velocity else {return};
 		let delta = info.delta as f32;
-		self.angular_velocity = Some((av.0, av.1 * 0.95));
-		self.pose.1 *= Quat::from_axis_angle(
-			self.angular_velocity.unwrap().0,
-			self.angular_velocity.unwrap().1 * delta,
-		);
+		let angular_drag = self.settings.angular_drag;
+		if *angle < 0.001 {
+			self.angular_velocity.take();
+		} else {
+			*angle *= (1.0 - angular_drag * delta).clamp(0.0, 1.0);
+			self.pose.1 *= Quat::from_axis_angle(*axis, *angle * delta);
+		}
 	}
 
 	pub fn grab_action(&self) -> &SingleActorAction<GrabData> {
