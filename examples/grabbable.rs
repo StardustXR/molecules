@@ -61,7 +61,7 @@ impl GrabbableDemo {
 	}
 }
 impl RootHandler for GrabbableDemo {
-	fn frame(&mut self, _info: FrameInfo) {
-		self.grabbable.update();
+	fn frame(&mut self, info: FrameInfo) {
+		self.grabbable.update(&info);
 	}
 }

@@ -1,6 +1,7 @@
 use crate::single_actor_action::SingleActorAction;
-use glam::{Quat, Vec3};
+use glam::{vec3, Quat, Vec3};
 use stardust_xr_fusion::{
+	client::FrameInfo,
 	core::values::Transform,
 	fields::Field,
 	input::{
@@ -26,9 +27,8 @@ pub struct Grabbable {
 	grab_action: SingleActorAction<GrabData>,
 	input_handler: HandlerWrapper<InputHandler, InputActionHandler<GrabData>>,
 	min_distance: f32,
-	prev_position: Vec3,
-	prev_rotation: Quat,
-	current_rotation: (Vec3, f32),
+	prev_pose: (Vec3, Quat),
+	pose: (Vec3, Quat),
 	linear_velocity: Option<Vec3>,
 	angular_velocity: Option<(Vec3, f32)>,
 }
@@ -71,14 +71,13 @@ impl Grabbable {
 			grab_action,
 			input_handler,
 			min_distance: f32::MAX,
-			prev_position: Vec3::default(),
-			prev_rotation: Quat::default(),
-			current_rotation: (Vec3::default(), 0.),
+			prev_pose: (vec3(0.0, 0.0, 0.0), Quat::IDENTITY),
+			pose: (vec3(0.0, 0.0, 0.0), Quat::IDENTITY),
 			linear_velocity: None,
 			angular_velocity: None,
 		})
 	}
-	pub fn update(&mut self) {
+	pub fn update(&mut self, info: &FrameInfo) {
 		self.input_handler.lock_wrapped().update_actions([
 			self.global_action.type_erase(),
 			self.condition_action.type_erase(),
@@ -86,77 +85,32 @@ impl Grabbable {
 		]);
 		self.grab_action.update(&mut self.condition_action);
 
-		if let Some(actor) = self.grab_action.actor() {
-			let transform = match &actor.input {
-				InputDataType::Hand(h) => Transform::from_position_rotation(
-					Vec3::from(h.thumb.tip.position).lerp(Vec3::from(h.index.tip.position), 0.5),
-					h.palm.rotation,
-				),
-				InputDataType::Pointer(p) => {
-					Transform::from_position_rotation(p.origin, p.orientation)
-				}
-				InputDataType::Tip(t) => Transform::from_position_rotation(t.origin, t.orientation),
-			};
+		if self.grab_action.actor_started() {
+			self.content_parent
+				.set_spatial_parent_in_place(self.input_handler.node())
+				.unwrap();
+		}
 
-			debug!(?transform, uid = actor.uid, "Currently grabbing");
+		if let Some(actor) = self.grab_action.actor() {
+			let (position, rotation) = input_position_rotation(&actor.input);
+			debug!(?position, ?rotation, uid = actor.uid, "Currently grabbing");
 
 			self.root
-				.set_transform(Some(self.input_handler.node()), transform)
+				.set_transform(
+					Some(self.input_handler.node()),
+					Transform::from_position_rotation(position, rotation),
+				)
 				.unwrap();
 
-			self.linear_velocity =
-				Some(Vec3::from(transform.position.unwrap()) - self.prev_position);
-			self.angular_velocity = Some(
-				(std::convert::Into::<Quat>::into(transform.rotation.unwrap())
-					* self.prev_rotation.conjugate())
-				.to_axis_angle(),
-			);
+			self.prev_pose = self.pose;
+			self.pose = (position, rotation);
 
-			self.prev_position = transform.position.unwrap().into();
-			self.prev_rotation = transform.rotation.unwrap().into();
-		} else {
-			if let Some(lv) = self.linear_velocity {
-				if lv.length() > 0.0001 {
-					self.linear_velocity = Some(lv * 0.95);
+			let delta = info.delta as f32;
+			self.linear_velocity
+				.replace((self.pose.0 - self.prev_pose.0) / delta);
 
-					self.content_parent
-						.set_rotation(Some(&self.content_parent), self.prev_rotation)
-						.unwrap();
-
-					self.content_parent
-						.set_position(Some(&self.content_parent), lv)
-						.unwrap();
-
-					self.content_parent
-						.set_rotation(
-							Some(&self.content_parent),
-							Quat::from_axis_angle(self.current_rotation.0, self.current_rotation.1),
-						)
-						.unwrap();
-				} else {
-					self.linear_velocity = None;
-				}
-			}
-
-			if let Some(av) = self.angular_velocity {
-				if av.1 > 0.001 {
-					self.angular_velocity = Some((av.0, av.1 * 0.95));
-
-					self.current_rotation = (
-						av.0,
-						self.current_rotation.1 * self.angular_velocity.unwrap().1,
-					);
-
-					self.content_parent
-						.set_rotation(
-							Some(&self.content_parent),
-							Quat::from_axis_angle(self.current_rotation.0, self.current_rotation.1),
-						)
-						.unwrap();
-				} else {
-					self.angular_velocity = None;
-				}
-			}
+			let (axis, angle) = (self.pose.1 * self.prev_pose.1.inverse()).to_axis_angle();
+			self.angular_velocity = Some((axis, angle / delta));
 		}
 
 		if self.grab_action.actor_started() {
@@ -171,10 +125,21 @@ impl Grabbable {
 		}
 		if self.grab_action.actor_stopped() {
 			debug!("Stopped grabbing");
-			self.content_parent
-				.set_spatial_parent_in_place(self.input_handler.node())
-				.unwrap();
 			self.content_parent.set_zoneable(true).unwrap();
+		}
+
+		if !self.grab_action.actor_acting() {
+			self.apply_linear_momentum(info);
+			self.apply_angular_momentum(info);
+
+			if self.linear_velocity.is_some() || self.angular_velocity.is_some() {
+				self.root
+					.set_transform(
+						Some(self.input_handler.node()),
+						Transform::from_position_rotation(self.pose.0, self.pose.1),
+					)
+					.unwrap();
+			}
 		}
 
 		self.min_distance = self
@@ -187,10 +152,34 @@ impl Grabbable {
 
 		println!("linear_velocity: {:?}", self.linear_velocity);
 		println!("angular_velocity: {:?}", self.angular_velocity);
-		println!("prev_position: {:?}", self.prev_position);
-		println!("prev_rotation: {:?}", self.prev_rotation);
 		println!();
 	}
+	fn apply_linear_momentum(&mut self, info: &FrameInfo) {
+		let Some(lv) = self.linear_velocity else {return};
+		if lv.length() < 0.0001 {
+			self.linear_velocity.take();
+			return;
+		}
+
+		let delta = info.delta as f32;
+		self.linear_velocity = Some(lv * 0.95);
+		self.pose.0 += self.linear_velocity.unwrap() * delta;
+	}
+	fn apply_angular_momentum(&mut self, info: &FrameInfo) {
+		let Some(av) = self.angular_velocity else {return};
+		if av.1 < 0.001 {
+			self.angular_velocity.take();
+			return;
+		}
+
+		let delta = info.delta as f32;
+		self.angular_velocity = Some((av.0, av.1 * 0.95));
+		self.pose.1 *= Quat::from_axis_angle(
+			self.angular_velocity.unwrap().0,
+			self.angular_velocity.unwrap().1 * delta,
+		);
+	}
+
 	pub fn grab_action(&self) -> &SingleActorAction<GrabData> {
 		&self.grab_action
 	}
@@ -199,5 +188,16 @@ impl Grabbable {
 	}
 	pub fn min_distance(&self) -> f32 {
 		self.min_distance
+	}
+}
+
+fn input_position_rotation(input: &InputDataType) -> (Vec3, Quat) {
+	match input {
+		InputDataType::Hand(h) => (
+			Vec3::from(h.thumb.tip.position).lerp(Vec3::from(h.index.tip.position), 0.5),
+			h.palm.rotation.into(),
+		),
+		InputDataType::Pointer(p) => (p.origin.into(), p.orientation.into()),
+		InputDataType::Tip(t) => (t.origin.into(), t.orientation.into()),
 	}
 }
