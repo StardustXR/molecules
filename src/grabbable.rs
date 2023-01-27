@@ -18,20 +18,17 @@ use tracing::{debug, trace};
 pub struct GrabData {
 	/// Max distance that you can be to start grabbing
 	pub max_distance: f32,
-	/// Should the object drift a bit after being let go?
-	pub momentum: bool,
-	/// Linear drag in m/s^2 for momentum
-	pub linear_drag: f32,
-	/// Angular drag in rad/s^2 for momentum
-	pub angular_drag: f32,
+	/// Linear drag (unity style) for momentum. None means no linear momentum.
+	pub linear_drag: Option<f32>,
+	/// Angular drag (unity style) for momentum. None means no linear momentum.
+	pub angular_drag: Option<f32>,
 }
 impl Default for GrabData {
 	fn default() -> Self {
 		Self {
 			max_distance: 0.05,
-			momentum: true,
-			linear_drag: 8.0,
-			angular_drag: 15.0,
+			linear_drag: Some(8.0),
+			angular_drag: Some(15.0),
 		}
 	}
 }
@@ -121,14 +118,15 @@ impl Grabbable {
 				)
 				.unwrap();
 
-			if self.settings.momentum {
-				self.prev_pose = self.pose;
-				self.pose = (position, rotation);
+			self.prev_pose = self.pose;
+			self.pose = (position, rotation);
 
-				let delta = info.delta as f32;
+			let delta = info.delta as f32;
+			if self.settings.linear_drag.is_some() {
 				let linear_velocity = self.pose.0 - self.prev_pose.0;
 				self.linear_velocity.replace(linear_velocity / delta);
-
+			}
+			if self.settings.angular_drag.is_some() {
 				let (axis, angle) = (self.pose.1 * self.prev_pose.1.inverse()).to_axis_angle();
 				self.angular_velocity = Some((axis, angle / delta));
 			}
@@ -150,8 +148,12 @@ impl Grabbable {
 		}
 
 		if !self.grab_action.actor_acting() {
-			self.apply_linear_momentum(info);
-			self.apply_angular_momentum(info);
+			if let Some(drag) = self.settings.linear_drag {
+				self.apply_linear_momentum(info, drag);
+			}
+			if let Some(drag) = self.settings.angular_drag {
+				self.apply_angular_momentum(info, drag);
+			}
 
 			if self.linear_velocity.is_some() || self.angular_velocity.is_some() {
 				self.root
@@ -171,26 +173,24 @@ impl Grabbable {
 			.reduce(|a, b| a.min(b))
 			.unwrap_or(f32::MAX);
 	}
-	fn apply_linear_momentum(&mut self, info: &FrameInfo) {
+	fn apply_linear_momentum(&mut self, info: &FrameInfo, drag: f32) {
 		let Some(velocity) = &mut self.linear_velocity else {return};
 		let delta = info.delta as f32;
-		let linear_drag = self.settings.linear_drag;
 		if velocity.length_squared() < 0.0001 {
 			self.linear_velocity.take();
 		} else {
-			*velocity *= (1.0 - linear_drag * delta).clamp(0.0, 1.0);
+			*velocity *= (1.0 - drag * delta).clamp(0.0, 1.0);
 			self.pose.0 += *velocity * delta;
 			trace!(?velocity, "linear momentum");
 		}
 	}
-	fn apply_angular_momentum(&mut self, info: &FrameInfo) {
+	fn apply_angular_momentum(&mut self, info: &FrameInfo, drag: f32) {
 		let Some((axis, angle)) = &mut self.angular_velocity else {return};
 		let delta = info.delta as f32;
-		let angular_drag = self.settings.angular_drag;
 		if *angle < 0.001 {
 			self.angular_velocity.take();
 		} else {
-			*angle *= (1.0 - angular_drag * delta).clamp(0.0, 1.0);
+			*angle *= (1.0 - drag * delta).clamp(0.0, 1.0);
 			self.pose.1 *= Quat::from_axis_angle(*axis, *angle * delta);
 			trace!(?axis, angle, "angular momentum");
 		}
