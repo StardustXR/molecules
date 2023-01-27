@@ -12,7 +12,7 @@ use stardust_xr_fusion::{
 	spatial::Spatial,
 	HandlerWrapper,
 };
-use tracing::debug;
+use tracing::{debug, trace};
 
 #[derive(Debug, Clone, Copy)]
 pub struct GrabData {
@@ -160,7 +160,6 @@ impl Grabbable {
 						Transform::from_position_rotation(self.pose.0, self.pose.1),
 					)
 					.unwrap();
-				println!();
 			}
 		}
 
@@ -181,7 +180,7 @@ impl Grabbable {
 		} else {
 			*velocity *= (1.0 - linear_drag * delta).clamp(0.0, 1.0);
 			self.pose.0 += *velocity * delta;
-			println!("linear speed: {:.3}", velocity.length());
+			trace!(?velocity, "linear momentum");
 		}
 	}
 	fn apply_angular_momentum(&mut self, info: &FrameInfo) {
@@ -193,7 +192,7 @@ impl Grabbable {
 		} else {
 			*angle *= (1.0 - angular_drag * delta).clamp(0.0, 1.0);
 			self.pose.1 *= Quat::from_axis_angle(*axis, *angle * delta);
-			println!("angular speed: {:.3}", angle);
+			trace!(?axis, angle, "angular momentum");
 		}
 	}
 
