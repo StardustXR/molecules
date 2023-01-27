@@ -160,6 +160,7 @@ impl Grabbable {
 						Transform::from_position_rotation(self.pose.0, self.pose.1),
 					)
 					.unwrap();
+				println!();
 			}
 		}
 
@@ -170,10 +171,6 @@ impl Grabbable {
 			.map(|data| data.distance)
 			.reduce(|a, b| a.min(b))
 			.unwrap_or(f32::MAX);
-
-		println!("linear_velocity: {:?}", self.linear_velocity);
-		println!("angular_velocity: {:?}", self.angular_velocity);
-		println!();
 	}
 	fn apply_linear_momentum(&mut self, info: &FrameInfo) {
 		let Some(velocity) = &mut self.linear_velocity else {return};
@@ -184,6 +181,7 @@ impl Grabbable {
 		} else {
 			*velocity *= (1.0 - linear_drag * delta).clamp(0.0, 1.0);
 			self.pose.0 += *velocity * delta;
+			println!("linear speed: {:.3}", velocity.length());
 		}
 	}
 	fn apply_angular_momentum(&mut self, info: &FrameInfo) {
@@ -195,6 +193,7 @@ impl Grabbable {
 		} else {
 			*angle *= (1.0 - angular_drag * delta).clamp(0.0, 1.0);
 			self.pose.1 *= Quat::from_axis_angle(*axis, *angle * delta);
+			println!("angular speed: {:.3}", angle);
 		}
 	}
 
