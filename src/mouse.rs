@@ -1,6 +1,7 @@
 use mint::Vector2;
 use serde::{Deserialize, Serialize};
 use stardust_xr_fusion::{
+	core::schemas::flex::flexbuffers,
 	data::{PulseReceiver, PulseSender},
 	items::panel::PanelItem,
 	node::NodeError,

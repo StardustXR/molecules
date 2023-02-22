@@ -129,13 +129,13 @@ impl TouchPlane {
 			self.touch_action.type_erase(),
 		]);
 		// When we move from hovering in front of the button to intersecting it, that's the start of a touch!self
-		let hovered: FxHashSet<Arc<InputData>> = self
-			.hover_action
-			.actively_acting
-			.iter()
-			.chain(self.hover_action.stopped_acting.iter())
-			.cloned()
-			.collect();
+		// let hovered: FxHashSet<Arc<InputData>> = self
+		// 	.hover_action
+		// 	.actively_acting
+		// 	.iter()
+		// 	.chain(self.hover_action.stopped_acting.iter())
+		// 	.cloned()
+		// 	.collect();
 		self.started_interacting = self
 			.hover_action
 			.stopped_acting

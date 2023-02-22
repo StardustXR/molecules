@@ -1,12 +1,13 @@
 use crate::single_actor_action::SingleActorAction;
 use glam::{vec3, Quat, Vec3};
+use mint::Vector3;
 use stardust_xr_fusion::{
 	client::FrameInfo,
 	core::values::Transform,
 	fields::Field,
 	input::{
 		action::{BaseInputAction, InputAction, InputActionHandler},
-		InputDataType, InputHandler,
+		InputData, InputDataType, InputHandler,
 	},
 	node::{NodeError, NodeType},
 	spatial::Spatial,
@@ -40,6 +41,7 @@ pub struct Grabbable {
 	condition_action: BaseInputAction<GrabData>,
 	grab_action: SingleActorAction<GrabData>,
 	input_handler: HandlerWrapper<InputHandler, InputActionHandler<GrabData>>,
+	pointer_distance: f32,
 	min_distance: f32,
 	settings: GrabData,
 	prev_pose: (Vec3, Quat),
@@ -86,6 +88,7 @@ impl Grabbable {
 			grab_action,
 			input_handler,
 			min_distance: f32::MAX,
+			pointer_distance: 0.0,
 			settings,
 			prev_pose: (vec3(0.0, 0.0, 0.0), Quat::IDENTITY),
 			pose: (vec3(0.0, 0.0, 0.0), Quat::IDENTITY),
@@ -105,10 +108,15 @@ impl Grabbable {
 			self.content_parent
 				.set_spatial_parent_in_place(self.input_handler.node())
 				.unwrap();
+			let actor = self.grab_action.actor().unwrap();
+			if let InputDataType::Pointer(pointer) = &actor.input {
+				self.pointer_distance =
+					Vec3::from(pointer.origin).distance(pointer.deepest_point.into());
+			}
 		}
 
-		if let Some(actor) = self.grab_action.actor() {
-			let (position, rotation) = input_position_rotation(&actor.input);
+		if let Some(actor) = self.grab_action.actor().cloned() {
+			let (position, rotation) = self.input_position_rotation(&actor);
 			debug!(?position, ?rotation, uid = actor.uid, "Currently grabbing");
 
 			self.root
@@ -173,10 +181,29 @@ impl Grabbable {
 			.reduce(|a, b| a.min(b))
 			.unwrap_or(f32::MAX);
 	}
+	fn input_position_rotation(&mut self, input: &InputData) -> (Vec3, Quat) {
+		match &input.input {
+			InputDataType::Hand(h) => (
+				Vec3::from(h.thumb.tip.position).lerp(Vec3::from(h.index.tip.position), 0.5),
+				h.palm.rotation.into(),
+			),
+			InputDataType::Pointer(p) => {
+				let scroll = input
+					.datamap
+					.with_data(|d| d.idx("scroll").as_vector().idx(1).as_f32());
+				self.pointer_distance += scroll * 0.01;
+				let grab_point =
+					Vec3::from(p.origin) + (Vec3::from(p.direction()) * self.pointer_distance);
+				(grab_point, p.orientation.into())
+			}
+			InputDataType::Tip(t) => (t.origin.into(), t.orientation.into()),
+		}
+	}
+	const LINEAR_VELOCITY_STOP_THRESHOLD: f32 = 0.0001;
 	fn apply_linear_momentum(&mut self, info: &FrameInfo, drag: f32) {
 		let Some(velocity) = &mut self.linear_velocity else {return};
 		let delta = info.delta as f32;
-		if velocity.length_squared() < 0.0001 {
+		if velocity.length_squared() < Self::LINEAR_VELOCITY_STOP_THRESHOLD {
 			self.linear_velocity.take();
 		} else {
 			*velocity *= (1.0 - drag * delta).clamp(0.0, 1.0);
@@ -184,16 +211,37 @@ impl Grabbable {
 			trace!(?velocity, "linear momentum");
 		}
 	}
+	const ANGULAR_VELOCITY_STOP_THRESHOLD: f32 = 0.001;
 	fn apply_angular_momentum(&mut self, info: &FrameInfo, drag: f32) {
 		let Some((axis, angle)) = &mut self.angular_velocity else {return};
 		let delta = info.delta as f32;
-		if *angle < 0.001 {
+		if *angle < Self::ANGULAR_VELOCITY_STOP_THRESHOLD {
 			self.angular_velocity.take();
 		} else {
 			*angle *= (1.0 - drag * delta).clamp(0.0, 1.0);
 			self.pose.1 *= Quat::from_axis_angle(*axis, *angle * delta);
 			trace!(?axis, angle, "angular momentum");
 		}
+	}
+
+	pub fn linear_velocity(&self) -> Option<Vector3<f32>> {
+		self.linear_velocity.map(|v| v.into())
+	}
+	pub fn linear_speed(&self) -> Option<f32> {
+		self.linear_velocity.map(|v| v.length())
+	}
+	pub fn just_stopped_moving(&self) -> bool {
+		!self.grab_action.actor_acting()
+			&& self.linear_velocity.is_some()
+			&& self.linear_velocity.unwrap().length_squared() < Self::LINEAR_VELOCITY_STOP_THRESHOLD
+	}
+	pub fn angular_velocity(&self) -> Option<(Vector3<f32>, f32)> {
+		self.angular_velocity.map(|(a, v)| (a.into(), v))
+	}
+	pub fn just_stopped_rotating(&self) -> bool {
+		!self.grab_action.actor_acting()
+			&& self.angular_velocity.is_some()
+			&& self.angular_velocity.unwrap().1 < Self::ANGULAR_VELOCITY_STOP_THRESHOLD
 	}
 
 	pub fn grab_action(&self) -> &SingleActorAction<GrabData> {
@@ -204,16 +252,5 @@ impl Grabbable {
 	}
 	pub fn min_distance(&self) -> f32 {
 		self.min_distance
-	}
-}
-
-fn input_position_rotation(input: &InputDataType) -> (Vec3, Quat) {
-	match input {
-		InputDataType::Hand(h) => (
-			Vec3::from(h.thumb.tip.position).lerp(Vec3::from(h.index.tip.position), 0.5),
-			h.palm.rotation.into(),
-		),
-		InputDataType::Pointer(p) => (p.origin.into(), p.orientation.into()),
-		InputDataType::Tip(t) => (t.origin.into(), t.orientation.into()),
 	}
 }

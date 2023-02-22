@@ -1,8 +1,12 @@
 use serde::{Deserialize, Serialize};
 use stardust_xr_fusion::{
-	data::{PulseReceiver, PulseSender},
+	core::{schemas::flex::flexbuffers, values::Transform},
+	data::{PulseReceiver, PulseReceiverHandler, PulseSender},
+	fields::Field,
 	items::panel::PanelItem,
-	node::NodeError,
+	node::{NodeError, NodeType},
+	spatial::Spatial,
+	HandlerWrapper,
 };
 pub use xkbcommon::xkb;
 use xkbcommon::xkb::{
@@ -108,17 +112,38 @@ impl KeyboardEvent {
 				panel.keyboard_set_keymap(&keymap)?;
 			}
 		}
-		if let Some(keys_up) = &self.keys_up {
-			for key in keys_up {
-				panel.keyboard_key(*key, false)?;
-			}
+
+		for key in self.keys_down.as_ref().unwrap_or(&Vec::new()) {
+			panel.keyboard_key(*key, true)?;
 		}
-		if let Some(keys_down) = &self.keys_down {
-			for key in keys_down {
-				panel.keyboard_key(*key, true)?;
-			}
+		for key in self.keys_down.as_ref().unwrap_or(&Vec::new()) {
+			panel.keyboard_key(*key, false)?;
 		}
 		Ok(())
+	}
+}
+
+pub type KeyboardPanelRelay = HandlerWrapper<PulseReceiver, KeyboardPanelHandler>;
+pub struct KeyboardPanelHandler {
+	panel: PanelItem,
+}
+impl KeyboardPanelHandler {
+	pub fn create<Fi: Field>(
+		parent: &Spatial,
+		transform: Transform,
+		field: &Fi,
+		panel: &PanelItem,
+	) -> Result<KeyboardPanelRelay, NodeError> {
+		let panel = panel.alias();
+		panel.keyboard_set_active(true)?;
+		PulseReceiver::create(parent, transform, field, &KEYBOARD_MASK)?
+			.wrap(KeyboardPanelHandler { panel })
+	}
+}
+impl PulseReceiverHandler for KeyboardPanelHandler {
+	fn data(&mut self, _uid: &str, data: &[u8], _data_reader: flexbuffers::MapReader<&[u8]>) {
+		let Some(keyboard_event) = KeyboardEvent::from_pulse_data(data) else {return};
+		let _ = keyboard_event.send_to_panel(&self.panel);
 	}
 }
 
