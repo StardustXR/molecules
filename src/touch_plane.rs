@@ -43,7 +43,7 @@ impl TouchPlane {
 		let field = BoxField::create(
 			&_root,
 			Transform::from_position([0.0, 0.0, thickness * -0.5]),
-			[size.x, size.y, thickness].into(),
+			[size.x, size.y, thickness],
 		)?;
 		let input = InputHandler::create(&_root, Transform::default(), &field)?
 			.wrap(InputActionHandler::new(State { size }))?;
