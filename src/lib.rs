@@ -8,5 +8,3 @@ pub mod touch_plane;
 
 pub use grabbable::*;
 pub use single_actor_action::SingleActorAction;
-
-pub use stardust_xr_fusion as fusion;
