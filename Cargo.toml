@@ -28,6 +28,3 @@ tracing = "0.1.37"
 tokio = { version = "1.25.0", features = ["full"] }
 color-eyre = { version = "0.6.2", default-features = false }
 manifest-dir-macros = "0.1.16"
-
-# [patch.crates-io]
-# stardust-xr-fusion = { path = "../core/fusion" }
