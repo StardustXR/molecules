@@ -230,6 +230,9 @@ impl Grabbable {
 	pub fn linear_speed(&self) -> Option<f32> {
 		self.linear_velocity.map(|v| v.length())
 	}
+	pub fn cancel_linear_velocity(&mut self) {
+		self.linear_velocity.take();
+	}
 	pub fn just_stopped_moving(&self) -> bool {
 		!self.grab_action.actor_acting()
 			&& self.linear_velocity.is_some()
@@ -237,6 +240,9 @@ impl Grabbable {
 	}
 	pub fn angular_velocity(&self) -> Option<(Vector3<f32>, f32)> {
 		self.angular_velocity.map(|(a, v)| (a.into(), v))
+	}
+	pub fn cancel_angular_velocity(&mut self) {
+		self.angular_velocity.take();
 	}
 	pub fn just_stopped_rotating(&self) -> bool {
 		!self.grab_action.actor_acting()
@@ -252,5 +258,9 @@ impl Grabbable {
 	}
 	pub fn min_distance(&self) -> f32 {
 		self.min_distance
+	}
+
+	pub fn set_enabled(&self, enabled: bool) -> Result<(), NodeError> {
+		self.input_handler.node().set_enabled(enabled)
 	}
 }

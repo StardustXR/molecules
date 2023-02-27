@@ -9,7 +9,7 @@ use stardust_xr_fusion::{
 		action::{BaseInputAction, InputAction, InputActionHandler},
 		InputData, InputDataType, InputHandler,
 	},
-	node::NodeError,
+	node::{NodeError, NodeType},
 	spatial::Spatial,
 	HandlerWrapper,
 };
@@ -121,6 +121,10 @@ impl TouchPlane {
 	}
 	pub fn stopped_inputs(&self) -> Vec<Arc<InputData>> {
 		self.stopped_interacting.iter().cloned().collect()
+	}
+
+	pub fn set_enabled(&self, enabled: bool) -> Result<(), NodeError> {
+		self.input.node().set_enabled(enabled)
 	}
 
 	pub fn update(&mut self) {
