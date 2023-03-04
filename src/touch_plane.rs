@@ -20,7 +20,7 @@ struct State {
 }
 
 pub struct TouchPlane {
-	_root: Spatial,
+	root: Spatial,
 	input: HandlerWrapper<InputHandler, InputActionHandler<State>>,
 	field: BoxField,
 	hover_action: BaseInputAction<State>,
@@ -39,19 +39,19 @@ impl TouchPlane {
 		thickness: f32,
 	) -> Result<Self, NodeError> {
 		let size = size.into();
-		let _root = Spatial::create(parent, transform, false)?;
+		let root = Spatial::create(parent, transform, false)?;
 		let field = BoxField::create(
-			&_root,
+			&root,
 			Transform::from_position([0.0, 0.0, thickness * -0.5]),
 			[size.x, size.y, thickness],
 		)?;
-		let input = InputHandler::create(&_root, Transform::default(), &field)?
+		let input = InputHandler::create(&root, Transform::default(), &field)?
 			.wrap(InputActionHandler::new(State { size }))?;
 
 		let hover_action = BaseInputAction::new(false, Self::hover_action);
 		let touch_action = BaseInputAction::new(true, Self::touch_action);
 		Ok(TouchPlane {
-			_root,
+			root,
 			input,
 			field,
 			hover_action,
@@ -86,6 +86,10 @@ impl TouchPlane {
 			}
 			_ => input.distance < 0.0,
 		}
+	}
+
+	pub fn root(&self) -> &Spatial {
+		&self.root
 	}
 
 	pub fn set_size(&mut self, size: impl Into<Vector2<f32>>) -> Result<(), NodeError> {
@@ -142,7 +146,7 @@ impl TouchPlane {
 		// 	.collect();
 		self.started_interacting = self
 			.hover_action
-			.stopped_acting
+			.actively_acting
 			.intersection(&self.touch_action.started_acting)
 			.cloned()
 			.collect();
