@@ -15,21 +15,36 @@ use stardust_xr_fusion::{
 };
 use tracing::{debug, trace};
 
+/// Linear drag is in m/s, angular drag is in rad/s.
+#[derive(Debug, Clone, Copy)]
+pub struct MomentumSettings {
+	/// Drag (unity style) for momentum.
+	pub drag: f32,
+	/// Minimum speed before momentum applies.
+	pub threshold: f32,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct GrabData {
 	/// Max distance that you can be to start grabbing
 	pub max_distance: f32,
-	/// Linear drag (unity style) for momentum. None means no linear momentum.
-	pub linear_drag: Option<f32>,
-	/// Angular drag (unity style) for momentum. None means no linear momentum.
-	pub angular_drag: Option<f32>,
+	/// None means no linear momentum.
+	pub linear_momentum: Option<MomentumSettings>,
+	/// None means no angular momentum.
+	pub angular_momentum: Option<MomentumSettings>,
 }
 impl Default for GrabData {
 	fn default() -> Self {
 		Self {
 			max_distance: 0.05,
-			linear_drag: Some(8.0),
-			angular_drag: Some(15.0),
+			linear_momentum: Some(MomentumSettings {
+				drag: 8.0,
+				threshold: 0.01,
+			}),
+			angular_momentum: Some(MomentumSettings {
+				drag: 15.0,
+				threshold: 0.2,
+			}),
 		}
 	}
 }
@@ -130,13 +145,16 @@ impl Grabbable {
 			self.pose = (position, rotation);
 
 			let delta = info.delta as f32;
-			if self.settings.linear_drag.is_some() {
+			if let Some(momentum_settings) = &self.settings.linear_momentum {
 				let linear_velocity = self.pose.0 - self.prev_pose.0;
-				self.linear_velocity.replace(linear_velocity / delta);
+				let above_threshold =
+					linear_velocity.length_squared() > momentum_settings.threshold.powf(2.0);
+				self.linear_velocity = above_threshold.then(|| linear_velocity / delta);
 			}
-			if self.settings.angular_drag.is_some() {
+			if let Some(momentum_settings) = &self.settings.angular_momentum {
 				let (axis, angle) = (self.pose.1 * self.prev_pose.1.inverse()).to_axis_angle();
-				self.angular_velocity = Some((axis, angle / delta));
+				let above_threshold = angle > momentum_settings.threshold;
+				self.angular_velocity = above_threshold.then(|| (axis, angle / delta));
 			}
 		}
 
@@ -156,11 +174,11 @@ impl Grabbable {
 		}
 
 		if !self.grab_action.actor_acting() {
-			if let Some(drag) = self.settings.linear_drag {
-				self.apply_linear_momentum(info, drag);
+			if let Some(settings) = self.settings.linear_momentum {
+				self.apply_linear_momentum(info, settings);
 			}
-			if let Some(drag) = self.settings.angular_drag {
-				self.apply_angular_momentum(info, drag);
+			if let Some(settings) = self.settings.angular_momentum {
+				self.apply_angular_momentum(info, settings);
 			}
 
 			if self.linear_velocity.is_some() || self.angular_velocity.is_some() {
@@ -200,25 +218,25 @@ impl Grabbable {
 		}
 	}
 	const LINEAR_VELOCITY_STOP_THRESHOLD: f32 = 0.0001;
-	fn apply_linear_momentum(&mut self, info: &FrameInfo, drag: f32) {
+	fn apply_linear_momentum(&mut self, info: &FrameInfo, settings: MomentumSettings) {
 		let Some(velocity) = &mut self.linear_velocity else {return};
 		let delta = info.delta as f32;
 		if velocity.length_squared() < Self::LINEAR_VELOCITY_STOP_THRESHOLD {
 			self.linear_velocity.take();
 		} else {
-			*velocity *= (1.0 - drag * delta).clamp(0.0, 1.0);
+			*velocity *= (1.0 - settings.drag * delta).clamp(0.0, 1.0);
 			self.pose.0 += *velocity * delta;
 			trace!(?velocity, "linear momentum");
 		}
 	}
 	const ANGULAR_VELOCITY_STOP_THRESHOLD: f32 = 0.001;
-	fn apply_angular_momentum(&mut self, info: &FrameInfo, drag: f32) {
+	fn apply_angular_momentum(&mut self, info: &FrameInfo, settings: MomentumSettings) {
 		let Some((axis, angle)) = &mut self.angular_velocity else {return};
 		let delta = info.delta as f32;
 		if *angle < Self::ANGULAR_VELOCITY_STOP_THRESHOLD {
 			self.angular_velocity.take();
 		} else {
-			*angle *= (1.0 - drag * delta).clamp(0.0, 1.0);
+			*angle *= (1.0 - settings.drag * delta).clamp(0.0, 1.0);
 			self.pose.1 *= Quat::from_axis_angle(*axis, *angle * delta);
 			trace!(?axis, angle, "angular momentum");
 		}
