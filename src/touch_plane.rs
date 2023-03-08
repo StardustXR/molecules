@@ -4,6 +4,7 @@ use mint::{Vector2, Vector3};
 use rustc_hash::FxHashSet;
 use stardust_xr_fusion::{
 	core::values::Transform,
+	drawable::Lines,
 	fields::BoxField,
 	input::{
 		action::{BaseInputAction, InputAction, InputActionHandler},
@@ -13,6 +14,8 @@ use stardust_xr_fusion::{
 	spatial::Spatial,
 	HandlerWrapper,
 };
+
+use crate::{lines, DebugSettings, VisualDebug};
 
 #[derive(Debug, Clone, Copy)]
 struct State {
@@ -30,6 +33,7 @@ pub struct TouchPlane {
 	started_interacting: FxHashSet<Arc<InputData>>,
 	currently_interacting: FxHashSet<Arc<InputData>>,
 	stopped_interacting: FxHashSet<Arc<InputData>>,
+	debug_lines: Option<Lines>,
 }
 impl TouchPlane {
 	pub fn new(
@@ -61,6 +65,7 @@ impl TouchPlane {
 			started_interacting: FxHashSet::default(),
 			currently_interacting: FxHashSet::default(),
 			stopped_interacting: FxHashSet::default(),
+			debug_lines: None,
 		})
 	}
 
@@ -167,5 +172,18 @@ impl TouchPlane {
 			.filter_map(|i| self.touch_action.actively_acting.get(i))
 			.cloned()
 			.collect();
+	}
+}
+impl VisualDebug for TouchPlane {
+	fn set_debug(&mut self, settings: Option<DebugSettings>) {
+		self.debug_lines = settings.and_then(|settings| {
+			Lines::create(
+				&self.root,
+				Transform::none(),
+				&lines::square(self.size.x, self.size.y, settings.thickness, settings.color),
+				true,
+			)
+			.ok()
+		})
 	}
 }
