@@ -4,11 +4,11 @@ use mint::Vector3;
 use stardust_xr_fusion::drawable::LinePoint;
 use std::f32::consts::TAU;
 
-pub fn square(width: f32, height: f32, thickness: f32, color: Rgba<f32>) -> Vec<LinePoint> {
+pub fn square(width: f32, height: f32, thickness: f32, color: Rgba<f32>) -> [LinePoint; 4] {
 	let half_width = width * 0.5;
 	let half_height = height * 0.5;
 
-	vec![
+	[
 		LinePoint {
 			point: Vector3 {
 				x: half_width,

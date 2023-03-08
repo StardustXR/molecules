@@ -8,7 +8,7 @@ use stardust_xr_fusion::{
 	drawable::{MaterialParameter, Model, ResourceID},
 	node::NodeError,
 };
-use stardust_xr_molecules::touch_plane::TouchPlane;
+use stardust_xr_molecules::{touch_plane::TouchPlane, DebugSettings, VisualDebug};
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
@@ -31,7 +31,9 @@ struct ButtonDemo {
 }
 impl ButtonDemo {
 	fn new(client: &Client) -> Result<Self, NodeError> {
-		let touch_plane = TouchPlane::new(client.get_root(), Transform::default(), [0.1; 2], 0.03)?;
+		let mut touch_plane =
+			TouchPlane::new(client.get_root(), Transform::default(), [0.1; 2], 0.03)?;
+		touch_plane.set_debug(Some(DebugSettings::default()));
 		let model = Model::create(
 			client.get_root(),
 			Transform::default(),

@@ -33,7 +33,7 @@ pub struct TouchPlane {
 	started_interacting: FxHashSet<Arc<InputData>>,
 	currently_interacting: FxHashSet<Arc<InputData>>,
 	stopped_interacting: FxHashSet<Arc<InputData>>,
-	debug_lines: Option<Lines>,
+	debug_lines: Option<(Lines, Lines)>,
 }
 impl TouchPlane {
 	pub fn new(
@@ -75,11 +75,11 @@ impl TouchPlane {
 	fn hover_action(input: &InputData, state: &State) -> bool {
 		match &input.input {
 			InputDataType::Pointer(_) => {
-				input.datamap.with_data(|d| d.idx("select").as_f32() < 0.5) && input.distance < 0.0
+				input.datamap.with_data(|d| d.idx("select").as_f32()) < 0.5
 			}
 			InputDataType::Hand(h) => {
-				Self::hover(state.size, h.thumb.tip.position)
-					|| Self::hover(state.size, h.index.tip.position)
+				// Self::hover(state.size, h.thumb.tip.position) ||
+				Self::hover(state.size, h.index.tip.position)
 			}
 			InputDataType::Tip(t) => Self::hover(state.size, t.origin),
 		}
@@ -95,6 +95,9 @@ impl TouchPlane {
 
 	pub fn root(&self) -> &Spatial {
 		&self.root
+	}
+	pub fn input_handler(&self) -> &InputHandler {
+		self.input.node()
 	}
 
 	pub fn set_size(&mut self, size: impl Into<Vector2<f32>>) -> Result<(), NodeError> {
@@ -142,16 +145,14 @@ impl TouchPlane {
 			self.touch_action.type_erase(),
 		]);
 		// When we move from hovering in front of the button to intersecting it, that's the start of a touch!self
-		// let hovered: FxHashSet<Arc<InputData>> = self
-		// 	.hover_action
-		// 	.actively_acting
-		// 	.iter()
-		// 	.chain(self.hover_action.stopped_acting.iter())
-		// 	.cloned()
-		// 	.collect();
-		self.started_interacting = self
+		let hovered: FxHashSet<Arc<InputData>> = self
 			.hover_action
 			.actively_acting
+			.iter()
+			.chain(self.hover_action.stopped_acting.iter())
+			.cloned()
+			.collect();
+		self.started_interacting = hovered
 			.intersection(&self.touch_action.started_acting)
 			.cloned()
 			.collect();
@@ -177,13 +178,20 @@ impl TouchPlane {
 impl VisualDebug for TouchPlane {
 	fn set_debug(&mut self, settings: Option<DebugSettings>) {
 		self.debug_lines = settings.and_then(|settings| {
-			Lines::create(
+			let square =
+				lines::square(self.size.x, self.size.y, settings.thickness, settings.color);
+			let lines_front = Lines::create(&self.root, Transform::none(), &square, true).ok()?;
+			let lines_back = Lines::create(
 				&self.root,
-				Transform::none(),
-				&lines::square(self.size.x, self.size.y, settings.thickness, settings.color),
+				Transform::from_position([0.0, 0.0, -self.thickness]),
+				&square.map(|mut l| {
+					l.color.a = 0.5;
+					l
+				}),
 				true,
 			)
-			.ok()
+			.ok()?;
+			Some((lines_front, lines_back))
 		})
 	}
 }
