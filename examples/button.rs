@@ -31,8 +31,14 @@ struct ButtonDemo {
 }
 impl ButtonDemo {
 	fn new(client: &Client) -> Result<Self, NodeError> {
-		let mut touch_plane =
-			TouchPlane::new(client.get_root(), Transform::default(), [0.1; 2], 0.03)?;
+		let mut touch_plane = TouchPlane::create(
+			client.get_root(),
+			Transform::default(),
+			[0.1; 2],
+			0.03,
+			0.0..1.0,
+			0.0..1.0,
+		)?;
 		touch_plane.set_debug(Some(DebugSettings::default()));
 		let model = Model::create(
 			client.get_root(),
@@ -46,6 +52,9 @@ impl ButtonDemo {
 impl RootHandler for ButtonDemo {
 	fn frame(&mut self, _info: FrameInfo) {
 		self.touch_plane.update();
+
+		// let touch_points = self.touch_plane.touching_points();
+
 		if self.touch_plane.touch_started() {
 			println!("Touch started");
 			let color = [0.0, 1.0, 0.0, 1.0];

@@ -12,18 +12,20 @@ pub use single_actor_action::SingleActorAction;
 
 #[derive(Debug, Clone, Copy)]
 pub struct DebugSettings {
-	pub thickness: f32,
-	pub color: color::Rgba<f32>,
+	pub line_thickness: f32,
+	pub line_color: color::Rgba<f32>,
 }
 impl Default for DebugSettings {
 	fn default() -> Self {
 		Self {
-			thickness: 0.002,
-			color: rgba!(0.14, 0.62, 1.0, 1.0),
+			line_thickness: 0.002,
+			line_color: rgba!(0.14, 0.62, 1.0, 1.0),
 		}
 	}
 }
 
+/// Trait to enable visual debugging of invisible widgets
 pub trait VisualDebug {
+	/// Enable or disable the visual debugging using the provided settings.
 	fn set_debug(&mut self, settings: Option<DebugSettings>);
 }

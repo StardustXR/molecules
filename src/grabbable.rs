@@ -65,7 +65,7 @@ pub struct Grabbable {
 	angular_velocity: Option<(Vec3, f32)>,
 }
 impl Grabbable {
-	pub fn new<Fi: Field>(
+	pub fn create<Fi: Field>(
 		content_space: &Spatial,
 		content_transform: Transform,
 		field: &Fi,
@@ -111,7 +111,7 @@ impl Grabbable {
 			angular_velocity: None,
 		})
 	}
-	pub fn update(&mut self, info: &FrameInfo) {
+	pub fn update(&mut self, info: &FrameInfo) -> Result<(), NodeError> {
 		self.input_handler.lock_wrapped().update_actions([
 			self.global_action.type_erase(),
 			self.condition_action.type_erase(),
@@ -121,8 +121,7 @@ impl Grabbable {
 
 		if self.grab_action.actor_started() {
 			self.content_parent
-				.set_spatial_parent_in_place(self.input_handler.node())
-				.unwrap();
+				.set_spatial_parent_in_place(self.input_handler.node())?;
 			let actor = self.grab_action.actor().unwrap();
 			if let InputDataType::Pointer(pointer) = &actor.input {
 				self.pointer_distance =
@@ -134,12 +133,10 @@ impl Grabbable {
 			let (position, rotation) = self.input_position_rotation(&actor);
 			debug!(?position, ?rotation, uid = actor.uid, "Currently grabbing");
 
-			self.root
-				.set_transform(
-					Some(self.input_handler.node()),
-					Transform::from_position_rotation(position, rotation),
-				)
-				.unwrap();
+			self.root.set_transform(
+				Some(self.input_handler.node()),
+				Transform::from_position_rotation(position, rotation),
+			)?;
 
 			self.prev_pose = self.pose;
 			self.pose = (position, rotation);
@@ -163,14 +160,13 @@ impl Grabbable {
 				uid = self.grab_action.actor().as_ref().unwrap().uid,
 				"Started grabbing"
 			);
-			self.content_parent.set_zoneable(false).unwrap();
+			self.content_parent.set_zoneable(false)?;
 			self.content_parent
-				.set_spatial_parent_in_place(&self.root)
-				.unwrap();
+				.set_spatial_parent_in_place(&self.root)?;
 		}
 		if self.grab_action.actor_stopped() {
 			debug!("Stopped grabbing");
-			self.content_parent.set_zoneable(true).unwrap();
+			self.content_parent.set_zoneable(true)?;
 		}
 
 		if !self.grab_action.actor_acting() {
@@ -182,12 +178,10 @@ impl Grabbable {
 			}
 
 			if self.linear_velocity.is_some() || self.angular_velocity.is_some() {
-				self.root
-					.set_transform(
-						Some(self.input_handler.node()),
-						Transform::from_position_rotation(self.pose.0, self.pose.1),
-					)
-					.unwrap();
+				self.root.set_transform(
+					Some(self.input_handler.node()),
+					Transform::from_position_rotation(self.pose.0, self.pose.1),
+				)?;
 			}
 		}
 
@@ -198,6 +192,8 @@ impl Grabbable {
 			.map(|data| data.distance)
 			.reduce(|a, b| a.min(b))
 			.unwrap_or(f32::MAX);
+
+		Ok(())
 	}
 	fn input_position_rotation(&mut self, input: &InputData) -> (Vec3, Quat) {
 		match &input.input {

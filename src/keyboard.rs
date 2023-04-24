@@ -3,7 +3,7 @@ use stardust_xr_fusion::{
 	core::{schemas::flex::flexbuffers, values::Transform},
 	data::{PulseReceiver, PulseReceiverHandler, PulseSender},
 	fields::Field,
-	items::panel::PanelItem,
+	items::panel::{PanelItem, SurfaceID},
 	node::{NodeError, NodeType},
 	spatial::Spatial,
 	HandlerWrapper,
@@ -99,7 +99,7 @@ impl KeyboardEvent {
 		}
 	}
 
-	pub fn send_to_panel(&self, panel: &PanelItem) -> Result<(), NodeError> {
+	pub fn send_to_panel(&self, panel: &PanelItem, surface: &SurfaceID) -> Result<(), NodeError> {
 		if let Some(keymap) = &self.keymap {
 			let ctx = Context::new(CONTEXT_NO_FLAGS);
 			let xkb_keymap = Keymap::new_from_string(
@@ -114,10 +114,10 @@ impl KeyboardEvent {
 		}
 
 		for key in self.keys_down.as_ref().unwrap_or(&Vec::new()) {
-			panel.keyboard_key(*key, true)?;
+			panel.keyboard_key(surface, *key, true)?;
 		}
 		for key in self.keys_down.as_ref().unwrap_or(&Vec::new()) {
-			panel.keyboard_key(*key, false)?;
+			panel.keyboard_key(surface, *key, false)?;
 		}
 		Ok(())
 	}
@@ -126,6 +126,7 @@ impl KeyboardEvent {
 pub type KeyboardPanelRelay = HandlerWrapper<PulseReceiver, KeyboardPanelHandler>;
 pub struct KeyboardPanelHandler {
 	panel: PanelItem,
+	focus: SurfaceID,
 }
 impl KeyboardPanelHandler {
 	pub fn create<Fi: Field>(
@@ -133,17 +134,17 @@ impl KeyboardPanelHandler {
 		transform: Transform,
 		field: &Fi,
 		panel: &PanelItem,
+		focus: SurfaceID,
 	) -> Result<KeyboardPanelRelay, NodeError> {
 		let panel = panel.alias();
-		panel.keyboard_set_active(true)?;
 		PulseReceiver::create(parent, transform, field, &KEYBOARD_MASK)?
-			.wrap(KeyboardPanelHandler { panel })
+			.wrap(KeyboardPanelHandler { panel, focus })
 	}
 }
 impl PulseReceiverHandler for KeyboardPanelHandler {
 	fn data(&mut self, _uid: &str, data: &[u8], _data_reader: flexbuffers::MapReader<&[u8]>) {
 		let Some(keyboard_event) = KeyboardEvent::from_pulse_data(data) else {return};
-		let _ = keyboard_event.send_to_panel(&self.panel);
+		let _ = keyboard_event.send_to_panel(&self.panel, &self.focus);
 	}
 }
 

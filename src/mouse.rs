@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use stardust_xr_fusion::{
 	core::schemas::flex::flexbuffers,
 	data::{PulseReceiver, PulseSender},
-	items::panel::PanelItem,
+	items::panel::{PanelItem, SurfaceID},
 	node::NodeError,
 };
 
@@ -73,21 +73,21 @@ impl MouseEvent {
 	}
 
 	/// Does not handle delta
-	pub fn send_to_panel(&self, panel: &PanelItem) -> Result<(), NodeError> {
+	pub fn send_to_panel(&self, panel: &PanelItem, surface: &SurfaceID) -> Result<(), NodeError> {
 		if let Some(scroll_distance) = &self.scroll_distance {
-			panel.pointer_scroll(Some(*scroll_distance), None)?;
+			panel.pointer_scroll(surface, Some(*scroll_distance), None)?;
 		}
 		if let Some(scroll_steps) = &self.scroll_steps {
-			panel.pointer_scroll(None, Some(*scroll_steps))?;
+			panel.pointer_scroll(surface, None, Some(*scroll_steps))?;
 		}
 		if let Some(buttons_up) = &self.buttons_up {
 			for button in buttons_up {
-				panel.pointer_button(*button, false)?;
+				panel.pointer_button(surface, *button, false)?;
 			}
 		}
 		if let Some(buttons_down) = &self.buttons_down {
 			for button in buttons_down {
-				panel.pointer_button(*button, true)?;
+				panel.pointer_button(surface, *button, true)?;
 			}
 		}
 		Ok(())

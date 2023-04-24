@@ -1,11 +1,10 @@
-use std::sync::Arc;
-
+use map_range::MapRange;
 use mint::{Vector2, Vector3};
 use rustc_hash::FxHashSet;
 use stardust_xr_fusion::{
 	core::values::Transform,
 	drawable::Lines,
-	fields::BoxField,
+	fields::{BoxField, Field, UnknownField},
 	input::{
 		action::{BaseInputAction, InputAction, InputActionHandler},
 		InputData, InputDataType, InputHandler,
@@ -14,6 +13,7 @@ use stardust_xr_fusion::{
 	spatial::Spatial,
 	HandlerWrapper,
 };
+use std::{ops::Range, sync::Arc};
 
 use crate::{lines, DebugSettings, VisualDebug};
 
@@ -29,18 +29,23 @@ pub struct TouchPlane {
 	hover_action: BaseInputAction<State>,
 	touch_action: BaseInputAction<State>,
 	size: Vector2<f32>,
+	pub x_range: Range<f32>,
+	pub y_range: Range<f32>,
 	thickness: f32,
+	currently_hovering: FxHashSet<Arc<InputData>>,
 	started_interacting: FxHashSet<Arc<InputData>>,
 	currently_interacting: FxHashSet<Arc<InputData>>,
 	stopped_interacting: FxHashSet<Arc<InputData>>,
 	debug_lines: Option<(Lines, Lines)>,
 }
 impl TouchPlane {
-	pub fn new(
+	pub fn create(
 		parent: &Spatial,
 		transform: Transform,
 		size: impl Into<Vector2<f32>>,
 		thickness: f32,
+		x_range: Range<f32>,
+		y_range: Range<f32>,
 	) -> Result<Self, NodeError> {
 		let size = size.into();
 		let root = Spatial::create(parent, transform, false)?;
@@ -61,7 +66,10 @@ impl TouchPlane {
 			hover_action,
 			touch_action,
 			size,
+			x_range,
+			y_range,
 			thickness,
+			currently_hovering: FxHashSet::default(),
 			started_interacting: FxHashSet::default(),
 			currently_interacting: FxHashSet::default(),
 			stopped_interacting: FxHashSet::default(),
@@ -92,6 +100,30 @@ impl TouchPlane {
 			_ => input.distance < 0.0,
 		}
 	}
+	pub fn interact_point(&self, input: &InputData) -> Vector2<f32> {
+		let interact_point = match &input.input {
+			InputDataType::Pointer(p) => p.deepest_point,
+			InputDataType::Hand(h) => h.index.tip.position,
+			InputDataType::Tip(t) => t.origin,
+		};
+
+		let x = interact_point
+			.x
+			.map_range(-self.size.x / 2.0..self.size.x / 2.0, self.x_range.clone())
+			.clamp(self.x_range.start, self.x_range.end);
+		let y = interact_point
+			.y
+			.map_range(self.size.y / 2.0..-self.size.y / 2.0, self.y_range.clone())
+			.clamp(self.y_range.start, self.y_range.end);
+
+		[x, y].into()
+	}
+	pub fn input_to_points<'a>(
+		&self,
+		inputs: impl Iterator<Item = &'a Arc<InputData>>,
+	) -> Vec<Vector2<f32>> {
+		inputs.map(|i| self.interact_point(i)).collect()
+	}
 
 	pub fn root(&self) -> &Spatial {
 		&self.root
@@ -99,51 +131,91 @@ impl TouchPlane {
 	pub fn input_handler(&self) -> &InputHandler {
 		self.input.node()
 	}
+	pub fn field(&self) -> UnknownField {
+		self.field.alias_unknown_field()
+	}
 
 	pub fn set_size(&mut self, size: impl Into<Vector2<f32>>) -> Result<(), NodeError> {
 		let size = size.into();
 		self.size = size;
+		self.input.lock_wrapped().update_state(State { size });
 		self.field.set_size([size.x, size.y, self.thickness])?;
 		Ok(())
 	}
 	pub fn set_thickness(&mut self, thickness: f32) -> Result<(), NodeError> {
 		self.thickness = thickness;
+		self.field
+			.set_position(None, [0.0, 0.0, thickness * -0.5])?;
 		self.field.set_size([self.size.x, self.size.y, thickness])?;
 		Ok(())
 	}
 
+	/// Is the surface getting its first touch?
 	pub fn touch_started(&self) -> bool {
 		!self.started_interacting.is_empty()
 			&& self
 				.started_interacting
 				.is_superset(&self.currently_interacting)
 	}
+	/// Is something touching the surface?
 	pub fn touching(&self) -> bool {
 		!self.currently_interacting.is_empty()
 	}
+	/// Did everything just stop touching the surface?
 	pub fn touch_stopped(&self) -> bool {
 		self.currently_interacting.is_empty() && !self.stopped_interacting.is_empty()
 	}
 
-	pub fn started_inputs(&self) -> Vec<Arc<InputData>> {
-		self.started_interacting.iter().cloned().collect()
+	/// Get all the raw inputs that are hovering
+	pub fn hovering_inputs(&self) -> &FxHashSet<Arc<InputData>> {
+		&self.currently_hovering
 	}
-	pub fn interacting_inputs(&self) -> Vec<Arc<InputData>> {
-		self.currently_interacting.iter().cloned().collect()
-	}
-	pub fn stopped_inputs(&self) -> Vec<Arc<InputData>> {
-		self.stopped_interacting.iter().cloned().collect()
+	/// Get all the points hovering over the surface, in x_range and y_range
+	pub fn hover_points(&self) -> Vec<Vector2<f32>> {
+		self.input_to_points(self.hover_action.actively_acting.iter())
 	}
 
+	/// Get all the raw inputs that just started touching
+	pub fn started_inputs(&self) -> &FxHashSet<Arc<InputData>> {
+		&self.started_interacting
+	}
+	/// Get all the raw inputs that are currently touching
+	pub fn interacting_inputs(&self) -> &FxHashSet<Arc<InputData>> {
+		&self.currently_interacting
+	}
+	/// Get all the raw inputs that just stopped touching
+	pub fn stopped_inputs(&self) -> &FxHashSet<Arc<InputData>> {
+		&self.stopped_interacting
+	}
+
+	/// Get all the 2D points in the x and y range that just started touching
+	pub fn touch_down_points(&self) -> Vec<Vector2<f32>> {
+		self.input_to_points(self.started_interacting.iter())
+	}
+	/// Get all the 2D points in the x and y range that are currently touching
+	pub fn touching_points(&self) -> Vec<Vector2<f32>> {
+		self.input_to_points(self.currently_interacting.iter())
+	}
+	/// Get all the 2D points in the x and y range that just stopped touching
+	pub fn touch_up_points(&self) -> Vec<Vector2<f32>> {
+		self.input_to_points(self.stopped_interacting.iter())
+	}
+
+	/// Set whether this will receive input or not
 	pub fn set_enabled(&self, enabled: bool) -> Result<(), NodeError> {
 		self.input.node().set_enabled(enabled)
 	}
 
+	/// Update the state of this touch plane. Run once every frame.
 	pub fn update(&mut self) {
 		self.input.lock_wrapped().update_actions([
 			self.hover_action.type_erase(),
 			self.touch_action.type_erase(),
 		]);
+
+		// Update the currently hovering stuff
+		self.currently_hovering = self.hover_action.actively_acting.clone();
+
 		// When we move from hovering in front of the button to intersecting it, that's the start of a touch!self
 		let hovered: FxHashSet<Arc<InputData>> = self
 			.hover_action
@@ -178,8 +250,12 @@ impl TouchPlane {
 impl VisualDebug for TouchPlane {
 	fn set_debug(&mut self, settings: Option<DebugSettings>) {
 		self.debug_lines = settings.and_then(|settings| {
-			let square =
-				lines::square(self.size.x, self.size.y, settings.thickness, settings.color);
+			let square = lines::square(
+				self.size.x,
+				self.size.y,
+				settings.line_thickness,
+				settings.line_color,
+			);
 			let lines_front = Lines::create(&self.root, Transform::none(), &square, true).ok()?;
 			let lines_back = Lines::create(
 				&self.root,

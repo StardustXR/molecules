@@ -40,7 +40,7 @@ struct GrabbableDemo {
 impl GrabbableDemo {
 	fn new(client: &Client) -> Result<Self, NodeError> {
 		let field = SphereField::create(client.get_root(), mint::Vector3::from([0.0; 3]), 0.1)?;
-		let grabbable = Grabbable::new(
+		let grabbable = Grabbable::create(
 			client.get_root(),
 			Transform::default(),
 			&field,
@@ -62,6 +62,6 @@ impl GrabbableDemo {
 }
 impl RootHandler for GrabbableDemo {
 	fn frame(&mut self, info: FrameInfo) {
-		self.grabbable.update(&info);
+		self.grabbable.update(&info).unwrap();
 	}
 }
