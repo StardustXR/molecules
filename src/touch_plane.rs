@@ -77,8 +77,10 @@ impl TouchPlane {
 		})
 	}
 
-	fn hover(size: Vector2<f32>, point: Vector3<f32>) -> bool {
-		point.x.abs() * 2.0 < size.x && point.y.abs() * 2.0 < size.y && point.z > 0.0
+	fn hover(size: Vector2<f32>, point: Vector3<f32>, front: bool) -> bool {
+		point.x.abs() * 2.0 < size.x
+			&& point.y.abs() * 2.0 < size.y
+			&& point.z.is_sign_positive() == front
 	}
 	fn hover_action(input: &InputData, state: &State) -> bool {
 		match &input.input {
@@ -87,17 +89,21 @@ impl TouchPlane {
 			}
 			InputDataType::Hand(h) => {
 				// Self::hover(state.size, h.thumb.tip.position) ||
-				Self::hover(state.size, h.index.tip.position)
+				Self::hover(state.size, h.index.tip.position, true)
 			}
-			InputDataType::Tip(t) => Self::hover(state.size, t.origin),
+			InputDataType::Tip(t) => Self::hover(state.size, t.origin, true),
 		}
 	}
-	fn touch_action(input: &InputData, _state: &State) -> bool {
+	fn touch_action(input: &InputData, state: &State) -> bool {
 		match &input.input {
 			InputDataType::Pointer(_) => {
 				input.datamap.with_data(|d| d.idx("select").as_f32() > 0.5) && input.distance < 0.0
 			}
-			_ => input.distance < 0.0,
+			InputDataType::Hand(h) => {
+				// Self::hover(state.size, h.thumb.tip.position) ||
+				Self::hover(state.size, h.index.tip.position, false)
+			}
+			InputDataType::Tip(t) => Self::hover(state.size, t.origin, false),
 		}
 	}
 	pub fn interact_point(&self, input: &InputData) -> Vector2<f32> {

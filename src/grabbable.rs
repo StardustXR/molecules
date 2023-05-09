@@ -32,6 +32,8 @@ pub struct GrabData {
 	pub linear_momentum: Option<MomentumSettings>,
 	/// None means no angular momentum.
 	pub angular_momentum: Option<MomentumSettings>,
+	/// Minimum number of frames you need to be grabbing to properly stop
+	pub frame_cancel_threshold: u32,
 }
 impl Default for GrabData {
 	fn default() -> Self {
@@ -45,6 +47,7 @@ impl Default for GrabData {
 				drag: 15.0,
 				threshold: 0.2,
 			}),
+			frame_cancel_threshold: 2,
 		}
 	}
 }
@@ -59,6 +62,9 @@ pub struct Grabbable {
 	pointer_distance: f32,
 	min_distance: f32,
 	settings: GrabData,
+	frame: u32,
+	start_frame: u32,
+	start_pose: (Vec3, Quat),
 	prev_pose: (Vec3, Quat),
 	pose: (Vec3, Quat),
 	linear_velocity: Option<Vec3>,
@@ -105,6 +111,9 @@ impl Grabbable {
 			min_distance: f32::MAX,
 			pointer_distance: 0.0,
 			settings,
+			frame: 0,
+			start_frame: 0,
+			start_pose: (vec3(0.0, 0.0, 0.0), Quat::IDENTITY),
 			prev_pose: (vec3(0.0, 0.0, 0.0), Quat::IDENTITY),
 			pose: (vec3(0.0, 0.0, 0.0), Quat::IDENTITY),
 			linear_velocity: None,
@@ -127,6 +136,7 @@ impl Grabbable {
 				self.pointer_distance =
 					Vec3::from(pointer.origin).distance(pointer.deepest_point.into());
 			}
+			self.start_frame = self.frame;
 		}
 
 		if let Some(actor) = self.grab_action.actor().cloned() {
@@ -140,6 +150,9 @@ impl Grabbable {
 
 			self.prev_pose = self.pose;
 			self.pose = (position, rotation);
+			if self.grab_action.actor_started() {
+				self.start_pose = self.pose;
+			}
 
 			let delta = info.delta as f32;
 			if let Some(momentum_settings) = &self.settings.linear_momentum {
@@ -167,6 +180,14 @@ impl Grabbable {
 		if self.grab_action.actor_stopped() {
 			debug!("Stopped grabbing");
 			self.content_parent.set_zoneable(true)?;
+			if !self.valid() {
+				self.cancel_angular_velocity();
+				self.cancel_linear_velocity();
+				self.root.set_transform(
+					Some(self.input_handler.node()),
+					Transform::from_position_rotation(self.start_pose.0, self.start_pose.1),
+				)?;
+			}
 		}
 
 		if !self.grab_action.actor_acting() {
@@ -193,6 +214,7 @@ impl Grabbable {
 			.reduce(|a, b| a.min(b))
 			.unwrap_or(f32::MAX);
 
+		self.frame += 1;
 		Ok(())
 	}
 	fn input_position_rotation(&mut self, input: &InputData) -> (Vec3, Quat) {
@@ -262,6 +284,11 @@ impl Grabbable {
 		!self.grab_action.actor_acting()
 			&& self.angular_velocity.is_some()
 			&& self.angular_velocity.unwrap().1 < Self::ANGULAR_VELOCITY_STOP_THRESHOLD
+	}
+
+	/// Is this a valid grab? (been grabbed more than the threshold)
+	pub fn valid(&self) -> bool {
+		self.frame > self.start_frame + self.settings.frame_cancel_threshold
 	}
 
 	pub fn grab_action(&self) -> &SingleActorAction<GrabData> {
