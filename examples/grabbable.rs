@@ -47,7 +47,7 @@ impl GrabbableDemo {
 			GrabData::default(),
 		)?;
 		let model = Model::create(
-			grabbable.content_parent(),
+			client.get_root(),
 			Transform::from_scale(Vector3::from([0.1; 3])),
 			&*ICON_RESOURCE,
 		)?;
@@ -63,5 +63,10 @@ impl GrabbableDemo {
 impl RootHandler for GrabbableDemo {
 	fn frame(&mut self, info: FrameInfo) {
 		self.grabbable.update(&info).unwrap();
+		self.model
+			.model_part("Icosphere.001")
+			.unwrap()
+			.set_spatial_parent(self.grabbable.content_parent())
+			.unwrap();
 	}
 }

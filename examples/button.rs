@@ -5,7 +5,7 @@ use manifest_dir_macros::directory_relative_path;
 use stardust_xr_fusion::{
 	client::{Client, FrameInfo, RootHandler},
 	core::values::Transform,
-	drawable::{MaterialParameter, Model, ResourceID},
+	drawable::{MaterialParameter, Model, ModelPart, ResourceID},
 	node::NodeError,
 };
 use stardust_xr_molecules::{touch_plane::TouchPlane, DebugSettings, VisualDebug};
@@ -28,6 +28,7 @@ async fn main() -> Result<()> {
 struct ButtonDemo {
 	touch_plane: TouchPlane,
 	model: Model,
+	button_part: ModelPart,
 }
 impl ButtonDemo {
 	fn new(client: &Client) -> Result<Self, NodeError> {
@@ -45,8 +46,13 @@ impl ButtonDemo {
 			Transform::default(),
 			&ResourceID::new_namespaced("molecules", "button"),
 		)?;
+		let button_part = model.model_part("Button/Model")?;
 
-		Ok(ButtonDemo { touch_plane, model })
+		Ok(ButtonDemo {
+			touch_plane,
+			model,
+			button_part,
+		})
 	}
 }
 impl RootHandler for ButtonDemo {
@@ -58,12 +64,11 @@ impl RootHandler for ButtonDemo {
 		if self.touch_plane.touch_started() {
 			println!("Touch started");
 			let color = [0.0, 1.0, 0.0, 1.0];
-			self.model
-				.set_material_parameter(0, "color", MaterialParameter::Color(color))
+			self.button_part
+				.set_material_parameter("color", MaterialParameter::Color(color))
 				.unwrap();
-			self.model
+			self.button_part
 				.set_material_parameter(
-					0,
 					"emission_factor",
 					MaterialParameter::Color(color.map(|c| c * 0.75)),
 				)
@@ -72,12 +77,11 @@ impl RootHandler for ButtonDemo {
 		if self.touch_plane.touch_stopped() {
 			println!("Touch ended");
 			let color = [1.0, 0.0, 0.0, 1.0];
-			self.model
-				.set_material_parameter(0, "color", MaterialParameter::Color(color))
+			self.button_part
+				.set_material_parameter("color", MaterialParameter::Color(color))
 				.unwrap();
-			self.model
+			self.button_part
 				.set_material_parameter(
-					0,
 					"emission_factor",
 					MaterialParameter::Color(color.map(|c| c * 0.5)),
 				)
