@@ -1,77 +1,117 @@
 use color::{Color, Rgba};
 use glam::Vec3;
+use lerp::Lerp;
 use mint::Vector3;
 use stardust_xr_fusion::drawable::LinePoint;
-use std::f32::consts::TAU;
+use std::f32::consts::{PI, TAU};
 
-pub fn square(width: f32, height: f32, thickness: f32, color: Rgba<f32>) -> [LinePoint; 4] {
+pub fn rectangle(width: f32, height: f32) -> [Vector3<f32>; 4] {
 	let half_width = width * 0.5;
 	let half_height = height * 0.5;
+	let points = [
+		[half_width, half_height],
+		[-half_width, half_height],
+		[-half_width, -half_height],
+		[half_width, -half_height],
+	];
 
-	[
-		LinePoint {
-			point: Vector3 {
-				x: half_width,
-				y: half_height,
-				z: 0.0,
-			},
-			thickness,
-			color,
-		},
-		LinePoint {
-			point: Vector3 {
-				x: -half_width,
-				y: half_height,
-				z: 0.0,
-			},
-			thickness,
-			color,
-		},
-		LinePoint {
-			point: Vector3 {
-				x: -half_width,
-				y: -half_height,
-				z: 0.0,
-			},
-			thickness,
-			color,
-		},
-		LinePoint {
-			point: Vector3 {
-				x: half_width,
-				y: -half_height,
-				z: 0.0,
-			},
-			thickness,
-			color,
-		},
-	]
+	let mut result = [[0.0; 3].into(); 4];
+	for (i, point) in points.iter().enumerate() {
+		result[i] = Vector3 {
+			x: point[0],
+			y: point[1],
+			z: 0.0,
+		};
+	}
+	result
 }
 
-pub fn circle(segments: usize, radius: f32, thickness: f32, color: Rgba<f32>) -> Vec<LinePoint> {
-	arc(segments, TAU, radius, thickness, color)
-}
-
-pub fn arc(
+pub fn rounded_rectangle(
+	width: f32,
+	height: f32,
+	corner_radius: f32,
 	segments: usize,
-	angle: f32,
-	radius: f32,
+) -> Vec<Vector3<f32>> {
+	let mut points = Vec::new();
+
+	let half_width = width / 2.0;
+	let half_height = height / 2.0;
+
+	let angle_step = PI / 2.0 / (segments as f32);
+
+	for i in 0..4 {
+		let start_angle = match i {
+			0 => 0.0,
+			1 => PI * 0.5,
+			2 => PI,
+			3 => PI * 1.5,
+			_ => unreachable!(),
+		};
+
+		let center = match i {
+			0 => Vec3::new(half_width - corner_radius, half_height - corner_radius, 0.0),
+			1 => Vec3::new(
+				-half_width + corner_radius,
+				half_height - corner_radius,
+				0.0,
+			),
+			2 => Vec3::new(
+				-half_width + corner_radius,
+				-half_height + corner_radius,
+				0.0,
+			),
+			3 => Vec3::new(
+				half_width - corner_radius,
+				-half_height + corner_radius,
+				0.0,
+			),
+			_ => unreachable!(),
+		};
+
+		for j in 0..=segments {
+			let angle = start_angle + (angle_step * j as f32);
+			let point = Vec3::new(
+				center.x + corner_radius * angle.cos(),
+				center.y + corner_radius * angle.sin(),
+				0.0,
+			);
+			points.push(point.into());
+		}
+	}
+
+	points
+}
+
+pub fn circle(segments: usize, start_angle: f32, radius: f32) -> Vec<Vector3<f32>> {
+	arc(segments, start_angle, start_angle + TAU, radius)
+}
+
+pub fn arc(segments: usize, start_angle: f32, end_angle: f32, radius: f32) -> Vec<Vector3<f32>> {
+	let angle = end_angle - start_angle;
+	(0..segments)
+		.map(|s| ((s as f32) / (segments as f32) * angle) + start_angle)
+		.map(|angle| {
+			let (x, y) = angle.sin_cos();
+			Vector3 {
+				x: x * radius,
+				y: y * radius,
+				z: 0.0,
+			}
+		})
+		.collect()
+}
+
+pub fn make_line_points(
+	vec3s: &[Vector3<f32>],
 	thickness: f32,
 	color: Rgba<f32>,
 ) -> Vec<LinePoint> {
-	(0..segments)
-		.map(|s| (s as f32) / (segments as f32) * angle)
-		.map(|angle| {
-			let (x, y) = angle.sin_cos();
-			LinePoint {
-				point: Vector3 {
-					x: x * radius,
-					y: y * radius,
-					z: 0.0,
-				},
-				thickness,
-				color,
-			}
+	vec3s
+		.into_iter()
+		.map(|point| LinePoint {
+			point: *point,
+			thickness,
+			color,
 		})
 		.collect()
 }
@@ -128,4 +168,26 @@ pub fn trace(t: f32, mut points: Vec<LinePoint>, cyclic: bool) -> Vec<LinePoint>
 	]);
 
 	points
+}
+
+pub fn lerp(from: &[LinePoint], to: &[LinePoint], amount: f32) -> Option<Vec<LinePoint>> {
+	if from.len() != to.len() {
+		return None;
+	}
+
+	Some(
+		from.into_iter()
+			.zip(to)
+			.map(|(from, to)| {
+				let from_point = Vec3::from(from.point);
+				let to_point = Vec3::from(to.point);
+
+				LinePoint {
+					point: from_point.lerp_bounded(to_point, amount).into(),
+					thickness: from.thickness.lerp_bounded(to.thickness, amount),
+					color: from.color.lerp_bounded(to.color, amount),
+				}
+			})
+			.collect(),
+	)
 }

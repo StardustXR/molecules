@@ -15,7 +15,10 @@ use stardust_xr_fusion::{
 };
 use std::{ops::Range, sync::Arc};
 
-use crate::{lines, DebugSettings, VisualDebug};
+use crate::{
+	lines::{self, make_line_points},
+	DebugSettings, VisualDebug,
+};
 
 #[derive(Debug, Clone, Copy)]
 struct State {
@@ -106,7 +109,7 @@ impl TouchPlane {
 			InputDataType::Tip(t) => Self::hover(state.size, t.origin, false),
 		}
 	}
-	pub fn interact_point(&self, input: &InputData) -> Vector2<f32> {
+	pub fn interact_point(&self, input: &InputData) -> (Vector2<f32>, f32) {
 		let interact_point = match &input.input {
 			InputDataType::Pointer(p) => p.deepest_point,
 			InputDataType::Hand(h) => h.index.tip.position,
@@ -115,20 +118,20 @@ impl TouchPlane {
 
 		let x = interact_point
 			.x
-			.map_range(-self.size.x / 2.0..self.size.x / 2.0, self.x_range.clone())
-			.clamp(self.x_range.start, self.x_range.end);
+			.clamp(-self.size.x / 2.0, self.size.x / 2.0)
+			.map_range(-self.size.x / 2.0..self.size.x / 2.0, self.x_range.clone());
 		let y = interact_point
 			.y
-			.map_range(self.size.y / 2.0..-self.size.y / 2.0, self.y_range.clone())
-			.clamp(self.y_range.start, self.y_range.end);
+			.clamp(-self.size.y / 2.0, self.size.y / 2.0)
+			.map_range(self.size.y / 2.0..-self.size.y / 2.0, self.y_range.clone());
 
-		[x, y].into()
+		([x, y].into(), interact_point.z)
 	}
 	pub fn input_to_points<'a>(
 		&self,
 		inputs: impl Iterator<Item = &'a Arc<InputData>>,
 	) -> Vec<Vector2<f32>> {
-		inputs.map(|i| self.interact_point(i)).collect()
+		inputs.map(|i| self.interact_point(i).0).collect()
 	}
 
 	pub fn root(&self) -> &Spatial {
@@ -156,6 +159,10 @@ impl TouchPlane {
 		Ok(())
 	}
 
+	/// Get all the raw inputs that are touching
+	pub fn touching_inputs(&self) -> &FxHashSet<Arc<InputData>> {
+		&self.touch_action.actively_acting
+	}
 	/// Is the surface getting its first touch?
 	pub fn touch_started(&self) -> bool {
 		!self.started_interacting.is_empty()
@@ -256,20 +263,26 @@ impl TouchPlane {
 impl VisualDebug for TouchPlane {
 	fn set_debug(&mut self, settings: Option<DebugSettings>) {
 		self.debug_lines = settings.and_then(|settings| {
-			let square = lines::square(
+			let square = lines::rounded_rectangle(
 				self.size.x,
 				self.size.y,
-				settings.line_thickness,
-				settings.line_color,
+				settings.line_thickness * 0.5,
+				4,
 			);
-			let lines_front = Lines::create(&self.root, Transform::none(), &square, true).ok()?;
+			let line_points =
+				make_line_points(&square, settings.line_thickness, settings.line_color);
+			let lines_front =
+				Lines::create(&self.root, Transform::none(), &line_points, true).ok()?;
 			let lines_back = Lines::create(
 				&self.root,
 				Transform::from_position([0.0, 0.0, -self.thickness]),
-				&square.map(|mut l| {
-					l.color.a = 0.5;
-					l
-				}),
+				&line_points
+					.into_iter()
+					.map(|mut l| {
+						l.color.a = 0.5;
+						l
+					})
+					.collect::<Vec<_>>(),
 				true,
 			)
 			.ok()?;

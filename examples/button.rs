@@ -5,10 +5,12 @@ use manifest_dir_macros::directory_relative_path;
 use stardust_xr_fusion::{
 	client::{Client, FrameInfo, RootHandler},
 	core::values::Transform,
-	drawable::{MaterialParameter, Model, ModelPart, ResourceID},
 	node::NodeError,
 };
-use stardust_xr_molecules::{touch_plane::TouchPlane, DebugSettings, VisualDebug};
+use stardust_xr_molecules::{
+	button::{Button, ButtonSettings},
+	DebugSettings, VisualDebug,
+};
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
@@ -25,67 +27,21 @@ async fn main() -> Result<()> {
 	Ok(())
 }
 
-struct ButtonDemo {
-	touch_plane: TouchPlane,
-	model: Model,
-	button_part: ModelPart,
-}
+struct ButtonDemo(Button);
 impl ButtonDemo {
 	fn new(client: &Client) -> Result<Self, NodeError> {
-		let mut touch_plane = TouchPlane::create(
+		let mut button = Button::create(
 			client.get_root(),
 			Transform::default(),
 			[0.1; 2],
-			0.03,
-			0.0..1.0,
-			0.0..1.0,
+			ButtonSettings::default(),
 		)?;
-		touch_plane.set_debug(Some(DebugSettings::default()));
-		let model = Model::create(
-			client.get_root(),
-			Transform::default(),
-			&ResourceID::new_namespaced("molecules", "button"),
-		)?;
-		let button_part = model.model_part("Button/Model")?;
-
-		Ok(ButtonDemo {
-			touch_plane,
-			model,
-			button_part,
-		})
+		button.set_debug(Some(DebugSettings::default()));
+		Ok(ButtonDemo(button))
 	}
 }
 impl RootHandler for ButtonDemo {
 	fn frame(&mut self, _info: FrameInfo) {
-		self.touch_plane.update();
-
-		// let touch_points = self.touch_plane.touching_points();
-
-		if self.touch_plane.touch_started() {
-			println!("Touch started");
-			let color = [0.0, 1.0, 0.0, 1.0];
-			self.button_part
-				.set_material_parameter("color", MaterialParameter::Color(color))
-				.unwrap();
-			self.button_part
-				.set_material_parameter(
-					"emission_factor",
-					MaterialParameter::Color(color.map(|c| c * 0.75)),
-				)
-				.unwrap();
-		}
-		if self.touch_plane.touch_stopped() {
-			println!("Touch ended");
-			let color = [1.0, 0.0, 0.0, 1.0];
-			self.button_part
-				.set_material_parameter("color", MaterialParameter::Color(color))
-				.unwrap();
-			self.button_part
-				.set_material_parameter(
-					"emission_factor",
-					MaterialParameter::Color(color.map(|c| c * 0.5)),
-				)
-				.unwrap();
-		}
+		self.0.update();
 	}
 }
