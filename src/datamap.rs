@@ -23,10 +23,7 @@ impl<D: Serialize + DeserializeOwned> Datamap<D> {
 			data,
 		})
 	}
-	pub fn update_input_method<I: InputMethod>(
-		&mut self,
-		input_method: &I,
-	) -> Result<(), NodeError> {
+	pub fn update_input_method(&mut self, input_method: &InputMethod) -> Result<(), NodeError> {
 		input_method.set_datamap(&self.serialize())
 	}
 

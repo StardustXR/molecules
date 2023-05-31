@@ -88,7 +88,7 @@ impl TouchPlane {
 	fn hover_action(input: &InputData, state: &State) -> bool {
 		match &input.input {
 			InputDataType::Pointer(_) => {
-				input.datamap.with_data(|d| d.idx("select").as_f32()) < 0.5
+				input.distance < 0.0 && input.datamap.with_data(|d| d.idx("select").as_f32()) < 0.5
 			}
 			InputDataType::Hand(h) => {
 				// Self::hover(state.size, h.thumb.tip.position) ||
