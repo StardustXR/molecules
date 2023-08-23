@@ -4,7 +4,7 @@ use mint::Vector3;
 use stardust_xr_fusion::{
 	client::FrameInfo,
 	core::values::Transform,
-	fields::Field,
+	fields::{Field, UnknownField},
 	input::{
 		action::{BaseInputAction, InputAction, InputActionHandler},
 		InputData, InputDataType, InputHandler,
@@ -13,7 +13,19 @@ use stardust_xr_fusion::{
 	spatial::Spatial,
 	HandlerWrapper,
 };
+use tokio::sync::mpsc;
 use tracing::{debug, trace};
+
+/// How should the grabbable interact with pointers?
+#[derive(Debug, Clone, Copy)]
+pub enum PointerMode {
+	/// Grabbable should act as a child of the pointer, its rotation stays constant relative to the pointer
+	Parent,
+	/// The grabbable aligns its forward direction with the pointer ray
+	Align,
+	/// The grabbable never rotates, only moves
+	Move,
+}
 
 /// Linear drag is in m/s, angular drag is in rad/s.
 #[derive(Debug, Clone, Copy)]
@@ -25,7 +37,7 @@ pub struct MomentumSettings {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct GrabData {
+pub struct GrabbableSettings {
 	/// Max distance that you can be to start grabbing
 	pub max_distance: f32,
 	/// None means no linear momentum.
@@ -34,8 +46,12 @@ pub struct GrabData {
 	pub angular_momentum: Option<MomentumSettings>,
 	/// Minimum number of frames you need to be grabbing to properly stop
 	pub frame_cancel_threshold: u32,
+	/// Should the grabbable be magnetized to the grab point?
+	pub magnet: bool,
+	/// How should pointers be handled?
+	pub pointer_mode: PointerMode,
 }
-impl Default for GrabData {
+impl Default for GrabbableSettings {
 	fn default() -> Self {
 		Self {
 			max_distance: 0.05,
@@ -48,25 +64,35 @@ impl Default for GrabData {
 				threshold: 0.2,
 			}),
 			frame_cancel_threshold: 2,
+			magnet: true,
+			pointer_mode: PointerMode::Parent,
 		}
 	}
+}
+
+#[derive(Clone)]
+pub struct GrabData {
+	pub settings: GrabbableSettings,
 }
 
 pub struct Grabbable {
 	root: Spatial,
 	content_parent: Spatial,
-	global_action: BaseInputAction<GrabData>,
 	condition_action: BaseInputAction<GrabData>,
 	grab_action: SingleActorAction<GrabData>,
 	input_handler: HandlerWrapper<InputHandler, InputActionHandler<GrabData>>,
+	field: UnknownField,
 	pointer_distance: f32,
-	min_distance: f32,
-	settings: GrabData,
+	settings: GrabbableSettings,
 	frame: u32,
 	start_frame: u32,
 	start_pose: (Vec3, Quat),
 	prev_pose: (Vec3, Quat),
 	pose: (Vec3, Quat),
+
+	closest_point_tx: mpsc::Sender<Vec3>,
+	closest_point_rx: mpsc::Receiver<Vec3>,
+
 	linear_velocity: Option<Vec3>,
 	angular_velocity: Option<(Vec3, f32)>,
 }
@@ -75,11 +101,10 @@ impl Grabbable {
 		content_space: &Spatial,
 		content_transform: Transform,
 		field: &Fi,
-		settings: GrabData,
+		settings: GrabbableSettings,
 	) -> Result<Self, NodeError> {
-		let global_action = BaseInputAction::new(false, |_, _| true);
-		let condition_action = BaseInputAction::new(false, |input, data: &GrabData| {
-			input.distance < data.max_distance
+		let condition_action = BaseInputAction::new(true, |input, data: &GrabData| {
+			input.distance < data.settings.max_distance
 		});
 		let grab_action = SingleActorAction::new(
 			true,
@@ -96,19 +121,19 @@ impl Grabbable {
 			Transform::default(),
 			field,
 		)?
-		.wrap(InputActionHandler::new(settings))?;
+		.wrap(InputActionHandler::new(GrabData { settings }))?;
 		let root = Spatial::create(input_handler.node(), Transform::default(), false)?;
 		let content_parent = Spatial::create(input_handler.node(), Transform::default(), true)?;
 		content_parent.set_transform(Some(content_space), content_transform)?;
 
+		let (closest_point_tx, closest_point_rx) = mpsc::channel(1);
 		Ok(Grabbable {
 			root,
 			content_parent,
-			global_action,
 			condition_action,
 			grab_action,
 			input_handler,
-			min_distance: f32::MAX,
+			field: field.alias_unknown_field(),
 			pointer_distance: 0.0,
 			settings,
 			frame: 0,
@@ -116,23 +141,29 @@ impl Grabbable {
 			start_pose: (vec3(0.0, 0.0, 0.0), Quat::IDENTITY),
 			prev_pose: (vec3(0.0, 0.0, 0.0), Quat::IDENTITY),
 			pose: (vec3(0.0, 0.0, 0.0), Quat::IDENTITY),
+
+			closest_point_tx,
+			closest_point_rx,
+
 			linear_velocity: None,
 			angular_velocity: None,
 		})
 	}
 	pub fn update(&mut self, info: &FrameInfo) -> Result<(), NodeError> {
+		// update input actions
 		self.input_handler.lock_wrapped().update_actions([
-			self.global_action.type_erase(),
 			self.condition_action.type_erase(),
 			self.grab_action.type_erase(),
 		]);
 		self.grab_action.update(&mut self.condition_action);
 
 		if self.grab_action.actor_started() {
+			// Make sure we can directly apply the grab data to the content parent
 			self.content_parent
 				.set_spatial_parent_in_place(self.input_handler.node())?;
 			let actor = self.grab_action.actor().unwrap();
 			if let InputDataType::Pointer(pointer) = &actor.input {
+				// store the pointer distance so we can keep it at the correct point
 				self.pointer_distance =
 					Vec3::from(pointer.origin).distance(pointer.deepest_point.into());
 			}
@@ -140,8 +171,15 @@ impl Grabbable {
 		}
 
 		if let Some(actor) = self.grab_action.actor().cloned() {
-			let (position, rotation) = self.input_position_rotation(&actor);
+			let (mut position, rotation) = self.input_position_rotation(&actor);
 			debug!(?position, ?rotation, uid = actor.uid, "Currently grabbing");
+
+			if self.settings.magnet {
+				if let Ok(closest_point) = self.closest_point_rx.try_recv() {
+					position -= rotation * closest_point;
+					let _ = self.closest_point_tx.try_send(closest_point);
+				}
+			}
 
 			self.root.set_transform(
 				Some(self.input_handler.node()),
@@ -176,6 +214,28 @@ impl Grabbable {
 			self.content_parent.set_zoneable(false)?;
 			self.content_parent
 				.set_spatial_parent_in_place(&self.root)?;
+
+			'magnet: {
+				if self.settings.magnet {
+					// if we have magnet strength, store the closest point so we can lerp that to the grab point
+					let grab_data = self.grab_action.actor().unwrap().clone();
+					// pointers are just too unstable to magnet
+					if let InputDataType::Pointer(_) = &grab_data.input {
+						break 'magnet;
+					}
+					let field = self.field.alias();
+					let root = self.root.alias();
+					let closest_point_tx = self.closest_point_tx.clone();
+					tokio::task::spawn(async move {
+						let result = async { field.closest_point(&root, [0.0; 3])?.await }
+							.await
+							.unwrap();
+						// if let Ok(result) = result {
+						let _ = closest_point_tx.send(result.into()).await;
+						// }
+					});
+				}
+			}
 		}
 		if self.grab_action.actor_stopped() {
 			debug!("Stopped grabbing");
@@ -188,6 +248,9 @@ impl Grabbable {
 					Transform::from_position_rotation(self.start_pose.0, self.start_pose.1),
 				)?;
 			}
+
+			// drain the closest point queue
+			let _ = self.closest_point_rx.try_recv();
 		}
 
 		if !self.grab_action.actor_acting() {
@@ -206,14 +269,6 @@ impl Grabbable {
 			}
 		}
 
-		self.min_distance = self
-			.global_action
-			.actively_acting
-			.iter()
-			.map(|data| data.distance)
-			.reduce(|a, b| a.min(b))
-			.unwrap_or(f32::MAX);
-
 		self.frame += 1;
 		Ok(())
 	}
@@ -230,7 +285,11 @@ impl Grabbable {
 				self.pointer_distance += scroll * 0.01;
 				let grab_point =
 					Vec3::from(p.origin) + (Vec3::from(p.direction()) * self.pointer_distance);
-				(grab_point, p.orientation.into())
+				match self.settings.pointer_mode {
+					PointerMode::Parent => (grab_point, p.orientation.into()),
+					PointerMode::Align => (grab_point, p.orientation.into()),
+					PointerMode::Move => (grab_point, Quat::IDENTITY),
+				}
 			}
 			InputDataType::Tip(t) => (t.origin.into(), t.orientation.into()),
 		}
@@ -296,9 +355,6 @@ impl Grabbable {
 	}
 	pub fn content_parent(&self) -> &Spatial {
 		&self.content_parent
-	}
-	pub fn min_distance(&self) -> f32 {
-		self.min_distance
 	}
 
 	pub fn set_enabled(&self, enabled: bool) -> Result<(), NodeError> {

@@ -1,3 +1,4 @@
+use glam::{vec3, Vec3};
 use map_range::MapRange;
 use mint::{Vector2, Vector3};
 use rustc_hash::FxHashSet;
@@ -111,7 +112,12 @@ impl TouchPlane {
 	}
 	pub fn interact_point(&self, input: &InputData) -> (Vector2<f32>, f32) {
 		let interact_point = match &input.input {
-			InputDataType::Pointer(p) => p.deepest_point,
+			InputDataType::Pointer(p) => {
+				let normal = vec3(0.0, 0.0, 1.0);
+				let denom = normal.dot(p.direction().into());
+				let t = -Vec3::from(p.origin).dot(normal) / denom;
+				(Vec3::from(p.origin) + Vec3::from(p.direction()) * t).into()
+			}
 			InputDataType::Hand(h) => h.index.tip.position,
 			InputDataType::Tip(t) => t.origin,
 		};

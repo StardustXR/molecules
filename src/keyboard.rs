@@ -89,12 +89,12 @@ impl KeyboardEvent {
 		};
 		if let Some(keys_up) = &self.keys_up {
 			for key_up in keys_up {
-				receiver_key_state.update_key(*key_up, KeyDirection::Up);
+				receiver_key_state.update_key((*key_up).into(), KeyDirection::Up);
 			}
 		}
 		if let Some(keys_down) = &self.keys_down {
 			for key_down in keys_down {
-				receiver_key_state.update_key(*key_down, KeyDirection::Down);
+				receiver_key_state.update_key((*key_down).into(), KeyDirection::Down);
 			}
 		}
 	}

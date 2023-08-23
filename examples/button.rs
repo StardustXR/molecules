@@ -2,6 +2,7 @@
 
 use color_eyre::eyre::Result;
 use manifest_dir_macros::directory_relative_path;
+use serde::{Deserialize, Serialize};
 use stardust_xr_fusion::{
 	client::{Client, FrameInfo, RootHandler},
 	core::values::Transform,
@@ -9,6 +10,7 @@ use stardust_xr_fusion::{
 };
 use stardust_xr_molecules::{
 	button::{Button, ButtonSettings},
+	data::SimplePulseReceiver,
 	DebugSettings, VisualDebug,
 };
 
@@ -27,7 +29,13 @@ async fn main() -> Result<()> {
 	Ok(())
 }
 
-struct ButtonDemo(Button);
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct ButtonAction {
+	action: (),
+	press: bool,
+}
+
+struct ButtonDemo(Button, SimplePulseReceiver<ButtonAction>);
 impl ButtonDemo {
 	fn new(client: &Client) -> Result<Self, NodeError> {
 		let mut button = Button::create(
@@ -37,7 +45,17 @@ impl ButtonDemo {
 			ButtonSettings::default(),
 		)?;
 		button.set_debug(Some(DebugSettings::default()));
-		Ok(ButtonDemo(button))
+		let action = SimplePulseReceiver::create(
+			button.touch_plane().root(),
+			Transform::default(),
+			&button.touch_plane().field(),
+			|_uid, data: &ButtonAction| {
+				if data.press {
+					dbg!(data);
+				}
+			},
+		)?;
+		Ok(ButtonDemo(button, action))
 	}
 }
 impl RootHandler for ButtonDemo {
