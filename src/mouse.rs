@@ -7,16 +7,11 @@ use stardust_xr_fusion::{
 	node::NodeError,
 };
 
-lazy_static::lazy_static! {
-	pub static ref MOUSE_MASK: Vec<u8> = {
-		let mut fbb = flexbuffers::Builder::default();
-		let mut map = fbb.start_map();
-		map.push("mouse", "v1");
-		map.end_map();
-		fbb.take_buffer()
-	};
-}
+use crate::datamap::Datamap;
 
+lazy_static::lazy_static! {
+	pub static ref MOUSE_MASK: Vec<u8> = Datamap::create(MouseEvent::default()).serialize();
+}
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MouseEvent {
 	pub mouse: String,
@@ -25,6 +20,18 @@ pub struct MouseEvent {
 	pub scroll_steps: Option<Vector2<f32>>,
 	pub buttons_up: Option<Vec<u32>>,
 	pub buttons_down: Option<Vec<u32>>,
+}
+impl Default for MouseEvent {
+	fn default() -> Self {
+		Self {
+			mouse: "v1".to_string(),
+			delta: None,
+			scroll_distance: None,
+			scroll_steps: None,
+			buttons_up: None,
+			buttons_down: None,
+		}
+	}
 }
 impl MouseEvent {
 	pub fn new(
@@ -100,19 +107,6 @@ async fn mouse_events() {
 		.await
 		.unwrap();
 	use stardust_xr_fusion::{core::values::Transform, node::NodeType};
-
-	struct PulseReceiverTest {
-		_client: std::sync::Arc<stardust_xr_fusion::client::Client>,
-	}
-	unsafe impl Send for PulseReceiverTest {}
-	unsafe impl Sync for PulseReceiverTest {}
-	impl stardust_xr_fusion::data::PulseReceiverHandler for PulseReceiverTest {
-		fn data(&mut self, uid: &str, data: &[u8], _data_reader: flexbuffers::MapReader<&[u8]>) {
-			let mouse_event = MouseEvent::from_pulse_data(data).unwrap();
-			println!("Pulse sender {} sent {:#?}", uid, mouse_event);
-			// self.client.stop_loop();
-		}
-	}
 	struct PulseSenderTest {
 		data: Vec<u8>,
 		node: PulseSender,
@@ -161,12 +155,12 @@ async fn mouse_events() {
 		node: pulse_sender.alias(),
 	};
 	let _pulse_sender = pulse_sender.wrap(pulse_sender_test).unwrap();
-	let _pulse_receiver =
-		PulseReceiver::create(client.get_root(), Transform::default(), &field, &MOUSE_MASK)
-			.unwrap()
-			.wrap(PulseReceiverTest {
-				_client: client.clone(),
-			});
+	let _pulse_receiver = crate::data::SimplePulseReceiver::create(
+		client.get_root(),
+		Transform::default(),
+		&field,
+		|uid, mouse_event: &MouseEvent| println!("Pulse sender {} sent {:#?}", uid, mouse_event),
+	);
 
 	tokio::select! {
 		_ = tokio::time::sleep(core::time::Duration::from_secs(60)) => panic!("Timed Out"),

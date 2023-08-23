@@ -14,14 +14,10 @@ use xkbcommon::xkb::{
 	KEYMAP_FORMAT_TEXT_V1,
 };
 
+use crate::datamap::Datamap;
+
 lazy_static::lazy_static! {
-	pub static ref KEYBOARD_MASK: Vec<u8> = {
-		let mut fbb = flexbuffers::Builder::default();
-		let mut map = fbb.start_map();
-		map.push("keyboard", "xkbv1");
-		map.end_map();
-		fbb.take_buffer()
-	};
+	pub static ref KEYBOARD_MASK: Vec<u8> = Datamap::create(KeyboardEvent::default()).serialize();
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -30,6 +26,16 @@ pub struct KeyboardEvent {
 	pub keymap: Option<String>,
 	pub keys_up: Option<Vec<u32>>,
 	pub keys_down: Option<Vec<u32>>,
+}
+impl Default for KeyboardEvent {
+	fn default() -> Self {
+		Self {
+			keyboard: "xkbv1".to_string(),
+			keymap: None,
+			keys_up: None,
+			keys_down: None,
+		}
+	}
 }
 impl KeyboardEvent {
 	pub fn new(
