@@ -7,7 +7,7 @@ use stardust_xr_fusion::{
 
 pub struct Datamap<D: Serialize + DeserializeOwned> {
 	serializer: FlexbufferSerializer,
-	data: D,
+	pub data: D,
 }
 impl<D: Serialize + DeserializeOwned> Datamap<D> {
 	pub fn create(data: D) -> Self {
