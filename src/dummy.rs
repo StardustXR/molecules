@@ -7,7 +7,7 @@ use stardust_xr_fusion::{
 	fields::UnknownField,
 	input::{InputData, InputHandlerHandler, UnknownInputMethod},
 	items::{
-		panel::{PanelItem, PanelItemHandler, PanelItemInitData, ToplevelInfo},
+		panel::{ChildInfo, Geometry, PanelItem, PanelItemHandler, PanelItemInitData},
 		EnvironmentItem, ItemAcceptorHandler,
 	},
 	spatial::{Spatial, ZoneHandler},
@@ -48,7 +48,10 @@ impl ItemAcceptorHandler<PanelItem> for DummyHandler {
 	fn released(&mut self, _uid: &str) {}
 }
 impl PanelItemHandler for DummyHandler {
-	fn commit_toplevel(&mut self, _state: Option<ToplevelInfo>) {}
+	fn toplevel_size_changed(&mut self, _size: mint::Vector2<u32>) {}
+	fn new_child(&mut self, _uid: &str, _info: ChildInfo) {}
+	fn reposition_child(&mut self, _uid: &str, _geometry: Geometry) {}
+	fn drop_child(&mut self, _uid: &str) {}
 }
 
 // Spatial
