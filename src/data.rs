@@ -17,7 +17,7 @@ pub struct SimplePulseReceiver<T: Serialize + DeserializeOwned + Default + 'stat
 	HandlerWrapper<PulseReceiver, InlineHandler<T>>,
 );
 impl<T: Serialize + DeserializeOwned + Default + 'static> SimplePulseReceiver<T> {
-	pub fn create<Fi: Field, F: FnMut(&str, &T) + Send + Sync + 'static>(
+	pub fn create<Fi: Field, F: FnMut(&str, T) + Send + Sync + 'static>(
 		spatial_parent: &Spatial,
 		transform: Transform,
 		field: &Fi,
@@ -44,7 +44,7 @@ impl<T: Serialize + DeserializeOwned + Default + 'static> std::ops::Deref
 }
 
 struct InlineHandler<T: Serialize + DeserializeOwned + Default + 'static>(
-	Box<dyn FnMut(&str, &T) + Send + Sync + 'static>,
+	Box<dyn FnMut(&str, T) + Send + Sync + 'static>,
 );
 impl<T: Serialize + DeserializeOwned + Default + 'static> PulseReceiverHandler
 	for InlineHandler<T>
@@ -52,7 +52,7 @@ impl<T: Serialize + DeserializeOwned + Default + 'static> PulseReceiverHandler
 	fn data(&mut self, uid: &str, data: &[u8], _data_reader: MapReader<&[u8]>) {
 		let Ok(root) = Reader::get_root(data) else {return};
 		let Ok(data) = T::deserialize(root) else {return};
-		(self.0)(uid, &data)
+		(self.0)(uid, data)
 	}
 }
 

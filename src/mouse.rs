@@ -159,7 +159,7 @@ async fn mouse_events() {
 		client.get_root(),
 		Transform::default(),
 		&field,
-		|uid, mouse_event: &MouseEvent| println!("Pulse sender {} sent {:#?}", uid, mouse_event),
+		|uid, mouse_event: MouseEvent| println!("Pulse sender {} sent {:#?}", uid, mouse_event),
 	);
 
 	tokio::select! {

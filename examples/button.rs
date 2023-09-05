@@ -32,6 +32,7 @@ async fn main() -> Result<()> {
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ButtonAction {
 	action: (),
+	button: (),
 	press: bool,
 }
 
@@ -49,7 +50,7 @@ impl ButtonDemo {
 			button.touch_plane().root(),
 			Transform::default(),
 			&button.touch_plane().field(),
-			|_uid, data: &ButtonAction| {
+			|_uid, data: ButtonAction| {
 				if data.press {
 					dbg!(data);
 				}
