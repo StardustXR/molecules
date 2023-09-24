@@ -66,23 +66,10 @@ impl<S: InputActionState> SingleActorAction<S> {
 			}
 		}
 
-		self.actor_started = false;
-		self.actor_changed = false;
-		self.actor_acting = false;
-		self.actor_stopped = false;
-
-		if old_actor.is_none() && self.actor.is_some() {
-			self.actor_started = true;
-		}
-		if old_actor.is_some() && self.actor.is_some() && old_actor != self.actor {
-			self.actor_changed = true;
-		}
-		if self.actor.is_some() {
-			self.actor_acting = true;
-		}
-		if old_actor.is_some() && self.actor.is_none() {
-			self.actor_stopped = true;
-		}
+		self.actor_started = old_actor.is_none() && self.actor.is_some();
+		self.actor_changed = old_actor.is_some() && self.actor.is_some() && old_actor != self.actor;
+		self.actor_acting = self.actor.is_some();
+		self.actor_stopped = old_actor.is_some() && self.actor.is_none();
 	}
 
 	pub fn actor_started(&self) -> bool {
