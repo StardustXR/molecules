@@ -116,14 +116,11 @@ impl Grabbable {
 			},
 			false,
 		);
-		let input_handler = InputHandler::create(
-			content_space.client()?.get_root(),
-			Transform::default(),
-			field,
-		)?
-		.wrap(InputActionHandler::new(GrabData { settings }))?;
-		let root = Spatial::create(input_handler.node(), Transform::default(), false)?;
-		let content_parent = Spatial::create(input_handler.node(), Transform::default(), true)?;
+		let input_handler =
+			InputHandler::create(content_space.client()?.get_root(), Transform::none(), field)?
+				.wrap(InputActionHandler::new(GrabData { settings }))?;
+		let root = Spatial::create(input_handler.node(), Transform::none(), false)?;
+		let content_parent = Spatial::create(input_handler.node(), Transform::none(), true)?;
 		content_parent.set_transform(Some(content_space), content_transform)?;
 
 		let (closest_point_tx, closest_point_rx) = mpsc::channel(1);

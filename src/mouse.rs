@@ -149,7 +149,7 @@ async fn mouse_events() {
 	};
 	mouse_event.serialize(&mut mouse_event_serializer).unwrap();
 	let pulse_sender =
-		PulseSender::create(client.get_root(), Transform::default(), &MOUSE_MASK).unwrap();
+		PulseSender::create(client.get_root(), Transform::none(), &MOUSE_MASK).unwrap();
 	let pulse_sender_test = PulseSenderTest {
 		data: mouse_event_serializer.take_buffer(),
 		node: pulse_sender.alias(),
@@ -157,7 +157,7 @@ async fn mouse_events() {
 	let _pulse_sender = pulse_sender.wrap(pulse_sender_test).unwrap();
 	let _pulse_receiver = crate::data::SimplePulseReceiver::create(
 		client.get_root(),
-		Transform::default(),
+		Transform::none(),
 		&field,
 		|uid, mouse_event: MouseEvent| println!("Pulse sender {} sent {:#?}", uid, mouse_event),
 	);

@@ -58,7 +58,7 @@ impl TouchPlane {
 			Transform::from_position([0.0, 0.0, thickness * -0.5]),
 			[size.x, size.y, thickness],
 		)?;
-		let input = InputHandler::create(&root, Transform::default(), &field)?
+		let input = InputHandler::create(&root, Transform::none(), &field)?
 			.wrap(InputActionHandler::new(State { size }))?;
 
 		let hover_action = BaseInputAction::new(false, Self::hover_action);

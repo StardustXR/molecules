@@ -41,7 +41,7 @@ impl GrabbableDemo {
 		let field = SphereField::create(client.get_root(), [0.0; 3], 0.1)?;
 		let grabbable = Grabbable::create(
 			client.get_root(),
-			Transform::default(),
+			Transform::none(),
 			&field,
 			GrabbableSettings::default(),
 		)?;

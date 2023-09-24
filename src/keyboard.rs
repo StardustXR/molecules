@@ -147,7 +147,7 @@ async fn keyboard_events() {
 		.serialize(&mut keyboard_event_serializer)
 		.unwrap();
 	let pulse_sender =
-		PulseSender::create(client.get_root(), Transform::default(), &KEYBOARD_MASK).unwrap();
+		PulseSender::create(client.get_root(), Transform::none(), &KEYBOARD_MASK).unwrap();
 	let pulse_sender_test = PulseSenderTest {
 		data: keyboard_event_serializer.take_buffer(),
 		node: pulse_sender.alias(),
@@ -155,7 +155,7 @@ async fn keyboard_events() {
 	let _pulse_sender = pulse_sender.wrap(pulse_sender_test).unwrap();
 	let _pulse_receiver = SimplePulseReceiver::create(
 		client.get_root(),
-		Transform::default(),
+		Transform::none(),
 		&field,
 		move |uid, keyboard_event: KeyboardEvent| {
 			println!("Pulse sender {} sent {:#?}", uid, keyboard_event);

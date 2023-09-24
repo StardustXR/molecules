@@ -41,14 +41,14 @@ impl ButtonDemo {
 	fn new(client: &Client) -> Result<Self, NodeError> {
 		let mut button = Button::create(
 			client.get_root(),
-			Transform::default(),
+			Transform::none(),
 			[0.1; 2],
 			ButtonSettings::default(),
 		)?;
 		button.set_debug(Some(DebugSettings::default()));
 		let action = SimplePulseReceiver::create(
 			button.touch_plane().root(),
-			Transform::default(),
+			Transform::none(),
 			&button.touch_plane().field(),
 			|_uid, data: ButtonAction| {
 				if data.press {
