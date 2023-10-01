@@ -4,11 +4,11 @@ use color_eyre::eyre::Result;
 use lazy_static::lazy_static;
 use manifest_dir_macros::directory_relative_path;
 use stardust_xr_fusion::{
-	client::{Client, FrameInfo, RootHandler},
+	client::{Client, ClientState, FrameInfo, RootHandler},
 	core::values::Transform,
 	drawable::{Model, ResourceID},
 	fields::SphereField,
-	node::NodeError,
+	node::{NodeError, NodeType},
 };
 use stardust_xr_molecules::{Grabbable, GrabbableSettings};
 
@@ -62,5 +62,11 @@ impl GrabbableDemo {
 impl RootHandler for GrabbableDemo {
 	fn frame(&mut self, info: FrameInfo) {
 		self.grabbable.update(&info).unwrap();
+	}
+	fn save_state(&mut self) -> ClientState {
+		ClientState {
+			root: Some(self.grabbable.content_parent().alias()),
+			..Default::default()
+		}
 	}
 }

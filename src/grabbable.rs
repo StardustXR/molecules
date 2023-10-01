@@ -103,8 +103,14 @@ impl Grabbable {
 		field: &Fi,
 		settings: GrabbableSettings,
 	) -> Result<Self, NodeError> {
-		let condition_action = BaseInputAction::new(true, |input, data: &GrabData| {
-			input.distance < data.settings.max_distance
+		let condition_action = BaseInputAction::new(false, |input, data: &GrabData| {
+			let max_distance = data.settings.max_distance;
+			match &input.input {
+				InputDataType::Hand(h) => {
+					h.thumb.tip.distance < max_distance && h.index.tip.distance < max_distance
+				}
+				_ => input.distance < max_distance,
+			}
 		});
 		let grab_action = SingleActorAction::new(
 			true,

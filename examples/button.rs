@@ -4,7 +4,7 @@ use color_eyre::eyre::Result;
 use manifest_dir_macros::directory_relative_path;
 use serde::{Deserialize, Serialize};
 use stardust_xr_fusion::{
-	client::{Client, FrameInfo, RootHandler},
+	client::{Client, ClientState, FrameInfo, RootHandler},
 	core::values::Transform,
 	node::NodeError,
 };
@@ -62,5 +62,8 @@ impl ButtonDemo {
 impl RootHandler for ButtonDemo {
 	fn frame(&mut self, _info: FrameInfo) {
 		self.0.update();
+	}
+	fn save_state(&mut self) -> ClientState {
+		ClientState::default()
 	}
 }

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use stardust_xr_fusion::{
-	client::{FrameInfo, RootHandler},
+	client::{ClientState, FrameInfo, RootHandler},
 	core::schemas::flex::flexbuffers::MapReader,
 	data::{NewReceiverInfo, PulseReceiver, PulseReceiverHandler, PulseSenderHandler},
 	fields::UnknownField,
@@ -16,6 +16,9 @@ use stardust_xr_fusion::{
 pub struct DummyHandler;
 impl RootHandler for DummyHandler {
 	fn frame(&mut self, _info: FrameInfo) {}
+	fn save_state(&mut self) -> ClientState {
+		ClientState::default()
+	}
 }
 
 // Input
