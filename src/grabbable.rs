@@ -284,7 +284,7 @@ impl Grabbable {
 			InputDataType::Pointer(p) => {
 				let scroll = input
 					.datamap
-					.with_data(|d| d.idx("scroll").as_vector().idx(1).as_f32());
+					.with_data(|d| d.idx("scroll_continuous").as_vector().idx(1).as_f32());
 				self.pointer_distance += scroll * 0.01;
 				let grab_point =
 					Vec3::from(p.origin) + (Vec3::from(p.direction()) * self.pointer_distance);
