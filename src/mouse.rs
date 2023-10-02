@@ -12,55 +12,39 @@ use crate::datamap::Datamap;
 lazy_static::lazy_static! {
 	pub static ref MOUSE_MASK: Vec<u8> = Datamap::create(MouseEvent::default()).serialize();
 }
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct MouseEvent {
-	pub mouse: String,
+	pub mouse: (),
+	pub v1: (),
 	pub delta: Option<Vector2<f32>>,
-	pub scroll_distance: Option<Vector2<f32>>,
-	pub scroll_steps: Option<Vector2<f32>>,
+	pub scroll_continuous: Option<Vector2<f32>>,
+	pub scroll_discrete: Option<Vector2<f32>>,
 	pub buttons_up: Option<Vec<u32>>,
 	pub buttons_down: Option<Vec<u32>>,
-}
-impl Default for MouseEvent {
-	fn default() -> Self {
-		Self {
-			mouse: "v1".to_string(),
-			delta: None,
-			scroll_distance: None,
-			scroll_steps: None,
-			buttons_up: None,
-			buttons_down: None,
-		}
-	}
 }
 impl MouseEvent {
 	pub fn new(
 		delta: Option<Vector2<f32>>,
-		scroll_distance: Option<Vector2<f32>>,
-		scroll_steps: Option<Vector2<f32>>,
+		scroll_continuous: Option<Vector2<f32>>,
+		scroll_discrete: Option<Vector2<f32>>,
 		buttons_up: Option<Vec<u32>>,
 		buttons_down: Option<Vec<u32>>,
 	) -> Self {
 		MouseEvent {
-			mouse: "v1".to_string(),
+			mouse: (),
+			v1: (),
 			delta,
-			scroll_distance,
-			scroll_steps,
+			scroll_continuous,
+			scroll_discrete,
 			buttons_up,
 			buttons_down,
 		}
 	}
 
 	pub fn from_pulse_data(data: &[u8]) -> Option<Self> {
-		flexbuffers::Reader::get_root(data).ok().and_then(|r| {
-			MouseEvent::deserialize(r).ok().and_then(|ev| {
-				if &ev.mouse == "v1" {
-					Some(ev)
-				} else {
-					None
-				}
-			})
-		})
+		flexbuffers::Reader::get_root(data)
+			.ok()
+			.and_then(|r| MouseEvent::deserialize(r).ok())
 	}
 
 	pub fn serialize_pulse_data(&self) -> Vec<u8> {
@@ -81,10 +65,10 @@ impl MouseEvent {
 
 	/// Does not handle delta
 	pub fn send_to_panel(&self, panel: &PanelItem, surface: &SurfaceID) -> Result<(), NodeError> {
-		if let Some(scroll_distance) = &self.scroll_distance {
+		if let Some(scroll_distance) = &self.scroll_continuous {
 			panel.pointer_scroll(surface, Some(*scroll_distance), None)?;
 		}
-		if let Some(scroll_steps) = &self.scroll_steps {
+		if let Some(scroll_steps) = &self.scroll_discrete {
 			panel.pointer_scroll(surface, None, Some(*scroll_steps))?;
 		}
 		if let Some(buttons_up) = &self.buttons_up {
@@ -140,10 +124,11 @@ async fn mouse_events() {
 
 	let mut mouse_event_serializer = flexbuffers::FlexbufferSerializer::new();
 	let mouse_event = MouseEvent {
-		mouse: "v1".to_string(),
+		mouse: (),
+		v1: (),
 		delta: None,
-		scroll_distance: None,
-		scroll_steps: None,
+		scroll_continuous: None,
+		scroll_discrete: None,
 		buttons_up: None,
 		buttons_down: Some(vec![]),
 	};
