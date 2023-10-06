@@ -8,8 +8,8 @@ pub fn multi_node_call<
 	O: Send + 'static,
 	F: Future<Output = Result<O, NodeError>> + Send + 'static,
 >(
-	inputs: &[I],
-	mut method: impl FnMut(&I) -> Result<F, NodeError>,
+	inputs: impl Iterator<Item = I>,
+	mut method: impl FnMut(I) -> Result<F, NodeError>,
 ) -> impl Future<Output = Vec<Result<O, NodeError>>> {
 	let mut join_set = JoinSet::new();
 	for input in inputs {
