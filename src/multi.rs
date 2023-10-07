@@ -4,7 +4,7 @@ use stardust_xr_fusion::node::NodeError;
 use tokio::task::JoinSet;
 
 pub fn multi_node_call<
-	I: 'static,
+	I,
 	O: Send + 'static,
 	F: Future<Output = Result<O, NodeError>> + Send + 'static,
 >(
