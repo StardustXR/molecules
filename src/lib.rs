@@ -2,6 +2,7 @@ pub mod button;
 pub mod data;
 pub mod datamap;
 mod dummy;
+mod exposure;
 mod grabbable;
 pub mod keyboard;
 pub mod lines;
@@ -12,6 +13,7 @@ pub mod touch_plane;
 
 use color::rgba;
 pub use dummy::*;
+pub use exposure::*;
 pub use grabbable::*;
 pub use single_actor_action::SingleActorAction;
 
