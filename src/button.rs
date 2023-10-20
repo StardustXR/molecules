@@ -5,7 +5,7 @@ use crate::{
 	touch_plane::TouchPlane,
 	VisualDebug,
 };
-use color::{rgba, AlphaColor, Rgba};
+use color::{color_space::LinearRgb, rgba_linear, AlphaColor, Rgba};
 use map_range::MapRange;
 use mint::Vector2;
 use stardust_xr_fusion::{
@@ -19,14 +19,14 @@ use stardust_xr_fusion::{
 pub struct ButtonSettings {
 	pub max_hover_distance: f32,
 	pub line_thickness: f32,
-	pub accent_color: Rgba<f32>,
+	pub accent_color: Rgba<f32, LinearRgb>,
 }
 impl Default for ButtonSettings {
 	fn default() -> Self {
 		Self {
 			max_hover_distance: 0.025,
 			line_thickness: 0.005,
-			accent_color: rgba!(0.0, 1.0, 0.75, 1.0),
+			accent_color: rgba_linear!(0.0, 1.0, 0.75, 1.0),
 		}
 	}
 }
@@ -95,7 +95,7 @@ impl ButtonVisuals {
 		let mut circle_points = make_line_points(
 			&circle(segment_count, PI * 0.5, half_size_x.min(half_size_y)),
 			0.0025,
-			rgba!(1.0, 1.0, 1.0, 1.0),
+			rgba_linear!(1.0, 1.0, 1.0, 1.0),
 		);
 		circle_points.reverse();
 		let rounded_rectangle_points = make_line_points(
@@ -106,7 +106,7 @@ impl ButtonVisuals {
 				segment_count / 4 - 1,
 			),
 			settings.line_thickness,
-			rgba!(1.0, 1.0, 1.0, 1.0),
+			rgba_linear!(1.0, 1.0, 1.0, 1.0),
 		);
 		let outline = Lines::create(
 			parent,
@@ -214,7 +214,7 @@ impl UnboundedVolumeSignifier {
 		parent: &Spatial,
 		position: impl Into<Vector2<f32>>,
 		thickness: f32,
-		color: Rgba<f32>,
+		color: Rgba<f32, LinearRgb>,
 	) -> Result<Self, NodeError> {
 		let position = position.into();
 		let start_point = LinePoint {

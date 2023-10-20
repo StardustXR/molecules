@@ -1,4 +1,4 @@
-use color::{Color, Rgba};
+use color::{color_space::LinearRgb, Color, Rgba};
 use glam::Vec3;
 use lerp::Lerp;
 use mint::Vector3;
@@ -104,7 +104,7 @@ pub fn arc(segments: usize, start_angle: f32, end_angle: f32, radius: f32) -> Ve
 pub fn make_line_points(
 	vec3s: &[Vector3<f32>],
 	thickness: f32,
-	color: Rgba<f32>,
+	color: Rgba<f32, LinearRgb>,
 ) -> Vec<LinePoint> {
 	vec3s
 		.into_iter()
