@@ -48,7 +48,12 @@ impl GrabbableDemo {
 			client.get_root(),
 			Transform::none(),
 			&field,
-			GrabbableSettings::default(),
+			GrabbableSettings {
+				linear_momentum: None,
+				angular_momentum: None,
+				magnet: false,
+				..Default::default()
+			},
 		)?;
 		let model = Model::create(
 			grabbable.content_parent(),
