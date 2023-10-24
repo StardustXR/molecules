@@ -38,11 +38,12 @@ impl<S: InputActionState> SingleActorAction<S> {
 	}
 	pub fn update<O: InputActionState>(&mut self, condition_action: &mut impl InputAction<O>) {
 		let old_actor = self.actor.clone();
+		self.base_action.capture_on_trigger =
+			self.capture_on_trigger && !condition_action.base().currently_acting.is_empty();
 
 		if let Some(actor) = &self.actor {
 			if self.base_action.stopped_acting.contains(actor) {
 				self.actor = None;
-				self.base_action.capture_on_trigger = false;
 			}
 		}
 		let condition_acting = condition_action
@@ -58,7 +59,6 @@ impl<S: InputActionState> SingleActorAction<S> {
 			.next();
 		if let Some(started_acting) = started_acting {
 			self.actor = Some(started_acting.clone());
-			self.base_action.capture_on_trigger = self.capture_on_trigger;
 		} else if let Some(actor) = &self.actor {
 			if let Some(actor) = self.base_action.currently_acting.get(actor) {
 				self.actor = Some(actor.clone());

@@ -69,7 +69,10 @@ impl<S: InputActionState> BaseInputAction<S> {
 
 	fn input_event(&mut self, data: &Arc<InputData>, state: &S) -> bool {
 		if (self.active_condition)(data, state) {
-			self.queued_inputs.insert(data.clone());
+			// if we want to capture this on trigger, then we shouldn't count it as triggered until it successfully captures
+			if !(self.capture_on_trigger && !data.captured) {
+				self.queued_inputs.insert(data.clone());
+			}
 			true
 		} else {
 			false
