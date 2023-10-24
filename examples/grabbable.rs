@@ -11,6 +11,7 @@ use stardust_xr_fusion::{
 	node::{NodeError, NodeType},
 };
 use stardust_xr_molecules::{Grabbable, GrabbableSettings};
+use tracing_subscriber::EnvFilter;
 
 lazy_static! {
 	static ref ICON_RESOURCE: ResourceID = ResourceID::new_namespaced("molecules", "urchin");
@@ -19,6 +20,10 @@ lazy_static! {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
 	color_eyre::install()?;
+	tracing_subscriber::fmt()
+		.compact()
+		.with_env_filter(EnvFilter::from_env("LOG_LEVEL"))
+		.init();
 	let (client, event_loop) = Client::connect_with_async_loop().await?;
 	client.set_base_prefixes(&[directory_relative_path!("res")]);
 

@@ -28,3 +28,4 @@ stardust-xr-fusion = { git = "https://github.com/StardustXR/core.git" }
 tokio = { version = "1.25.0", features = ["full"] }
 color-eyre = { version = "0.6.2", default-features = false }
 manifest-dir-macros = "0.1.16"
+tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
