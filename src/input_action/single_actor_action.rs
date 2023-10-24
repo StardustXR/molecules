@@ -1,9 +1,8 @@
 use rustc_hash::FxHashSet;
-use stardust_xr_fusion::input::{
-	action::{ActiveCondition, BaseInputAction, InputAction, InputActionState},
-	InputData,
-};
+use stardust_xr_fusion::input::InputData;
 use std::sync::Arc;
+
+use crate::input_action::{ActiveCondition, BaseInputAction, InputAction, InputActionState};
 
 #[derive(Debug)]
 pub struct SingleActorAction<S: InputActionState> {
@@ -48,7 +47,7 @@ impl<S: InputActionState> SingleActorAction<S> {
 		}
 		let condition_acting = condition_action
 			.base()
-			.actively_acting
+			.currently_acting
 			.difference(&condition_action.base().started_acting)
 			.cloned()
 			.collect::<FxHashSet<_>>();
@@ -61,7 +60,7 @@ impl<S: InputActionState> SingleActorAction<S> {
 			self.actor = Some(started_acting.clone());
 			self.base_action.capture_on_trigger = self.capture_on_trigger;
 		} else if let Some(actor) = &self.actor {
-			if let Some(actor) = self.base_action.actively_acting.get(actor) {
+			if let Some(actor) = self.base_action.currently_acting.get(actor) {
 				self.actor = Some(actor.clone());
 			}
 		}

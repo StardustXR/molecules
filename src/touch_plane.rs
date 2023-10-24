@@ -1,3 +1,8 @@
+use crate::{
+	input_action::{BaseInputAction, InputAction, InputActionHandler},
+	lines::{self, make_line_points},
+	DebugSettings, VisualDebug,
+};
 use glam::{vec3, Vec3};
 use map_range::MapRange;
 use mint::{Vector2, Vector3};
@@ -6,20 +11,12 @@ use stardust_xr_fusion::{
 	core::values::Transform,
 	drawable::Lines,
 	fields::{BoxField, Field, UnknownField},
-	input::{
-		action::{BaseInputAction, InputAction, InputActionHandler},
-		InputData, InputDataType, InputHandler,
-	},
+	input::{InputData, InputDataType, InputHandler},
 	node::{NodeError, NodeType},
 	spatial::Spatial,
 	HandlerWrapper,
 };
 use std::{ops::Range, sync::Arc};
-
-use crate::{
-	lines::{self, make_line_points},
-	DebugSettings, VisualDebug,
-};
 
 #[derive(Debug, Clone, Copy)]
 struct State {
@@ -167,7 +164,7 @@ impl TouchPlane {
 
 	/// Get all the raw inputs that are touching
 	pub fn touching_inputs(&self) -> &FxHashSet<Arc<InputData>> {
-		&self.touch_action.actively_acting
+		&self.touch_action.currently_acting
 	}
 	/// Is the surface getting its first touch?
 	pub fn touch_started(&self) -> bool {
@@ -191,7 +188,7 @@ impl TouchPlane {
 	}
 	/// Get all the points hovering over the surface, in x_range and y_range
 	pub fn hover_points(&self) -> Vec<Vector2<f32>> {
-		self.input_to_points(self.hover_action.actively_acting.iter())
+		self.input_to_points(self.hover_action.currently_acting.iter())
 	}
 
 	/// Get all the raw inputs that just started touching
@@ -233,12 +230,12 @@ impl TouchPlane {
 		]);
 
 		// Update the currently hovering stuff
-		self.currently_hovering = self.hover_action.actively_acting.clone();
+		self.currently_hovering = self.hover_action.currently_acting.clone();
 
 		// When we move from hovering in front of the button to intersecting it, that's the start of a touch!self
 		let hovered: FxHashSet<Arc<InputData>> = self
 			.hover_action
-			.actively_acting
+			.currently_acting
 			.iter()
 			.chain(self.hover_action.stopped_acting.iter())
 			.cloned()
@@ -261,7 +258,7 @@ impl TouchPlane {
 			// Add all the items that just started touching after hovering
 			.chain(self.started_interacting.iter())
 			// Update all the items that are still valid
-			.filter_map(|i| self.touch_action.actively_acting.get(i))
+			.filter_map(|i| self.touch_action.currently_acting.get(i))
 			.cloned()
 			.collect();
 	}

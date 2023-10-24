@@ -1,14 +1,11 @@
-use crate::single_actor_action::SingleActorAction;
+use crate::input_action::{BaseInputAction, InputAction, InputActionHandler, SingleActorAction};
 use glam::{vec3, Quat, Vec3};
 use mint::Vector3;
 use stardust_xr_fusion::{
 	client::FrameInfo,
 	core::values::Transform,
 	fields::{Field, UnknownField},
-	input::{
-		action::{BaseInputAction, InputAction, InputActionHandler},
-		InputData, InputDataType, InputHandler,
-	},
+	input::{InputData, InputDataType, InputHandler},
 	node::{NodeError, NodeType},
 	spatial::Spatial,
 	HandlerWrapper,
@@ -44,8 +41,6 @@ pub struct GrabbableSettings {
 	pub linear_momentum: Option<MomentumSettings>,
 	/// None means no angular momentum.
 	pub angular_momentum: Option<MomentumSettings>,
-	/// Minimum number of frames you need to be grabbing to properly stop
-	pub frame_cancel_threshold: u32,
 	/// Should the grabbable be magnetized to the grab point?
 	pub magnet: bool,
 	/// How should pointers be handled?
@@ -63,7 +58,6 @@ impl Default for GrabbableSettings {
 				drag: 15.0,
 				threshold: 0.2,
 			}),
-			frame_cancel_threshold: 2,
 			magnet: true,
 			pointer_mode: PointerMode::Parent,
 		}
@@ -243,14 +237,6 @@ impl Grabbable {
 		if self.grab_action.actor_stopped() {
 			debug!("Stopped grabbing");
 			self.content_parent.set_zoneable(true)?;
-			if !self.valid() {
-				self.cancel_angular_velocity();
-				self.cancel_linear_velocity();
-				self.root.set_transform(
-					Some(self.input_handler.node()),
-					Transform::from_position_rotation(self.start_pose.0, self.start_pose.1),
-				)?;
-			}
 
 			// drain the closest point queue
 			let _ = self.closest_point_rx.try_recv();
@@ -346,11 +332,6 @@ impl Grabbable {
 		!self.grab_action.actor_acting()
 			&& self.angular_velocity.is_some()
 			&& self.angular_velocity.unwrap().1 < Self::ANGULAR_VELOCITY_STOP_THRESHOLD
-	}
-
-	/// Is this a valid grab? (been grabbed more than the threshold)
-	pub fn valid(&self) -> bool {
-		self.frame > self.start_frame + self.settings.frame_cancel_threshold
 	}
 
 	pub fn grab_action(&self) -> &SingleActorAction<GrabData> {

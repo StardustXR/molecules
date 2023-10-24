@@ -4,18 +4,17 @@ pub mod datamap;
 mod dummy;
 mod exposure;
 mod grabbable;
+pub mod input_action;
 pub mod keyboard;
 pub mod lines;
 pub mod mouse;
 pub mod multi;
-mod single_actor_action;
 pub mod touch_plane;
 
 use color::{color_space::LinearRgb, rgba_linear};
 pub use dummy::*;
 pub use exposure::*;
 pub use grabbable::*;
-pub use single_actor_action::SingleActorAction;
 
 #[derive(Debug, Clone, Copy)]
 pub struct DebugSettings {
