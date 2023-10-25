@@ -100,9 +100,7 @@ impl Grabbable {
 		let condition_action = BaseInputAction::new(false, |input, data: &GrabData| {
 			let max_distance = data.settings.max_distance;
 			match &input.input {
-				InputDataType::Hand(h) => {
-					h.thumb.tip.distance < max_distance && h.index.tip.distance < max_distance
-				}
+				InputDataType::Hand(h) => h.thumb.tip.distance < 0.0 && h.index.tip.distance < 0.0,
 				_ => input.distance < max_distance,
 			}
 		});
