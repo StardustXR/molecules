@@ -169,6 +169,30 @@ impl Grabbable {
 				// store the pointer distance so we can keep it at the correct point
 				self.pointer_distance =
 					Vec3::from(pointer.origin).distance(pointer.deepest_point.into());
+				match &self.settings.pointer_mode {
+					PointerMode::Align => {
+						let future = self
+							.content_parent
+							.get_position_rotation_scale(self.input_handler.node())
+							.unwrap();
+						let content_parent = self.content_parent.alias();
+						let pointer = pointer.clone();
+						tokio::task::spawn(async move {
+							let Ok((position, _, _)) = future.await else {
+								return;
+							};
+							let rotation = swing(
+								Quat::from_rotation_arc(
+									pointer.direction().into(),
+									(Vec3::from(position) - Vec3::from(pointer.origin)).normalize(),
+								),
+								pointer.direction().into(),
+							);
+							content_parent.set_rotation(None, rotation).unwrap();
+						});
+					}
+					_ => (),
+				}
 			}
 			self.start_frame = self.frame;
 		}
@@ -188,13 +212,6 @@ impl Grabbable {
 				Some(self.input_handler.node()),
 				Transform::from_position_rotation(position, rotation),
 			)?;
-			match (&actor.input, &self.settings.pointer_mode) {
-				(InputDataType::Pointer(_), PointerMode::Align) => {
-					self.content_parent()
-						.set_rotation(Some(&self.root), Quat::IDENTITY)?;
-				}
-				_ => (),
-			}
 
 			self.prev_pose = self.pose;
 			self.pose = (position, rotation);
@@ -289,9 +306,7 @@ impl Grabbable {
 					Vec3::from(p.origin) + (Vec3::from(p.direction()) * self.pointer_distance);
 				match self.settings.pointer_mode {
 					PointerMode::Parent => (grab_point, p.orientation.into()),
-					PointerMode::Align => (grab_point, {
-						swing(Quat::from(p.orientation), p.direction().into())
-					}),
+					PointerMode::Align => (grab_point, p.orientation.into()),
 					PointerMode::Move => (grab_point, Quat::IDENTITY),
 				}
 			}
