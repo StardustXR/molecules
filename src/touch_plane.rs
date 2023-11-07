@@ -29,12 +29,13 @@ pub struct TouchPlane {
 	field: BoxField,
 	hover_action: BaseInputAction<State>,
 	touch_action: BaseInputAction<State>,
+	touch_capture_action: BaseInputAction<State>,
 	size: Vector2<f32>,
 	pub x_range: Range<f32>,
 	pub y_range: Range<f32>,
 	thickness: f32,
 	currently_hovering: FxHashSet<Arc<InputData>>,
-	started_interacting: FxHashSet<Arc<InputData>>,
+	started_touching: FxHashSet<Arc<InputData>>,
 	currently_interacting: FxHashSet<Arc<InputData>>,
 	stopped_interacting: FxHashSet<Arc<InputData>>,
 	debug_lines: Option<(Lines, Lines)>,
@@ -59,19 +60,21 @@ impl TouchPlane {
 			.wrap(InputActionHandler::new(State { size }))?;
 
 		let hover_action = BaseInputAction::new(false, Self::hover_action);
-		let touch_action = BaseInputAction::new(true, Self::touch_action);
+		let touch_action = BaseInputAction::new(false, Self::touch_action);
+		let touch_capture_action = BaseInputAction::new(true, Self::touch_action);
 		Ok(TouchPlane {
 			root,
 			input,
 			field,
 			hover_action,
 			touch_action,
+			touch_capture_action,
 			size,
 			x_range,
 			y_range,
 			thickness,
 			currently_hovering: FxHashSet::default(),
-			started_interacting: FxHashSet::default(),
+			started_touching: FxHashSet::default(),
 			currently_interacting: FxHashSet::default(),
 			stopped_interacting: FxHashSet::default(),
 			debug_lines: None,
@@ -169,9 +172,9 @@ impl TouchPlane {
 	}
 	/// Is the surface getting its first touch?
 	pub fn touch_started(&self) -> bool {
-		!self.started_interacting.is_empty()
+		!self.started_touching.is_empty()
 			&& self
-				.started_interacting
+				.started_touching
 				.is_superset(&self.currently_interacting)
 	}
 	/// Is something touching the surface?
@@ -197,7 +200,7 @@ impl TouchPlane {
 
 	/// Get all the raw inputs that just started touching
 	pub fn started_inputs(&self) -> &FxHashSet<Arc<InputData>> {
-		&self.started_interacting
+		&self.started_touching
 	}
 	/// Get all the raw inputs that are currently touching
 	pub fn interacting_inputs(&self) -> &FxHashSet<Arc<InputData>> {
@@ -210,7 +213,7 @@ impl TouchPlane {
 
 	/// Get all the 2D points in the x and y range that just started touching
 	pub fn touch_down_points(&self) -> Vec<Vector2<f32>> {
-		self.input_to_points(self.started_interacting.iter())
+		self.input_to_points(self.started_touching.iter())
 	}
 	/// Get all the 2D points in the x and y range that are currently touching
 	pub fn touching_points(&self) -> Vec<Vector2<f32>> {
@@ -231,6 +234,7 @@ impl TouchPlane {
 		self.input.lock_wrapped().update_actions([
 			self.hover_action.type_erase(),
 			self.touch_action.type_erase(),
+			self.touch_capture_action.type_erase(),
 		]);
 
 		// Update the currently hovering stuff
@@ -241,10 +245,11 @@ impl TouchPlane {
 			.hover_action
 			.currently_acting
 			.iter()
+			.filter(|i| !self.hover_action.started_acting.contains(*i))
 			.chain(self.hover_action.stopped_acting.iter())
 			.cloned()
 			.collect();
-		self.started_interacting = hovered
+		self.started_touching = hovered
 			.intersection(&self.touch_action.started_acting)
 			.cloned()
 			.collect();
@@ -260,7 +265,7 @@ impl TouchPlane {
 			.currently_interacting
 			.iter()
 			// Add all the items that just started touching after hovering
-			.chain(self.started_interacting.iter())
+			.chain(self.started_touching.iter())
 			// Update all the items that are still valid
 			.filter_map(|i| self.touch_action.currently_acting.get(i))
 			.cloned()
