@@ -85,20 +85,21 @@ impl TouchPlane {
 	}
 	fn hover_action(input: &InputData, state: &State) -> bool {
 		match &input.input {
-			InputDataType::Pointer(_) => {
-				input.distance < 0.0 && input.datamap.with_data(|d| d.idx("select").as_f32()) < 0.5
-			}
+			InputDataType::Pointer(_) => input.distance < 0.0,
 			InputDataType::Hand(h) => {
 				// Self::hover(state.size, h.thumb.tip.position) ||
 				Self::hover(state.size, h.index.tip.position, true)
+					|| Self::hover(state.size, h.index.tip.position, false)
 			}
-			InputDataType::Tip(t) => Self::hover(state.size, t.origin, true),
+			InputDataType::Tip(t) => {
+				Self::hover(state.size, t.origin, true) || Self::hover(state.size, t.origin, false)
+			}
 		}
 	}
 	fn touch_action(input: &InputData, state: &State) -> bool {
 		match &input.input {
 			InputDataType::Pointer(_) => {
-				input.datamap.with_data(|d| d.idx("select").as_f32() > 0.5) && input.distance < 0.0
+				input.datamap.with_data(|d| d.idx("select").as_f32() > 0.5)
 			}
 			InputDataType::Hand(h) => {
 				// Self::hover(state.size, h.thumb.tip.position) ||
@@ -183,8 +184,11 @@ impl TouchPlane {
 	}
 
 	/// Get all the raw inputs that are hovering
-	pub fn hovering_inputs(&self) -> &FxHashSet<Arc<InputData>> {
-		&self.currently_hovering
+	pub fn hovering_inputs(&self) -> FxHashSet<Arc<InputData>> {
+		self.currently_hovering
+			.difference(&self.currently_interacting)
+			.cloned()
+			.collect()
 	}
 	/// Get all the points hovering over the surface, in x_range and y_range
 	pub fn hover_points(&self) -> Vec<Vector2<f32>> {

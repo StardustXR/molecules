@@ -150,7 +150,7 @@ impl ButtonVisuals {
 		if let Some((hover_point, hover_distance)) = touch_plane
 			.hovering_inputs()
 			.into_iter()
-			.map(|p| touch_plane.interact_point(p))
+			.map(|p| touch_plane.interact_point(&p))
 			.nth(0)
 		{
 			let scale = hover_distance
@@ -192,13 +192,15 @@ impl ButtonVisuals {
 			self.outline.update_points(&points).unwrap();
 		}
 		if touch_plane.touching() {
-			let distance = touch_plane
+			let Some(distance) = touch_plane
 				.touching_inputs()
 				.into_iter()
 				.map(|i| touch_plane.interact_point(i).1)
 				.reduce(|a, b| a.abs().max(b.abs()))
-				.unwrap()
-				.abs();
+				.map(f32::abs)
+			else {
+				return;
+			};
 
 			let _ = self.outline.set_scale(None, [1.0, 1.0, distance]);
 		}
