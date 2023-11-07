@@ -1,5 +1,5 @@
 use crate::input_action::{BaseInputAction, InputAction, InputActionHandler, SingleActorAction};
-use glam::{vec3, Quat, Vec3};
+use glam::{vec3, EulerRot, Quat, Vec3};
 use mint::Vector3;
 use stardust_xr_fusion::{
 	client::FrameInfo,
@@ -274,7 +274,11 @@ impl Grabbable {
 					Vec3::from(p.origin) + (Vec3::from(p.direction()) * self.pointer_distance);
 				match self.settings.pointer_mode {
 					PointerMode::Parent => (grab_point, p.orientation.into()),
-					PointerMode::Align => (grab_point, p.orientation.into()),
+					PointerMode::Align => (grab_point, {
+						let o = Quat::from(p.orientation);
+						let (x, y, _) = o.to_euler(EulerRot::XYZ);
+						Quat::from_euler(EulerRot::XYZ, x, y, 0.0)
+					}),
 					PointerMode::Move => (grab_point, Quat::IDENTITY),
 				}
 			}
@@ -283,7 +287,9 @@ impl Grabbable {
 	}
 	const LINEAR_VELOCITY_STOP_THRESHOLD: f32 = 0.0001;
 	fn apply_linear_momentum(&mut self, info: &FrameInfo, settings: MomentumSettings) {
-		let Some(velocity) = &mut self.linear_velocity else {return};
+		let Some(velocity) = &mut self.linear_velocity else {
+			return;
+		};
 		let delta = info.delta as f32;
 		if velocity.length_squared() < Self::LINEAR_VELOCITY_STOP_THRESHOLD {
 			self.linear_velocity.take();
@@ -295,7 +301,9 @@ impl Grabbable {
 	}
 	const ANGULAR_VELOCITY_STOP_THRESHOLD: f32 = 0.001;
 	fn apply_angular_momentum(&mut self, info: &FrameInfo, settings: MomentumSettings) {
-		let Some((axis, angle)) = &mut self.angular_velocity else {return};
+		let Some((axis, angle)) = &mut self.angular_velocity else {
+			return;
+		};
 		let delta = info.delta as f32;
 		if *angle < Self::ANGULAR_VELOCITY_STOP_THRESHOLD {
 			self.angular_velocity.take();
