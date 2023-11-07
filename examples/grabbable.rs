@@ -10,7 +10,7 @@ use stardust_xr_fusion::{
 	fields::SphereField,
 	node::{NodeError, NodeType},
 };
-use stardust_xr_molecules::{Grabbable, GrabbableSettings};
+use stardust_xr_molecules::{Grabbable, GrabbableSettings, PointerMode};
 use tracing_subscriber::EnvFilter;
 
 lazy_static! {
@@ -52,6 +52,7 @@ impl GrabbableDemo {
 				linear_momentum: None,
 				angular_momentum: None,
 				magnet: false,
+				pointer_mode: PointerMode::Align,
 				..Default::default()
 			},
 		)?;

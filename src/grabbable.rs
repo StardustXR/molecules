@@ -1,5 +1,5 @@
 use crate::input_action::{BaseInputAction, InputAction, InputActionHandler, SingleActorAction};
-use glam::{vec3, EulerRot, Quat, Vec3};
+use glam::{vec3, Quat, Vec3};
 use mint::Vector3;
 use stardust_xr_fusion::{
 	client::FrameInfo,
@@ -13,14 +13,14 @@ use stardust_xr_fusion::{
 use tokio::sync::mpsc;
 use tracing::{debug, trace};
 
-pub fn swing_twist_decomposition(rotation: Quat, direction: Vec3) -> (Quat, Quat) {
-	let ra = Vec3::new(rotation.x, rotation.y, rotation.z); // rotation axis
-	let p = ra.project_onto(direction); // projection of ra onto direction
-	let twist = Quat::from_xyzw(p.x, p.y, p.z, rotation.w).normalize();
-	let swing = rotation * twist.conjugate();
-	(swing, twist)
-}
+fn swing(orientation: Quat, twist_direction: Vec3) -> Quat {
+	let rotation_axis = Vec3::new(orientation.x, orientation.y, orientation.z);
+	let proj = rotation_axis.project_onto(twist_direction);
+	let twist = Quat::from_xyzw(proj.x, proj.y, proj.z, orientation.w).normalize();
+	let swing = orientation * twist.inverse();
 
+	swing
+}
 /// How should the grabbable interact with pointers?
 #[derive(Debug, Clone, Copy)]
 pub enum PointerMode {
@@ -188,6 +188,13 @@ impl Grabbable {
 				Some(self.input_handler.node()),
 				Transform::from_position_rotation(position, rotation),
 			)?;
+			match (&actor.input, &self.settings.pointer_mode) {
+				(InputDataType::Pointer(_), PointerMode::Align) => {
+					self.content_parent()
+						.set_rotation(Some(&self.root), Quat::IDENTITY)?;
+				}
+				_ => (),
+			}
 
 			self.prev_pose = self.pose;
 			self.pose = (position, rotation);
@@ -283,7 +290,7 @@ impl Grabbable {
 				match self.settings.pointer_mode {
 					PointerMode::Parent => (grab_point, p.orientation.into()),
 					PointerMode::Align => (grab_point, {
-						swing_twist_decomposition(Quat::from(p.orientation), p.direction().into()).0
+						swing(Quat::from(p.orientation), p.direction().into())
 					}),
 					PointerMode::Move => (grab_point, Quat::IDENTITY),
 				}
