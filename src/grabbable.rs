@@ -13,6 +13,14 @@ use stardust_xr_fusion::{
 use tokio::sync::mpsc;
 use tracing::{debug, trace};
 
+pub fn swing_twist_decomposition(rotation: Quat, direction: Vec3) -> (Quat, Quat) {
+	let ra = Vec3::new(rotation.x, rotation.y, rotation.z); // rotation axis
+	let p = ra.project_onto(direction); // projection of ra onto direction
+	let twist = Quat::from_xyzw(p.x, p.y, p.z, rotation.w).normalize();
+	let swing = rotation * twist.conjugate();
+	(swing, twist)
+}
+
 /// How should the grabbable interact with pointers?
 #[derive(Debug, Clone, Copy)]
 pub enum PointerMode {
@@ -275,9 +283,7 @@ impl Grabbable {
 				match self.settings.pointer_mode {
 					PointerMode::Parent => (grab_point, p.orientation.into()),
 					PointerMode::Align => (grab_point, {
-						let o = Quat::from(p.orientation);
-						let (x, y, _) = o.to_euler(EulerRot::XYZ);
-						Quat::from_euler(EulerRot::XYZ, x, y, 0.0)
+						swing_twist_decomposition(Quat::from(p.orientation), p.direction().into()).0
 					}),
 					PointerMode::Move => (grab_point, Quat::IDENTITY),
 				}
