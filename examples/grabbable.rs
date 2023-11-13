@@ -7,14 +7,14 @@ use stardust_xr_fusion::{
 	client::{Client, ClientState, FrameInfo, RootHandler},
 	core::values::Transform,
 	drawable::{Model, ResourceID},
-	fields::SphereField,
+	fields::BoxField,
 	node::{NodeError, NodeType},
 };
 use stardust_xr_molecules::{Grabbable, GrabbableSettings, PointerMode};
 use tracing_subscriber::EnvFilter;
 
 lazy_static! {
-	static ref ICON_RESOURCE: ResourceID = ResourceID::new_namespaced("molecules", "urchin");
+	static ref GRABBABLE_MODEL: ResourceID = ResourceID::new_namespaced("molecules", "grabbable");
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -27,7 +27,7 @@ async fn main() -> Result<()> {
 	let (client, event_loop) = Client::connect_with_async_loop().await?;
 	client.set_base_prefixes(&[directory_relative_path!("res")]);
 
-	let _wrapped_root = client.wrap_root(GrabbableDemo::new(&client)?)?;
+	let _wrapped_root = client.wrap_root(GrabbableDemo::new(&client).await?)?;
 
 	tokio::select! {
 		_ = tokio::signal::ctrl_c() => (),
@@ -38,12 +38,23 @@ async fn main() -> Result<()> {
 
 struct GrabbableDemo {
 	grabbable: Grabbable,
-	field: SphereField,
+	field: BoxField,
 	model: Model,
 }
 impl GrabbableDemo {
-	fn new(client: &Client) -> Result<Self, NodeError> {
-		let field = SphereField::create(client.get_root(), [0.0; 3], 0.1)?;
+	async fn new(client: &Client) -> Result<Self, NodeError> {
+		let model = Model::create(
+			client.get_root(),
+			Transform::from_scale([0.5; 3]),
+			&*GRABBABLE_MODEL,
+		)?;
+		let bounds = model.get_bounding_box(Some(client.get_root()))?.await?;
+		let field = BoxField::create(
+			&client.get_root(),
+			Transform::from_position(bounds.center),
+			bounds.size,
+		)?;
+
 		let grabbable = Grabbable::create(
 			client.get_root(),
 			Transform::none(),
@@ -56,11 +67,7 @@ impl GrabbableDemo {
 				..Default::default()
 			},
 		)?;
-		let model = Model::create(
-			grabbable.content_parent(),
-			Transform::from_scale([0.1; 3]),
-			&*ICON_RESOURCE,
-		)?;
+		model.set_spatial_parent(grabbable.content_parent())?;
 		field.set_spatial_parent(grabbable.content_parent())?;
 
 		Ok(GrabbableDemo {
