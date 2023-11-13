@@ -18,7 +18,7 @@ use tracing::{debug, trace};
 fn swing_direction(direction: Vec3) -> Quat {
 	let pitch = direction.y.asin();
 	let yaw = direction.z.atan2(direction.x);
-	Quat::from_euler(EulerRot::XYZ, pitch, -yaw + PI / 2.0, 0.0)
+	Quat::from_euler(EulerRot::XYZ, pitch, -yaw - PI / 2.0, 0.0)
 }
 
 /// How should the grabbable interact with pointers?
