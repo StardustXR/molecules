@@ -1,7 +1,7 @@
 use std::f32::consts::PI;
 
 use crate::input_action::{BaseInputAction, InputAction, InputActionHandler, SingleActorAction};
-use glam::{vec3, EulerRot, Quat, Vec3};
+use glam::{vec3, Quat, Vec3};
 use mint::Vector3;
 use stardust_xr_fusion::{
 	client::FrameInfo,
@@ -18,7 +18,7 @@ use tracing::{debug, trace};
 fn swing_direction(direction: Vec3) -> Quat {
 	let pitch = direction.y.asin();
 	let yaw = direction.z.atan2(direction.x);
-	Quat::from_euler(EulerRot::XYZ, pitch, -yaw - PI / 2.0, 0.0)
+	Quat::from_rotation_y(-yaw - PI / 2.0) * Quat::from_rotation_x(pitch)
 }
 
 /// How should the grabbable interact with pointers?
@@ -183,19 +183,14 @@ impl Grabbable {
 					let _ = self.closest_point_tx.try_send(closest_point);
 				}
 			}
-			self.root.set_transform(
+			let transform_spatial = match (self.settings.pointer_mode, &actor.input) {
+				(PointerMode::Align, InputDataType::Pointer(_)) => self.content_parent(),
+				_ => &self.root,
+			};
+			transform_spatial.set_transform(
 				Some(self.input_handler.node()),
 				Transform::from_position_rotation(position, rotation),
 			)?;
-			match (self.settings.pointer_mode, &actor.input) {
-				(PointerMode::Align, InputDataType::Pointer(p)) => {
-					self.content_parent.set_rotation(
-						Some(self.input_handler.node()),
-						swing_direction(p.direction().into()),
-					)?
-				}
-				_ => (),
-			};
 
 			self.prev_pose = self.pose;
 			self.pose = (position, rotation);
@@ -290,7 +285,7 @@ impl Grabbable {
 					Vec3::from(p.origin) + (Vec3::from(p.direction()) * self.pointer_distance);
 				match self.settings.pointer_mode {
 					PointerMode::Parent => (p.origin.into(), p.orientation.into()),
-					PointerMode::Align => (grab_point, Quat::IDENTITY),
+					PointerMode::Align => (grab_point, swing_direction(p.direction().into())),
 					PointerMode::Move => (grab_point, Quat::IDENTITY),
 				}
 			}
