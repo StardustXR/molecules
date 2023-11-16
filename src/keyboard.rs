@@ -7,7 +7,6 @@ use stardust_xr_fusion::{
 	node::{NodeError, NodeType},
 	spatial::Spatial,
 };
-pub use xkbcommon::xkb;
 
 use crate::{data::SimplePulseReceiver, datamap::Datamap};
 
