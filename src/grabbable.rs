@@ -162,7 +162,7 @@ impl Grabbable {
 			self.condition_action.type_erase(),
 			self.grab_action.type_erase(),
 		]);
-		self.grab_action.update(&mut self.condition_action);
+		self.grab_action.update(Some(&mut self.condition_action));
 
 		if self.grab_action.actor_started() {
 			// Make sure we can directly apply the grab data to the content parent

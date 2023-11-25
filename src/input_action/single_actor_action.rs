@@ -36,7 +36,10 @@ impl<S: InputActionState> SingleActorAction<S> {
 			actor: None,
 		}
 	}
-	pub fn update<O: InputActionState>(&mut self, condition_action: &mut impl InputAction<O>) {
+	pub fn update<O: InputActionState>(
+		&mut self,
+		condition_action: Option<&mut impl InputAction<O>>,
+	) {
 		let old_actor = self.actor.clone();
 
 		if let Some(actor) = &self.actor {
@@ -44,19 +47,26 @@ impl<S: InputActionState> SingleActorAction<S> {
 				self.actor = None;
 			}
 		}
-		let condition_acting = condition_action
-			.base()
-			.currently_acting
-			.difference(&condition_action.base().started_acting)
-			.cloned()
-			.collect::<FxHashSet<_>>();
-		let started_acting = self
-			.base_action
-			.started_acting
-			.intersection(&condition_acting)
-			.next();
-		self.base_action.capture_on_trigger =
-			self.capture_on_trigger && !condition_acting.is_empty();
+		let started_acting;
+		if let Some(condition_action) = condition_action {
+			let condition_acting = condition_action
+				.base()
+				.currently_acting
+				.difference(&condition_action.base().started_acting)
+				.cloned()
+				.collect::<FxHashSet<_>>();
+			started_acting = self
+				.base_action
+				.started_acting
+				.intersection(&condition_acting)
+				.next()
+				.cloned();
+			self.base_action.capture_on_trigger =
+				self.capture_on_trigger && !condition_acting.is_empty();
+		} else {
+			started_acting = self.base_action.started_acting.iter().next().cloned();
+			self.base_action.capture_on_trigger = self.capture_on_trigger;
+		}
 		if let Some(started_acting) = started_acting {
 			self.actor = Some(started_acting.clone());
 		} else if let Some(actor) = &self.actor {
