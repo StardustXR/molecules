@@ -13,7 +13,10 @@ impl<D: Serialize + DeserializeOwned> Datamap<D> {
 	pub fn from_data(data: &[u8]) -> Result<Self, DeserializationError> {
 		flexbuffers::from_slice(data).map(|f| Datamap(f))
 	}
-	pub fn update_input_method(&mut self, input_method: &InputMethod) -> Result<(), NodeError> {
+	pub fn update_input_method(
+		&mut self,
+		input_method: &impl InputMethod,
+	) -> Result<(), NodeError> {
 		input_method.set_datamap(&self.serialize())
 	}
 

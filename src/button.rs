@@ -10,7 +10,7 @@ use map_range::MapRange;
 use mint::Vector2;
 use stardust_xr_fusion::{
 	core::values::Transform,
-	drawable::{LinePoint, Lines},
+	drawable::{Line, LinePoint, Lines},
 	node::NodeError,
 	spatial::Spatial,
 };
@@ -111,8 +111,10 @@ impl ButtonVisuals {
 		let outline = Lines::create(
 			parent,
 			Transform::from_scale([1.0, 1.0, 0.0]),
-			&circle_points,
-			true,
+			&[Line {
+				points: circle_points.clone(),
+				cyclic: true,
+			}],
 		)?;
 		let corner_lines = array::from_fn(|n| {
 			let (corner_sin, corner_cos) = (settings.line_thickness * 0.5).sin_cos();
@@ -158,15 +160,15 @@ impl ButtonVisuals {
 				.clamp(0.0, 1.0);
 
 			let scale_morph = scale.map_range(0.5..1.0, 0.0..1.0);
-			let _ = self.outline.update_points(
-				lerp(
+			let _ = self.outline.update_lines(&[Line {
+				points: lerp(
 					&self.circle_points,
 					&self.rounded_rectangle_points,
 					scale_morph,
 				)
-				.as_ref()
 				.unwrap(),
-			);
+				cyclic: true,
+			}]);
 			let _ = self.outline.set_transform(
 				None,
 				Transform::from_position_scale(
@@ -189,7 +191,12 @@ impl ButtonVisuals {
 					point
 				})
 				.collect::<Vec<_>>();
-			self.outline.update_points(&points).unwrap();
+			self.outline
+				.update_lines(&[Line {
+					points,
+					cyclic: true,
+				}])
+				.unwrap();
 		}
 		if touch_plane.touching() {
 			let Some(distance) = touch_plane
@@ -232,8 +239,10 @@ impl UnboundedVolumeSignifier {
 		Ok(UnboundedVolumeSignifier(Lines::create(
 			parent,
 			Transform::from_position([position.x, position.y, 0.0]),
-			&[start_point, end_point],
-			false,
+			&[Line {
+				points: vec![start_point, end_point],
+				cyclic: false,
+			}],
 		)?))
 	}
 }

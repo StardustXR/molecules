@@ -60,7 +60,7 @@ impl PanelItemHandler for DummyHandler {
 // Spatial
 impl ZoneHandler for DummyHandler {
 	fn enter(&mut self, _uid: &str, _spatial: Spatial) {}
-	fn capture(&mut self, _uid: &str, _spatial: Spatial) {}
+	fn capture(&mut self, _uid: &str) {}
 	fn release(&mut self, _uid: &str) {}
 	fn leave(&mut self, _uid: &str) {}
 }

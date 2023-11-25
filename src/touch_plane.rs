@@ -9,7 +9,7 @@ use mint::{Vector2, Vector3};
 use rustc_hash::FxHashSet;
 use stardust_xr_fusion::{
 	core::values::Transform,
-	drawable::Lines,
+	drawable::{Line, Lines},
 	fields::{BoxField, Field, UnknownField},
 	input::{InputData, InputDataType, InputHandler},
 	node::{NodeError, NodeType},
@@ -38,7 +38,7 @@ pub struct TouchPlane {
 	started_touching: FxHashSet<Arc<InputData>>,
 	currently_interacting: FxHashSet<Arc<InputData>>,
 	stopped_interacting: FxHashSet<Arc<InputData>>,
-	debug_lines: Option<(Lines, Lines)>,
+	debug_lines: Option<Lines>,
 }
 impl TouchPlane {
 	pub fn create(
@@ -283,22 +283,29 @@ impl VisualDebug for TouchPlane {
 			);
 			let line_points =
 				make_line_points(&square, settings.line_thickness, settings.line_color);
-			let lines_front =
-				Lines::create(&self.root, Transform::none(), &line_points, true).ok()?;
-			let lines_back = Lines::create(
-				&self.root,
-				Transform::from_position([0.0, 0.0, -self.thickness]),
-				&line_points
-					.into_iter()
+			let line_back = Line {
+				points: line_points
+					.iter()
+					.cloned()
 					.map(|mut l| {
 						l.color.a = 0.5;
+						l.point.z = -self.thickness;
 						l
 					})
 					.collect::<Vec<_>>(),
-				true,
+				cyclic: true,
+			};
+			let line_front = Line {
+				points: line_points,
+				cyclic: true,
+			};
+			let lines = Lines::create(
+				&self.root,
+				Transform::from_position([0.0, 0.0, 0.0]),
+				&[line_front, line_back],
 			)
 			.ok()?;
-			Some((lines_front, lines_back))
+			Some(lines)
 		})
 	}
 }
