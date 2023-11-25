@@ -1,6 +1,6 @@
 use std::f32::consts::PI;
 
-use crate::input_action::{BaseInputAction, InputAction, InputActionHandler, SingleActorAction};
+use crate::input_action::{BaseInputAction, InputActionHandler, SingleActorAction};
 use glam::{vec3, Quat, Vec3};
 use mint::Vector3;
 use stardust_xr_fusion::{
@@ -158,10 +158,9 @@ impl Grabbable {
 	}
 	pub fn update(&mut self, info: &FrameInfo) -> Result<(), NodeError> {
 		// update input actions
-		self.input_handler.lock_wrapped().update_actions([
-			self.condition_action.type_erase(),
-			self.grab_action.type_erase(),
-		]);
+		self.input_handler
+			.lock_wrapped()
+			.update_actions([&mut self.condition_action, self.grab_action.base_mut()]);
 		self.grab_action.update(Some(&mut self.condition_action));
 
 		if self.grab_action.actor_started() {

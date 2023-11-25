@@ -2,7 +2,7 @@ use rustc_hash::FxHashSet;
 use stardust_xr_fusion::input::InputData;
 use std::sync::Arc;
 
-use crate::input_action::{ActiveCondition, BaseInputAction, InputAction, InputActionState};
+use crate::input_action::{ActiveCondition, BaseInputAction, InputActionState};
 
 #[derive(Debug)]
 pub struct SingleActorAction<S: InputActionState> {
@@ -36,10 +36,7 @@ impl<S: InputActionState> SingleActorAction<S> {
 			actor: None,
 		}
 	}
-	pub fn update<O: InputActionState>(
-		&mut self,
-		condition_action: Option<&mut impl InputAction<O>>,
-	) {
+	pub fn update(&mut self, condition_action: Option<&mut BaseInputAction<S>>) {
 		let old_actor = self.actor.clone();
 
 		if let Some(actor) = &self.actor {
@@ -50,9 +47,8 @@ impl<S: InputActionState> SingleActorAction<S> {
 		let started_acting;
 		if let Some(condition_action) = condition_action {
 			let condition_acting = condition_action
-				.base()
 				.currently_acting
-				.difference(&condition_action.base().started_acting)
+				.difference(&condition_action.started_acting)
 				.cloned()
 				.collect::<FxHashSet<_>>();
 			started_acting = self
@@ -80,6 +76,12 @@ impl<S: InputActionState> SingleActorAction<S> {
 		self.actor_acting = self.actor.is_some();
 		self.actor_stopped = old_actor.is_some() && self.actor.is_none();
 	}
+	pub fn base(&self) -> &BaseInputAction<S> {
+		&self.base_action
+	}
+	pub fn base_mut(&mut self) -> &mut BaseInputAction<S> {
+		&mut self.base_action
+	}
 
 	pub fn actor_started(&self) -> bool {
 		self.actor_started
@@ -95,13 +97,5 @@ impl<S: InputActionState> SingleActorAction<S> {
 	}
 	pub fn actor(&self) -> Option<&Arc<InputData>> {
 		self.actor.as_ref()
-	}
-}
-impl<S: InputActionState> InputAction<S> for SingleActorAction<S> {
-	fn base(&self) -> &BaseInputAction<S> {
-		&self.base_action
-	}
-	fn base_mut(&mut self) -> &mut BaseInputAction<S> {
-		&mut self.base_action
 	}
 }

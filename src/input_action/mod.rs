@@ -10,17 +10,6 @@ impl<T: Sized + Clone + Send + Sync + 'static> InputActionState for T {}
 
 pub type ActiveCondition<S> = fn(&InputData, state: &S) -> bool;
 
-pub trait InputAction<S: InputActionState> {
-	fn base(&self) -> &BaseInputAction<S>;
-	fn base_mut(&mut self) -> &mut BaseInputAction<S>;
-	fn type_erase(&mut self) -> &mut dyn InputAction<S>
-	where
-		Self: Sized,
-	{
-		self as &mut dyn InputAction<S>
-	}
-}
-
 #[derive(Clone)]
 pub struct BaseInputAction<S: InputActionState> {
 	pub capture_on_trigger: bool,
@@ -79,15 +68,6 @@ impl<S: InputActionState> BaseInputAction<S> {
 		}
 	}
 }
-
-impl<S: InputActionState> InputAction<S> for BaseInputAction<S> {
-	fn base(&self) -> &BaseInputAction<S> {
-		self
-	}
-	fn base_mut(&mut self) -> &mut BaseInputAction<S> {
-		self
-	}
-}
 impl<S: InputActionState> PartialEq for BaseInputAction<S> {
 	fn eq(&self, other: &Self) -> bool {
 		self.capture_on_trigger == other.capture_on_trigger
@@ -123,7 +103,7 @@ impl<S: InputActionState> InputActionHandler<S> {
 
 	pub fn update_actions<'a>(
 		&mut self,
-		actions: impl IntoIterator<Item = &'a mut (dyn InputAction<S> + 'a)>,
+		actions: impl IntoIterator<Item = &'a mut BaseInputAction<S>>,
 	) {
 		self.back_state = self.state.clone();
 
@@ -133,11 +113,11 @@ impl<S: InputActionState> InputActionHandler<S> {
 				if let Some(internal_action) = self
 					.actions
 					.iter_mut()
-					.find(|internal_action| **internal_action == *action.base())
+					.find(|internal_action| *internal_action == action)
 				{
-					internal_action.update(action.base_mut());
+					internal_action.update(action);
 				}
-				action.base().clone()
+				action.clone()
 			})
 			.collect();
 	}

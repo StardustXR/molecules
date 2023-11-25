@@ -1,5 +1,5 @@
 use crate::{
-	input_action::{BaseInputAction, InputAction, InputActionHandler},
+	input_action::{BaseInputAction, InputActionHandler},
 	lines::{self, make_line_points},
 	DebugSettings, VisualDebug,
 };
@@ -232,9 +232,9 @@ impl TouchPlane {
 	/// Update the state of this touch plane. Run once every frame.
 	pub fn update(&mut self) {
 		self.input.lock_wrapped().update_actions([
-			self.hover_action.type_erase(),
-			self.touch_action.type_erase(),
-			self.touch_capture_action.type_erase(),
+			&mut self.hover_action,
+			&mut self.touch_action,
+			&mut self.touch_capture_action,
 		]);
 
 		// Update the currently hovering stuff
