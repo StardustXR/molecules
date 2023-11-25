@@ -53,6 +53,8 @@ pub struct GrabbableSettings {
 	pub magnet: bool,
 	/// How should pointers be handled?
 	pub pointer_mode: PointerMode,
+	/// Should the object be movable by zones?
+	pub zoneable: bool,
 }
 impl Default for GrabbableSettings {
 	fn default() -> Self {
@@ -68,6 +70,7 @@ impl Default for GrabbableSettings {
 			}),
 			magnet: true,
 			pointer_mode: PointerMode::Parent,
+			zoneable: true,
 		}
 	}
 }
@@ -126,7 +129,8 @@ impl Grabbable {
 			InputHandler::create(content_space.client()?.get_root(), Transform::none(), field)?
 				.wrap(InputActionHandler::new(GrabData { settings }))?;
 		let root = Spatial::create(input_handler.node(), Transform::none(), false)?;
-		let content_parent = Spatial::create(input_handler.node(), Transform::none(), true)?;
+		let content_parent =
+			Spatial::create(input_handler.node(), Transform::none(), settings.zoneable)?;
 		content_parent.set_transform(Some(content_space), content_transform)?;
 
 		let (closest_point_tx, closest_point_rx) = mpsc::channel(1);
@@ -245,7 +249,7 @@ impl Grabbable {
 		}
 		if self.grab_action.actor_stopped() {
 			debug!("Stopped grabbing");
-			self.content_parent.set_zoneable(true)?;
+			self.content_parent.set_zoneable(self.settings.zoneable)?;
 
 			// drain the closest point queue
 			let _ = self.closest_point_rx.try_recv();

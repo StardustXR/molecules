@@ -60,11 +60,12 @@ impl GrabbableDemo {
 			Transform::none(),
 			&field,
 			GrabbableSettings {
+				max_distance: Default::default(),
 				linear_momentum: None,
 				angular_momentum: None,
 				magnet: false,
 				pointer_mode: PointerMode::Align,
-				..Default::default()
+				zoneable: true,
 			},
 		)?;
 		model.set_spatial_parent(grabbable.content_parent())?;
