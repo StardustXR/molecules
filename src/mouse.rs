@@ -3,8 +3,6 @@ use serde::{Deserialize, Serialize};
 use stardust_xr_fusion::{
 	core::schemas::flex::flexbuffers,
 	data::{PulseReceiver, PulseSender},
-	items::panel::{PanelItem, SurfaceID},
-	node::NodeError,
 };
 
 use crate::datamap::Datamap;
@@ -19,16 +17,14 @@ pub struct MouseEvent {
 	pub delta: Option<Vector2<f32>>,
 	pub scroll_continuous: Option<Vector2<f32>>,
 	pub scroll_discrete: Option<Vector2<f32>>,
-	pub buttons_up: Option<Vec<u32>>,
-	pub buttons_down: Option<Vec<u32>>,
+	pub raw_input_events: Option<Vec<u32>>,
 }
 impl MouseEvent {
 	pub fn new(
 		delta: Option<Vector2<f32>>,
 		scroll_continuous: Option<Vector2<f32>>,
 		scroll_discrete: Option<Vector2<f32>>,
-		buttons_up: Option<Vec<u32>>,
-		buttons_down: Option<Vec<u32>>,
+		raw_input_events: Option<Vec<u32>>,
 	) -> Self {
 		MouseEvent {
 			mouse: (),
@@ -36,8 +32,7 @@ impl MouseEvent {
 			delta,
 			scroll_continuous,
 			scroll_discrete,
-			buttons_up,
-			buttons_down,
+			raw_input_events,
 		}
 	}
 
@@ -61,27 +56,6 @@ impl MouseEvent {
 				let _ = sender.send_data(receiver, &data);
 			}
 		}
-	}
-
-	/// Does not handle delta
-	pub fn send_to_panel(&self, panel: &PanelItem, surface: &SurfaceID) -> Result<(), NodeError> {
-		if let Some(scroll_distance) = &self.scroll_continuous {
-			panel.pointer_scroll(surface, Some(*scroll_distance), None)?;
-		}
-		if let Some(scroll_steps) = &self.scroll_discrete {
-			panel.pointer_scroll(surface, None, Some(*scroll_steps))?;
-		}
-		if let Some(buttons_up) = &self.buttons_up {
-			for button in buttons_up {
-				panel.pointer_button(surface, *button, false)?;
-			}
-		}
-		if let Some(buttons_down) = &self.buttons_down {
-			for button in buttons_down {
-				panel.pointer_button(surface, *button, true)?;
-			}
-		}
-		Ok(())
 	}
 }
 
@@ -129,8 +103,7 @@ async fn mouse_events() {
 		delta: None,
 		scroll_continuous: None,
 		scroll_discrete: None,
-		buttons_up: None,
-		buttons_down: Some(vec![]),
+		raw_input_events: None,
 	};
 	mouse_event.serialize(&mut mouse_event_serializer).unwrap();
 	let pulse_sender =
