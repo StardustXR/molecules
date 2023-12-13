@@ -1,8 +1,16 @@
+use crate::input_action::{ActiveCondition, BaseInputAction, InputActionState};
 use rustc_hash::FxHashSet;
 use stardust_xr_fusion::input::InputData;
 use std::sync::Arc;
 
-use crate::input_action::{ActiveCondition, BaseInputAction, InputActionState};
+// so this code is hella buggy, it needs better logic to fulfill the requirements:
+// when no condition action is present:
+//     - first actor to fulfill the condition is the single actor
+//     - if change_actor and another actor fulfills the condition, make it the single actor
+// when a condition action is present:
+//     - first actor that fulfills the active condition after fulfilling the condition action (so, can't just have started fulfilling the condition action's active condition) is the single actor
+//     - if change_actor, then the next actor that fulfills the active condition after fulfilling the condition action (so, can't just have started fulfilling the condition action's active condition) is the single actor
+//     - if the single actor stops acting (with the condition action not being met at the same time) then it must have lost tracking or similar, so if that actor starts acting again (even if the condition action was started being met the same frame) then make it the single actor unless there is another
 
 #[derive(Debug)]
 pub struct SingleActorAction<S: InputActionState> {
