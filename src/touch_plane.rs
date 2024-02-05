@@ -8,12 +8,11 @@ use map_range::MapRange;
 use mint::{Vector2, Vector3};
 use rustc_hash::FxHashSet;
 use stardust_xr_fusion::{
-	core::values::Transform,
 	drawable::{Line, Lines},
-	fields::{BoxField, Field, UnknownField},
+	fields::{BoxField, BoxFieldAspect, UnknownField},
 	input::{InputData, InputDataType, InputHandler},
 	node::{NodeError, NodeType},
-	spatial::Spatial,
+	spatial::{Spatial, SpatialAspect, Transform},
 	HandlerWrapper,
 };
 use std::{ops::Range, sync::Arc};
@@ -42,7 +41,7 @@ pub struct TouchPlane {
 }
 impl TouchPlane {
 	pub fn create(
-		parent: &Spatial,
+		parent: &impl SpatialAspect,
 		transform: Transform,
 		size: impl Into<Vector2<f32>>,
 		thickness: f32,
@@ -53,11 +52,13 @@ impl TouchPlane {
 		let root = Spatial::create(parent, transform, false)?;
 		let field = BoxField::create(
 			&root,
-			Transform::from_position([0.0, 0.0, thickness * -0.5]),
+			Transform::from_translation([0.0, 0.0, thickness * -0.5]),
 			[size.x, size.y, thickness],
 		)?;
-		let input = InputHandler::create(&root, Transform::none(), &field)?
-			.wrap(InputActionHandler::new(State { size }))?;
+		let input = InputActionHandler::wrap(
+			InputHandler::create(&root, Transform::none(), &field)?,
+			State { size },
+		)?;
 
 		let hover_action = BaseInputAction::new(false, Self::hover_action);
 		let touch_action = BaseInputAction::new(false, Self::touch_action);
@@ -148,7 +149,7 @@ impl TouchPlane {
 		self.input.node()
 	}
 	pub fn field(&self) -> UnknownField {
-		self.field.alias_unknown_field()
+		UnknownField::alias_field(&self.field)
 	}
 
 	pub fn set_size(&mut self, size: impl Into<Vector2<f32>>) -> Result<(), NodeError> {
@@ -161,7 +162,7 @@ impl TouchPlane {
 	pub fn set_thickness(&mut self, thickness: f32) -> Result<(), NodeError> {
 		self.thickness = thickness;
 		self.field
-			.set_position(None, [0.0, 0.0, thickness * -0.5])?;
+			.set_local_transform(Transform::from_translation([0.0, 0.0, thickness * -0.5]))?;
 		self.field.set_size([self.size.x, self.size.y, thickness])?;
 		Ok(())
 	}
@@ -301,7 +302,7 @@ impl VisualDebug for TouchPlane {
 			};
 			let lines = Lines::create(
 				&self.root,
-				Transform::from_position([0.0, 0.0, 0.0]),
+				Transform::from_translation([0.0, 0.0, 0.0]),
 				&[line_front, line_back],
 			)
 			.ok()?;

@@ -9,10 +9,9 @@ use color::{color_space::LinearRgb, rgba_linear, AlphaColor, Rgba};
 use map_range::MapRange;
 use mint::Vector2;
 use stardust_xr_fusion::{
-	core::values::Transform,
-	drawable::{Line, LinePoint, Lines},
+	drawable::{Line, LinePoint, Lines, LinesAspect},
 	node::NodeError,
-	spatial::Spatial,
+	spatial::{SpatialAspect, Transform},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -38,7 +37,7 @@ pub struct Button {
 }
 impl Button {
 	pub fn create(
-		parent: &Spatial,
+		parent: &impl SpatialAspect,
 		transform: Transform,
 		size: impl Into<Vector2<f32>>,
 		settings: ButtonSettings,
@@ -85,7 +84,7 @@ struct ButtonVisuals {
 }
 impl ButtonVisuals {
 	fn create(
-		parent: &Spatial,
+		parent: &impl SpatialAspect,
 		size: Vector2<f32>,
 		settings: &ButtonSettings,
 	) -> Result<Self, NodeError> {
@@ -147,7 +146,9 @@ impl ButtonVisuals {
 
 	pub fn update(&self, touch_plane: &TouchPlane, settings: &ButtonSettings) {
 		if touch_plane.hovering_inputs().is_empty() && !touch_plane.touching() {
-			let _ = self.outline.set_scale(None, [0.0; 3]);
+			let _ = self
+				.outline
+				.set_local_transform(Transform::from_scale([0.0; 3]));
 		}
 		if let Some((hover_point, hover_distance)) = touch_plane
 			.hovering_inputs()
@@ -160,7 +161,7 @@ impl ButtonVisuals {
 				.clamp(0.0, 1.0);
 
 			let scale_morph = scale.map_range(0.5..1.0, 0.0..1.0);
-			let _ = self.outline.update_lines(&[Line {
+			let _ = self.outline.set_lines(&[Line {
 				points: lerp(
 					&self.circle_points,
 					&self.rounded_rectangle_points,
@@ -169,17 +170,16 @@ impl ButtonVisuals {
 				.unwrap(),
 				cyclic: true,
 			}]);
-			let _ = self.outline.set_transform(
-				None,
-				Transform::from_position_scale(
+			let _ = self
+				.outline
+				.set_local_transform(Transform::from_translation_scale(
 					[
 						hover_point.x * (1.0 - scale),
 						hover_point.y * (1.0 - scale),
 						0.0,
 					],
 					[scale, scale, 0.000],
-				),
-			);
+				));
 		}
 		if touch_plane.touch_started() {
 			let points = self
@@ -192,7 +192,7 @@ impl ButtonVisuals {
 				})
 				.collect::<Vec<_>>();
 			self.outline
-				.update_lines(&[Line {
+				.set_lines(&[Line {
 					points,
 					cyclic: true,
 				}])
@@ -209,7 +209,9 @@ impl ButtonVisuals {
 				return;
 			};
 
-			let _ = self.outline.set_scale(None, [1.0, 1.0, distance]);
+			let _ = self
+				.outline
+				.set_local_transform(Transform::from_scale([1.0, 1.0, distance]));
 		}
 		// if touch_plane.touch_stopped() {
 		// 	self.outline.update_points(&self.circle_points).unwrap();
@@ -220,7 +222,7 @@ impl ButtonVisuals {
 struct UnboundedVolumeSignifier(Lines);
 impl UnboundedVolumeSignifier {
 	pub fn create(
-		parent: &Spatial,
+		parent: &impl SpatialAspect,
 		position: impl Into<Vector2<f32>>,
 		thickness: f32,
 		color: Rgba<f32, LinearRgb>,
@@ -238,7 +240,7 @@ impl UnboundedVolumeSignifier {
 		};
 		Ok(UnboundedVolumeSignifier(Lines::create(
 			parent,
-			Transform::from_position([position.x, position.y, 0.0]),
+			Transform::from_translation([position.x, position.y, 0.0]),
 			&[Line {
 				points: vec![start_point, end_point],
 				cyclic: false,

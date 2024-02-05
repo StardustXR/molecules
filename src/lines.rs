@@ -123,14 +123,14 @@ pub fn trace(t: f32, mut points: Vec<LinePoint>, cyclic: bool) -> Vec<LinePoint>
 	if t >= 1.0 || points.len() < 2 {
 		return points;
 	}
-	let first_point = *points.first().unwrap();
+	let first_point = points.first().unwrap().clone();
 	if cyclic {
-		points.push(first_point);
+		points.push(first_point.clone());
 	}
 	let mut segment_start_t = 0.0;
-	let mut segment_start_point = first_point;
+	let mut segment_start_point = first_point.clone();
 	let mut segment_end_t = 0.0;
-	let mut segment_end_point = first_point;
+	let mut segment_end_point = first_point.clone();
 
 	let mut new_length: usize = 0;
 	{
@@ -144,8 +144,8 @@ pub fn trace(t: f32, mut points: Vec<LinePoint>, cyclic: bool) -> Vec<LinePoint>
 				new_length = points_len;
 				segment_start_t = previous_t;
 				segment_end_t = current_t;
-				segment_start_point = *previous_point;
-				segment_end_point = *point;
+				segment_start_point = previous_point.clone();
+				segment_end_point = point.clone();
 				break;
 			}
 			previous_point = point;

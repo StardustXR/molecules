@@ -2,7 +2,11 @@ mod single_actor_action;
 pub use single_actor_action::*;
 
 use rustc_hash::FxHashSet;
-use stardust_xr_fusion::input::{InputData, InputHandlerHandler, UnknownInputMethod};
+use stardust_xr_fusion::{
+	input::{InputData, InputHandler, InputHandlerHandler, UnknownInputMethod},
+	node::{NodeResult, NodeType},
+	HandlerWrapper,
+};
 use std::{fmt::Debug, mem::swap, sync::Arc};
 
 pub trait InputActionState: Sized + Clone + Send + Sync + 'static {}
@@ -86,19 +90,22 @@ impl<S: InputActionState> Debug for BaseInputAction<S> {
 	}
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct InputActionHandler<S: InputActionState> {
 	actions: Vec<BaseInputAction<S>>,
+	handler: InputHandler,
 	state: S,
 	back_state: S,
 }
 impl<S: InputActionState> InputActionHandler<S> {
-	pub fn new(state: S) -> Self {
-		Self {
+	pub fn wrap(handler: InputHandler, state: S) -> NodeResult<HandlerWrapper<InputHandler, Self>> {
+		let action_handler = Self {
 			actions: Vec::new(),
+			handler: handler.alias(),
 			back_state: state.clone(),
 			state,
-		}
+		};
+		handler.wrap(action_handler)
 	}
 
 	pub fn update_actions<'a>(
@@ -135,7 +142,7 @@ impl<S: InputActionState> InputHandlerHandler for InputActionHandler<S> {
 			.reduce(|a, b| a || b)
 			.unwrap_or_default();
 		if capture {
-			let _ = input.capture();
+			let _ = input.capture(&self.handler);
 		}
 	}
 }

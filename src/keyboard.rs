@@ -1,17 +1,16 @@
+use crate::data::SimplePulseReceiver;
 use serde::{Deserialize, Serialize};
 use stardust_xr_fusion::{
-	core::{schemas::flex::flexbuffers, values::Transform},
-	data::{PulseReceiver, PulseSender},
-	fields::Field,
+	core::values::Datamap,
+	data::{PulseReceiver, PulseReceiverAspect, PulseSender},
+	fields::FieldAspect,
 	items::panel::{PanelItem, SurfaceID},
 	node::{NodeError, NodeType},
-	spatial::Spatial,
+	spatial::{SpatialAspect, Transform},
 };
 
-use crate::{data::SimplePulseReceiver, datamap::Datamap};
-
 lazy_static::lazy_static! {
-	pub static ref KEYBOARD_MASK: Vec<u8> = Datamap::create(KeyboardEvent::default()).serialize();
+	pub static ref KEYBOARD_MASK: Datamap = Datamap::from_typed(KeyboardEvent::default()).unwrap();
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -32,19 +31,10 @@ impl Default for KeyboardEvent {
 	}
 }
 impl KeyboardEvent {
-	pub fn serialize_pulse_data(&self) -> Vec<u8> {
-		let mut serializer = flexbuffers::FlexbufferSerializer::new();
-		let _ = self.serialize(&mut serializer);
-		serializer.take_buffer()
-	}
-
 	pub fn send_event(&self, sender: &PulseSender, receivers: &[&PulseReceiver]) {
-		let mut serializer = flexbuffers::FlexbufferSerializer::new();
-		if self.serialize(&mut serializer).is_ok() {
-			let data = serializer.take_buffer();
-			for receiver in receivers.into_iter() {
-				let _ = sender.send_data(receiver, &data);
-			}
+		let data = Datamap::from_typed(self).unwrap();
+		for receiver in receivers.into_iter() {
+			let _ = receiver.send_data(sender, &data);
 		}
 	}
 
@@ -79,10 +69,10 @@ impl KeyboardEvent {
 }
 
 pub type KeyboardPanelHandler = SimplePulseReceiver<KeyboardEvent>;
-pub fn create_keyboard_panel_handler<Fi: Field>(
-	parent: &Spatial,
+pub fn create_keyboard_panel_handler(
+	parent: &impl SpatialAspect,
 	transform: Transform,
-	field: &Fi,
+	field: &impl FieldAspect,
 	panel: &PanelItem,
 	focus: SurfaceID,
 ) -> Result<KeyboardPanelHandler, NodeError> {
@@ -99,31 +89,30 @@ pub fn create_keyboard_panel_handler<Fi: Field>(
 
 #[tokio::test]
 async fn keyboard_events() {
+	use stardust_xr_fusion::data::PulseSenderAspect;
 	let (client, event_loop) = stardust_xr_fusion::client::Client::connect_with_async_loop()
 		.await
 		.unwrap();
-	use stardust_xr_fusion::{core::values::Transform, node::NodeType};
 
 	struct PulseSenderTest {
-		data: Vec<u8>,
+		data: Datamap,
 		node: PulseSender,
 	}
 	impl stardust_xr_fusion::data::PulseSenderHandler for PulseSenderTest {
 		fn new_receiver(
 			&mut self,
-			info: stardust_xr_fusion::data::NewReceiverInfo,
+			uid: String,
 			receiver: PulseReceiver,
 			field: stardust_xr_fusion::fields::UnknownField,
 		) {
 			println!(
-				"New pulse receiver {:?} with field {:?} and info {:?}",
+				"New pulse receiver {:?} with field {:?} and uid {uid}",
 				receiver.node().get_path(),
 				field.node().get_path(),
-				info
 			);
-			self.node.send_data(&receiver, &self.data).unwrap();
+			receiver.send_data(&self.node, &self.data).unwrap();
 		}
-		fn drop_receiver(&mut self, uid: &str) {
+		fn drop_receiver(&mut self, uid: String) {
 			println!("Pulse receiver {} dropped", uid);
 		}
 	}
@@ -135,20 +124,16 @@ async fn keyboard_events() {
 	)
 	.unwrap();
 
-	let mut keyboard_event_serializer = flexbuffers::FlexbufferSerializer::new();
 	let keyboard_event = KeyboardEvent {
 		keyboard: (),
 		xkbv1: (),
 		keymap_id: "".to_string(),
 		keys: vec![1, -1],
 	};
-	keyboard_event
-		.serialize(&mut keyboard_event_serializer)
-		.unwrap();
 	let pulse_sender =
 		PulseSender::create(client.get_root(), Transform::none(), &KEYBOARD_MASK).unwrap();
 	let pulse_sender_test = PulseSenderTest {
-		data: keyboard_event_serializer.take_buffer(),
+		data: Datamap::from_typed(keyboard_event).unwrap(),
 		node: pulse_sender.alias(),
 	};
 	let _pulse_sender = pulse_sender.wrap(pulse_sender_test).unwrap();

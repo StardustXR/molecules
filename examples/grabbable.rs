@@ -5,10 +5,11 @@ use lazy_static::lazy_static;
 use manifest_dir_macros::directory_relative_path;
 use stardust_xr_fusion::{
 	client::{Client, ClientState, FrameInfo, RootHandler},
-	core::values::Transform,
-	drawable::{Model, ResourceID},
+	core::values::ResourceID,
+	drawable::Model,
 	fields::BoxField,
 	node::{NodeError, NodeType},
+	spatial::{SpatialAspect, Transform},
 };
 use stardust_xr_molecules::{Grabbable, GrabbableSettings, PointerMode};
 use tracing_subscriber::EnvFilter;
@@ -48,10 +49,10 @@ impl GrabbableDemo {
 			Transform::from_scale([0.5; 3]),
 			&*GRABBABLE_MODEL,
 		)?;
-		let bounds = model.get_bounding_box(Some(client.get_root()))?.await?;
+		let bounds = model.get_relative_bounding_box(client.get_root()).await?;
 		let field = BoxField::create(
-			&client.get_root(),
-			Transform::from_position(bounds.center),
+			client.get_root(),
+			Transform::from_translation(bounds.center),
 			bounds.size,
 		)?;
 

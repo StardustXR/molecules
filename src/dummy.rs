@@ -1,9 +1,7 @@
-use std::path::PathBuf;
-
 use stardust_xr_fusion::{
 	client::{ClientState, FrameInfo, RootHandler},
-	core::schemas::flex::flexbuffers::MapReader,
-	data::{NewReceiverInfo, PulseReceiver, PulseReceiverHandler, PulseSenderHandler},
+	core::values::Datamap,
+	data::{PulseReceiver, PulseReceiverHandler, PulseSenderHandler},
 	fields::UnknownField,
 	input::{InputData, InputHandlerHandler, UnknownInputMethod},
 	items::{
@@ -12,6 +10,7 @@ use stardust_xr_fusion::{
 	},
 	spatial::{Spatial, ZoneHandler},
 };
+use std::path::PathBuf;
 
 pub struct DummyHandler;
 impl RootHandler for DummyHandler {
@@ -28,27 +27,21 @@ impl InputHandlerHandler for DummyHandler {
 
 // Data
 impl PulseSenderHandler for DummyHandler {
-	fn new_receiver(
-		&mut self,
-		_info: NewReceiverInfo,
-		_receiver: PulseReceiver,
-		_field: UnknownField,
-	) {
-	}
-	fn drop_receiver(&mut self, _uid: &str) {}
+	fn new_receiver(&mut self, _uid: String, _receiver: PulseReceiver, _field: UnknownField) {}
+	fn drop_receiver(&mut self, _uid: String) {}
 }
 impl PulseReceiverHandler for DummyHandler {
-	fn data(&mut self, _uid: &str, _data: &[u8], _data_reader: MapReader<&[u8]>) {}
+	fn data(&mut self, _uid: String, _data: Datamap) {}
 }
 
 // Items
 impl ItemAcceptorHandler<EnvironmentItem> for DummyHandler {
-	fn captured(&mut self, _uid: &str, _item: EnvironmentItem, _init_data: PathBuf) {}
-	fn released(&mut self, _uid: &str) {}
+	fn captured(&mut self, _uid: String, _item: EnvironmentItem, _init_data: PathBuf) {}
+	fn released(&mut self, _uid: String) {}
 }
 impl ItemAcceptorHandler<PanelItem> for DummyHandler {
-	fn captured(&mut self, _uid: &str, _item: PanelItem, _init_data: PanelItemInitData) {}
-	fn released(&mut self, _uid: &str) {}
+	fn captured(&mut self, _uid: String, _item: PanelItem, _init_data: PanelItemInitData) {}
+	fn released(&mut self, _uid: String) {}
 }
 impl PanelItemHandler for DummyHandler {
 	fn toplevel_size_changed(&mut self, _size: mint::Vector2<u32>) {}
@@ -59,8 +52,8 @@ impl PanelItemHandler for DummyHandler {
 
 // Spatial
 impl ZoneHandler for DummyHandler {
-	fn enter(&mut self, _uid: &str, _spatial: Spatial) {}
-	fn capture(&mut self, _uid: &str) {}
-	fn release(&mut self, _uid: &str) {}
-	fn leave(&mut self, _uid: &str) {}
+	fn enter(&mut self, _uid: String, _spatial: Spatial) {}
+	fn capture(&mut self, _uid: String) {}
+	fn release(&mut self, _uid: String) {}
+	fn leave(&mut self, _uid: String) {}
 }

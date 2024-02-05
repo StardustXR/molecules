@@ -5,8 +5,8 @@ use manifest_dir_macros::directory_relative_path;
 use serde::{Deserialize, Serialize};
 use stardust_xr_fusion::{
 	client::{Client, ClientState, FrameInfo, RootHandler},
-	core::values::Transform,
 	node::NodeError,
+	spatial::Transform,
 };
 use stardust_xr_molecules::{
 	button::{Button, ButtonSettings},

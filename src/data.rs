@@ -1,14 +1,11 @@
 use crate::dummy::DummyHandler;
 use serde::{de::DeserializeOwned, Serialize};
 use stardust_xr_fusion::{
-	core::{
-		schemas::flex::flexbuffers::{FlexbufferSerializer, MapReader, Reader},
-		values::Transform,
-	},
-	data::{PulseReceiver, PulseReceiverHandler},
-	fields::Field,
+	core::values::Datamap,
+	data::{PulseReceiver, PulseReceiverAspect, PulseReceiverHandler},
+	fields::FieldAspect,
 	node::NodeError,
-	spatial::Spatial,
+	spatial::{SpatialAspect, Transform},
 	HandlerWrapper,
 };
 
@@ -17,19 +14,20 @@ pub struct SimplePulseReceiver<T: Serialize + DeserializeOwned + Default + 'stat
 	HandlerWrapper<PulseReceiver, InlineHandler<T>>,
 );
 impl<T: Serialize + DeserializeOwned + Default + 'static> SimplePulseReceiver<T> {
-	pub fn create<Fi: Field, F: FnMut(&str, T) + Send + Sync + 'static>(
-		spatial_parent: &Spatial,
+	pub fn create<F: FnMut(String, T) + Send + Sync + 'static>(
+		spatial_parent: &impl SpatialAspect,
 		transform: Transform,
-		field: &Fi,
+		field: &impl FieldAspect,
 		on_data: F,
 	) -> Result<Self, NodeError> {
-		let mut mask_serializer = FlexbufferSerializer::new();
-		T::default()
-			.serialize(&mut mask_serializer)
-			.map_err(|_| NodeError::Serialization)?;
 		Ok(SimplePulseReceiver(
-			PulseReceiver::create(spatial_parent, transform, field, mask_serializer.view())?
-				.wrap(InlineHandler(Box::new(on_data)))?,
+			PulseReceiver::create(
+				spatial_parent,
+				transform,
+				field,
+				&Datamap::from_typed(T::default()).map_err(|_| NodeError::Serialization)?,
+			)?
+			.wrap(InlineHandler(Box::new(on_data)))?,
 		))
 	}
 }
@@ -44,14 +42,13 @@ impl<T: Serialize + DeserializeOwned + Default + 'static> std::ops::Deref
 }
 
 struct InlineHandler<T: Serialize + DeserializeOwned + Default + 'static>(
-	Box<dyn FnMut(&str, T) + Send + Sync + 'static>,
+	Box<dyn FnMut(String, T) + Send + Sync + 'static>,
 );
 impl<T: Serialize + DeserializeOwned + Default + 'static> PulseReceiverHandler
 	for InlineHandler<T>
 {
-	fn data(&mut self, uid: &str, data: &[u8], _data_reader: MapReader<&[u8]>) {
-		let Ok(root) = Reader::get_root(data) else {return};
-		let Ok(data) = T::deserialize(root) else {return};
+	fn data(&mut self, uid: String, data: Datamap) {
+		let Ok(data) = data.deserialize() else { return };
 		(self.0)(uid, data)
 	}
 }
@@ -59,28 +56,14 @@ impl<T: Serialize + DeserializeOwned + Default + 'static> PulseReceiverHandler
 /// Pulse receiver that only acts as a tag, doesn't
 pub struct NodeTag(HandlerWrapper<PulseReceiver, DummyHandler>);
 impl NodeTag {
-	pub fn create<T: Serialize + Default, Fi: Field>(
-		spatial_parent: &Spatial,
+	pub fn create<T: Serialize + Default>(
+		spatial_parent: &impl SpatialAspect,
 		transform: Transform,
-		field: &Fi,
+		field: &impl FieldAspect,
 	) -> Result<Self, NodeError> {
-		let mut mask_serializer = FlexbufferSerializer::new();
-		T::default()
-			.serialize(&mut mask_serializer)
-			.map_err(|_| NodeError::Serialization)?;
-
-		// check if the mask is a map or not
-		{
-			let flex_root =
-				Reader::get_root(mask_serializer.view()).map_err(|_| NodeError::Serialization)?;
-			let _map_reader = flex_root.get_map().map_err(|_| NodeError::ReturnedError {
-				e: "Mask is not a map".to_string(),
-			})?;
-		}
-
+		let mask = Datamap::from_typed(T::default()).map_err(|_| NodeError::Serialization)?;
 		Ok(NodeTag(
-			PulseReceiver::create(spatial_parent, transform, field, mask_serializer.view())?
-				.wrap(DummyHandler)?,
+			PulseReceiver::create(spatial_parent, transform, field, &mask)?.wrap(DummyHandler)?,
 		))
 	}
 }

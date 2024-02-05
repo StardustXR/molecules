@@ -1,14 +1,12 @@
 use mint::Vector2;
 use serde::{Deserialize, Serialize};
 use stardust_xr_fusion::{
-	core::schemas::flex::flexbuffers,
-	data::{PulseReceiver, PulseSender},
+	core::{schemas::flex::flexbuffers, values::Datamap},
+	data::{PulseReceiver, PulseReceiverAspect, PulseSender},
 };
 
-use crate::datamap::Datamap;
-
 lazy_static::lazy_static! {
-	pub static ref MOUSE_MASK: Vec<u8> = Datamap::create(MouseEvent::default()).serialize();
+	pub static ref MOUSE_MASK: Datamap = Datamap::from_typed(MouseEvent::default()).unwrap();
 }
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct MouseEvent {
@@ -49,12 +47,9 @@ impl MouseEvent {
 	}
 
 	pub fn send_event(&self, sender: &PulseSender, receivers: &[&PulseReceiver]) {
-		let mut serializer = flexbuffers::FlexbufferSerializer::new();
-		if self.serialize(&mut serializer).is_ok() {
-			let data = serializer.take_buffer();
-			for receiver in receivers.into_iter() {
-				let _ = sender.send_data(receiver, &data);
-			}
+		let data = Datamap::from_typed(self).unwrap();
+		for receiver in receivers.into_iter() {
+			let _ = receiver.send_data(sender, &data);
 		}
 	}
 }
@@ -64,27 +59,27 @@ async fn mouse_events() {
 	let (client, event_loop) = stardust_xr_fusion::client::Client::connect_with_async_loop()
 		.await
 		.unwrap();
-	use stardust_xr_fusion::{core::values::Transform, node::NodeType};
+	use stardust_xr_fusion::{data::PulseSenderAspect, node::NodeType, spatial::Transform};
 	struct PulseSenderTest {
-		data: Vec<u8>,
+		data: Datamap,
 		node: PulseSender,
 	}
 	impl stardust_xr_fusion::data::PulseSenderHandler for PulseSenderTest {
 		fn new_receiver(
 			&mut self,
-			info: stardust_xr_fusion::data::NewReceiverInfo,
+			uid: String,
 			receiver: PulseReceiver,
 			field: stardust_xr_fusion::fields::UnknownField,
 		) {
 			println!(
-				"New pulse receiver {:?} with field {:?} and info {:?}",
+				"New pulse receiver {:?} with field {:?} and uid {:?}",
 				receiver.node().get_path(),
 				field.node().get_path(),
-				info
+				uid
 			);
-			self.node.send_data(&receiver, &self.data).unwrap();
+			receiver.send_data(&self.node, &self.data).unwrap();
 		}
-		fn drop_receiver(&mut self, uid: &str) {
+		fn drop_receiver(&mut self, uid: String) {
 			println!("Pulse receiver {} dropped", uid);
 		}
 	}
@@ -95,21 +90,10 @@ async fn mouse_events() {
 		0.1,
 	)
 	.unwrap();
-
-	let mut mouse_event_serializer = flexbuffers::FlexbufferSerializer::new();
-	let mouse_event = MouseEvent {
-		mouse: (),
-		v1: (),
-		delta: None,
-		scroll_continuous: None,
-		scroll_discrete: None,
-		raw_input_events: None,
-	};
-	mouse_event.serialize(&mut mouse_event_serializer).unwrap();
 	let pulse_sender =
 		PulseSender::create(client.get_root(), Transform::none(), &MOUSE_MASK).unwrap();
 	let pulse_sender_test = PulseSenderTest {
-		data: mouse_event_serializer.take_buffer(),
+		data: MOUSE_MASK.clone(),
 		node: pulse_sender.alias(),
 	};
 	let _pulse_sender = pulse_sender.wrap(pulse_sender_test).unwrap();

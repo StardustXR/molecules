@@ -5,11 +5,10 @@ use glam::{vec3, Quat, Vec3};
 use mint::Vector3;
 use stardust_xr_fusion::{
 	client::FrameInfo,
-	core::values::Transform,
-	fields::{Field, UnknownField},
+	fields::{FieldAspect, UnknownField},
 	input::{InputData, InputDataType, InputHandler},
 	node::{NodeError, NodeType},
-	spatial::Spatial,
+	spatial::{Spatial, SpatialAspect, Transform},
 	HandlerWrapper,
 };
 use tokio::sync::mpsc;
@@ -102,10 +101,10 @@ pub struct Grabbable {
 	angular_velocity: Option<(Vec3, f32)>,
 }
 impl Grabbable {
-	pub fn create<Fi: Field>(
-		content_space: &Spatial,
+	pub fn create(
+		content_space: &impl SpatialAspect,
 		content_transform: Transform,
-		field: &Fi,
+		field: &impl FieldAspect,
 		settings: GrabbableSettings,
 	) -> Result<Self, NodeError> {
 		let condition_action = BaseInputAction::new(false, |input, data: &GrabData| {
@@ -125,13 +124,17 @@ impl Grabbable {
 			},
 			false,
 		);
-		let input_handler =
-			InputHandler::create(content_space.client()?.get_root(), Transform::none(), field)?
-				.wrap(InputActionHandler::new(GrabData { settings }))?;
-		let root = Spatial::create(input_handler.node(), Transform::none(), false)?;
-		let content_parent =
-			Spatial::create(input_handler.node(), Transform::none(), settings.zoneable)?;
-		content_parent.set_transform(Some(content_space), content_transform)?;
+		let input_handler = InputActionHandler::wrap(
+			InputHandler::create(content_space.client()?.get_root(), Transform::none(), field)?,
+			GrabData { settings },
+		)?;
+		let root = Spatial::create(input_handler.node().as_ref(), Transform::none(), false)?;
+		let content_parent = Spatial::create(
+			input_handler.node().as_ref(),
+			Transform::none(),
+			settings.zoneable,
+		)?;
+		content_parent.set_relative_transform(content_space, content_transform)?;
 
 		let (closest_point_tx, closest_point_rx) = mpsc::channel(1);
 		Ok(Grabbable {
@@ -140,7 +143,7 @@ impl Grabbable {
 			condition_action,
 			grab_action,
 			input_handler,
-			field: field.alias_unknown_field(),
+			field: UnknownField::alias_field(field),
 			pointer_distance: 0.0,
 			settings,
 			frame: 0,
@@ -166,7 +169,7 @@ impl Grabbable {
 		if self.grab_action.actor_started() {
 			// Make sure we can directly apply the grab data to the content parent
 			self.content_parent
-				.set_spatial_parent_in_place(self.input_handler.node())?;
+				.set_spatial_parent_in_place(self.input_handler.node().as_ref())?;
 			let actor = self.grab_action.actor().unwrap();
 			if let InputDataType::Pointer(pointer) = &actor.input {
 				// store the pointer distance so we can keep it at the correct point
@@ -190,9 +193,9 @@ impl Grabbable {
 				(PointerMode::Align, InputDataType::Pointer(_)) => self.content_parent(),
 				_ => &self.root,
 			};
-			transform_spatial.set_transform(
-				Some(self.input_handler.node()),
-				Transform::from_position_rotation(position, rotation),
+			transform_spatial.set_relative_transform(
+				self.input_handler.node().as_ref(),
+				Transform::from_translation_rotation(position, rotation),
 			)?;
 
 			self.prev_pose = self.pose;
@@ -236,9 +239,7 @@ impl Grabbable {
 					let root = self.root.alias();
 					let closest_point_tx = self.closest_point_tx.clone();
 					tokio::task::spawn(async move {
-						let result = async { field.closest_point(&root, [0.0; 3])?.await }
-							.await
-							.unwrap();
+						let result = field.closest_point(&root, [0.0; 3]).await.unwrap();
 						// if let Ok(result) = result {
 						let _ = closest_point_tx.send(result.into()).await;
 						// }
@@ -263,9 +264,9 @@ impl Grabbable {
 			}
 
 			if self.linear_velocity.is_some() || self.angular_velocity.is_some() {
-				self.root.set_transform(
-					Some(self.input_handler.node()),
-					Transform::from_position_rotation(self.pose.0, self.pose.1),
+				self.root.set_relative_transform(
+					self.input_handler.node().as_ref(),
+					Transform::from_translation_rotation(self.pose.0, self.pose.1),
 				)?;
 			}
 		}

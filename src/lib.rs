@@ -1,6 +1,5 @@
 pub mod button;
 pub mod data;
-pub mod datamap;
 mod dummy;
 mod exposure;
 mod grabbable;
