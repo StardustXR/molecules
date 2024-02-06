@@ -107,6 +107,10 @@ impl Grabbable {
 		field: &impl FieldAspect,
 		settings: GrabbableSettings,
 	) -> Result<Self, NodeError> {
+		let input_handler = InputActionHandler::wrap(
+			InputHandler::create(content_space.client()?.get_root(), Transform::none(), field)?,
+			GrabData { settings },
+		)?;
 		let condition_action = BaseInputAction::new(false, |input, data: &GrabData| {
 			let max_distance = data.settings.max_distance;
 			match &input.input {
@@ -124,10 +128,6 @@ impl Grabbable {
 			},
 			false,
 		);
-		let input_handler = InputActionHandler::wrap(
-			InputHandler::create(content_space.client()?.get_root(), Transform::none(), field)?,
-			GrabData { settings },
-		)?;
 		let root = Spatial::create(input_handler.node().as_ref(), Transform::none(), false)?;
 		let content_parent = Spatial::create(
 			input_handler.node().as_ref(),

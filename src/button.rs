@@ -92,13 +92,13 @@ impl ButtonVisuals {
 		let half_size_y = size.y * 0.5;
 		let segment_count = (size.x.min(size.y) * 1280.0) as usize / 4 * 4;
 		let mut circle_points = make_line_points(
-			&circle(segment_count, PI * 0.5, half_size_x.min(half_size_y)),
+			circle(segment_count, PI * 0.5, half_size_x.min(half_size_y)),
 			0.0025,
 			rgba_linear!(1.0, 1.0, 1.0, 1.0),
 		);
 		circle_points.reverse();
 		let rounded_rectangle_points = make_line_points(
-			&rounded_rectangle(
+			rounded_rectangle(
 				size.x,
 				size.y,
 				settings.line_thickness * 0.5,
@@ -240,7 +240,7 @@ impl UnboundedVolumeSignifier {
 		};
 		Ok(UnboundedVolumeSignifier(Lines::create(
 			parent,
-			Transform::from_translation([position.x, position.y, 0.0]),
+			Transform::from_translation([position.x, position.y, -thickness]),
 			&[Line {
 				points: vec![start_point, end_point],
 				cyclic: false,

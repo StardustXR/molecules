@@ -1,8 +1,8 @@
 use color::{color_space::LinearRgb, Color, Rgba};
-use glam::Vec3;
+use glam::{vec3, Vec3};
 use lerp::Lerp;
 use mint::Vector3;
-use stardust_xr_fusion::drawable::LinePoint;
+use stardust_xr_fusion::{drawable::LinePoint, spatial::BoundingBox};
 use std::f32::consts::{PI, TAU};
 
 pub fn rectangle(width: f32, height: f32) -> [Vector3<f32>; 4] {
@@ -101,15 +101,59 @@ pub fn arc(segments: usize, start_angle: f32, end_angle: f32, radius: f32) -> Ve
 		.collect()
 }
 
+pub fn bounding_box(bounding_box: BoundingBox) -> Vec<Vec<Vector3<f32>>> {
+	let center = Vec3::from(bounding_box.center);
+	let size_half = Vec3::from(bounding_box.size) / 2.0;
+
+	vec![
+		vec![
+			(center + vec3(-size_half.x, size_half.y, size_half.z)).into(),
+			(center + vec3(-size_half.x, size_half.y, -size_half.z)).into(),
+		],
+		vec![
+			(center + vec3(-size_half.x, size_half.y, size_half.z)).into(),
+			(center + vec3(size_half.x, size_half.y, size_half.z)).into(),
+		],
+		vec![
+			(center + vec3(-size_half.x, size_half.y, -size_half.z)).into(),
+			(center + vec3(size_half.x, size_half.y, -size_half.z)).into(),
+		],
+		vec![
+			(center + vec3(-size_half.x, -size_half.y, size_half.z)).into(),
+			(center + vec3(-size_half.x, -size_half.y, -size_half.z)).into(),
+		],
+		vec![
+			(center + vec3(-size_half.x, -size_half.y, size_half.z)).into(),
+			(center + vec3(size_half.x, -size_half.y, size_half.z)).into(),
+		],
+		vec![
+			(center + vec3(-size_half.x, -size_half.y, -size_half.z)).into(),
+			(center + vec3(size_half.x, -size_half.y, -size_half.z)).into(),
+		],
+		vec![
+			(center + vec3(size_half.x, size_half.y, size_half.z)).into(),
+			(center + vec3(size_half.x, size_half.y, -size_half.z)).into(),
+		],
+		vec![
+			(center + vec3(size_half.x, size_half.y, size_half.z)).into(),
+			(center + vec3(size_half.x, -size_half.y, size_half.z)).into(),
+		],
+		vec![
+			(center + vec3(size_half.x, size_half.y, -size_half.z)).into(),
+			(center + vec3(size_half.x, -size_half.y, -size_half.z)).into(),
+		],
+	]
+}
+
 pub fn make_line_points(
-	vec3s: &[Vector3<f32>],
+	vec3s: Vec<Vector3<f32>>,
 	thickness: f32,
 	color: Rgba<f32, LinearRgb>,
 ) -> Vec<LinePoint> {
 	vec3s
 		.into_iter()
 		.map(|point| LinePoint {
-			point: *point,
+			point,
 			thickness,
 			color,
 		})

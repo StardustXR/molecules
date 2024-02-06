@@ -1,17 +1,21 @@
 #![allow(dead_code)]
 
+use color::rgba_linear;
 use color_eyre::eyre::Result;
 use lazy_static::lazy_static;
 use manifest_dir_macros::directory_relative_path;
 use stardust_xr_fusion::{
 	client::{Client, ClientState, FrameInfo, RootHandler},
 	core::values::ResourceID,
-	drawable::Model,
+	drawable::{Line, Lines, Model},
 	fields::BoxField,
 	node::{NodeError, NodeType},
 	spatial::{SpatialAspect, Transform},
 };
-use stardust_xr_molecules::{Grabbable, GrabbableSettings, PointerMode};
+use stardust_xr_molecules::{
+	lines::{bounding_box, make_line_points},
+	Grabbable, GrabbableSettings, PointerMode,
+};
 use tracing_subscriber::EnvFilter;
 
 lazy_static! {
@@ -41,6 +45,7 @@ struct GrabbableDemo {
 	grabbable: Grabbable,
 	field: BoxField,
 	model: Model,
+	bounding_box: Lines,
 }
 impl GrabbableDemo {
 	async fn new(client: &Client) -> Result<Self, NodeError> {
@@ -50,8 +55,16 @@ impl GrabbableDemo {
 			&*GRABBABLE_MODEL,
 		)?;
 		let bounds = model.get_relative_bounding_box(client.get_root()).await?;
+		let bounding_lines: Vec<Line> = bounding_box(bounds.clone())
+			.into_iter()
+			.map(|l| Line {
+				points: make_line_points(l, 0.001, rgba_linear!(1.0, 1.0, 1.0, 1.0)),
+				cyclic: true,
+			})
+			.collect();
+		let bounding_box = Lines::create(&model, Transform::identity(), &bounding_lines)?;
 		let field = BoxField::create(
-			client.get_root(),
+			&model,
 			Transform::from_translation(bounds.center),
 			bounds.size,
 		)?;
@@ -71,11 +84,13 @@ impl GrabbableDemo {
 		)?;
 		model.set_spatial_parent(grabbable.content_parent())?;
 		field.set_spatial_parent(grabbable.content_parent())?;
+		bounding_box.set_spatial_parent(grabbable.content_parent())?;
 
 		Ok(GrabbableDemo {
 			grabbable,
 			field,
 			model,
+			bounding_box,
 		})
 	}
 }

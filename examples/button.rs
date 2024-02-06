@@ -1,10 +1,14 @@
 #![allow(dead_code)]
 
+use std::f32::consts::PI;
+
 use color_eyre::eyre::Result;
+use glam::Quat;
 use manifest_dir_macros::directory_relative_path;
 use serde::{Deserialize, Serialize};
 use stardust_xr_fusion::{
 	client::{Client, ClientState, FrameInfo, RootHandler},
+	drawable::{Text, TextAspect, TextStyle, XAlign, YAlign},
 	node::NodeError,
 	spatial::Transform,
 };
@@ -36,7 +40,11 @@ pub struct ButtonAction {
 	press: bool,
 }
 
-struct ButtonDemo(Button, SimplePulseReceiver<ButtonAction>);
+struct ButtonDemo {
+	button: Button,
+	reciever: SimplePulseReceiver<ButtonAction>,
+	text: Text,
+}
 impl ButtonDemo {
 	fn new(client: &Client) -> Result<Self, NodeError> {
 		let mut button = Button::create(
@@ -46,7 +54,7 @@ impl ButtonDemo {
 			ButtonSettings::default(),
 		)?;
 		button.set_debug(Some(DebugSettings::default()));
-		let action = SimplePulseReceiver::create(
+		let reciever = SimplePulseReceiver::create(
 			button.touch_plane().root(),
 			Transform::none(),
 			&button.touch_plane().field(),
@@ -56,12 +64,33 @@ impl ButtonDemo {
 				}
 			},
 		)?;
-		Ok(ButtonDemo(button, action))
+		let text = Text::create(
+			button.touch_plane().root(),
+			Transform::from_translation_rotation([0.0, -0.06, 0.0], Quat::from_rotation_y(PI)),
+			"Unpressed",
+			TextStyle {
+				character_height: 0.01,
+				text_align_x: XAlign::Center,
+				text_align_y: YAlign::Top,
+				..Default::default()
+			},
+		)?;
+		Ok(ButtonDemo {
+			button,
+			reciever,
+			text,
+		})
 	}
 }
 impl RootHandler for ButtonDemo {
 	fn frame(&mut self, _info: FrameInfo) {
-		self.0.update();
+		self.button.update();
+		if self.button.touch_plane().touch_started() {
+			self.text.set_text("Pressed").unwrap();
+		}
+		if self.button.touch_plane().touch_stopped() {
+			self.text.set_text("Unpressed").unwrap();
+		}
 	}
 	fn save_state(&mut self) -> ClientState {
 		ClientState::default()

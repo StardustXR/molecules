@@ -283,7 +283,7 @@ impl VisualDebug for TouchPlane {
 				4,
 			);
 			let line_points =
-				make_line_points(&square, settings.line_thickness, settings.line_color);
+				make_line_points(square, settings.line_thickness, settings.line_color);
 			let line_back = Line {
 				points: line_points
 					.iter()
