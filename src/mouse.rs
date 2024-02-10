@@ -1,4 +1,5 @@
 use mint::Vector2;
+use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
 use stardust_xr_fusion::{
 	core::{schemas::flex::flexbuffers, values::Datamap},
@@ -15,14 +16,14 @@ pub struct MouseEvent {
 	pub delta: Option<Vector2<f32>>,
 	pub scroll_continuous: Option<Vector2<f32>>,
 	pub scroll_discrete: Option<Vector2<f32>>,
-	pub raw_input_events: Option<Vec<u32>>,
+	pub raw_input_events: Option<FxHashSet<u32>>,
 }
 impl MouseEvent {
 	pub fn new(
 		delta: Option<Vector2<f32>>,
 		scroll_continuous: Option<Vector2<f32>>,
 		scroll_discrete: Option<Vector2<f32>>,
-		raw_input_events: Option<Vec<u32>>,
+		raw_input_events: Option<FxHashSet<u32>>,
 	) -> Self {
 		MouseEvent {
 			mouse: (),

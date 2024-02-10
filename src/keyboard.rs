@@ -1,4 +1,5 @@
 use crate::data::SimplePulseReceiver;
+use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
 use stardust_xr_fusion::{
 	core::values::Datamap,
@@ -18,7 +19,7 @@ pub struct KeyboardEvent {
 	pub keyboard: (),
 	pub xkbv1: (),
 	pub keymap_id: String,
-	pub keys: Vec<i32>,
+	pub keys: FxHashSet<i32>,
 }
 impl Default for KeyboardEvent {
 	fn default() -> Self {
@@ -64,7 +65,11 @@ impl KeyboardEvent {
 	// }
 
 	pub fn send_to_panel(self, panel: &PanelItem, surface: &SurfaceID) -> Result<(), NodeError> {
-		panel.keyboard_keys(surface, &self.keymap_id, self.keys)
+		panel.keyboard_keys(
+			surface,
+			&self.keymap_id,
+			self.keys.iter().cloned().collect(),
+		)
 	}
 }
 
@@ -128,7 +133,7 @@ async fn keyboard_events() {
 		keyboard: (),
 		xkbv1: (),
 		keymap_id: "".to_string(),
-		keys: vec![1, -1],
+		keys: [1, -1].into_iter().collect(),
 	};
 	let pulse_sender =
 		PulseSender::create(client.get_root(), Transform::none(), &KEYBOARD_MASK).unwrap();
