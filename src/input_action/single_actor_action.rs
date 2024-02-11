@@ -47,35 +47,34 @@ impl<S: InputActionState> SingleActorAction<S> {
 	pub fn update(&mut self, condition_action: Option<&mut BaseInputAction<S>>) {
 		let old_actor = self.actor.clone();
 
-		if let Some(actor) = &self.actor {
-			if self.base_action.stopped_acting.contains(actor) {
-				self.actor = None;
+		match &mut self.actor {
+			// Action not active (e.g. object is not being grabbed)
+			None => {
+				self.actor = self.check_actor_starting(condition_action);
 			}
-		}
-		let started_acting;
-		if let Some(condition_action) = condition_action {
-			let condition_acting = condition_action
-				.currently_acting
-				.difference(&condition_action.started_acting)
-				.cloned()
-				.collect::<FxHashSet<_>>();
-			started_acting = self
-				.base_action
-				.started_acting
-				.intersection(&condition_acting)
-				.next()
-				.cloned();
-			self.base_action.capture_on_trigger =
-				self.capture_on_trigger && !condition_acting.is_empty();
-		} else {
-			started_acting = self.base_action.started_acting.iter().next().cloned();
-			self.base_action.capture_on_trigger = self.capture_on_trigger;
-		}
-		if let Some(started_acting) = started_acting {
-			self.actor = Some(started_acting.clone());
-		} else if let Some(actor) = &self.actor {
-			if let Some(actor) = self.base_action.currently_acting.get(actor) {
-				self.actor = Some(actor.clone());
+			// Action active (e.g. object is being grabbed)
+			Some(actor) => {
+				// If we stopped acting (e.g. stopped pinching)
+				if self.base_action.stopped_acting.contains(actor) {
+					// If the condition is still happening (e.g. your hand just unpinched but is still nearby)
+					if condition_action.is_some() {
+						self.actor.take();
+					} else {
+						// Action is still active here but hand stopped being tracked or some other disruption, so don't do anything
+					}
+				} else {
+					if self.change_actor {
+						if let Some(new_actor) = self.check_actor_starting(condition_action) {
+							self.actor.replace(new_actor);
+						}
+					} else {
+						if let Some(new_actor) =
+							self.base_action.currently_acting.get(actor).cloned()
+						{
+							self.actor.replace(new_actor);
+						}
+					}
+				}
 			}
 		}
 
@@ -84,6 +83,30 @@ impl<S: InputActionState> SingleActorAction<S> {
 		self.actor_acting = self.actor.is_some();
 		self.actor_stopped = old_actor.is_some() && self.actor.is_none();
 	}
+	fn check_actor_starting(
+		&self,
+		condition_action: Option<&mut BaseInputAction<S>>,
+	) -> Option<Arc<InputData>> {
+		// If there's a condition (e.g. your hand has to be close to grab something)
+		if let Some(condition_action) = condition_action {
+			// All the input data of input methods that are currently fulfilling the condition action but have not just started
+			let condition_acting = condition_action
+				.currently_acting
+				.difference(&condition_action.started_acting)
+				.cloned()
+				.collect::<FxHashSet<_>>();
+			// Pick the first one that just started (e.g. grab condition action is being close enough, single actor action pinching, you want to be close to something BEFORE you pinch it)
+			self.base_action
+				.started_acting
+				.intersection(&condition_acting)
+				.next()
+				.cloned()
+		} else {
+			// Pick the first thing that started acting
+			self.base_action.started_acting.iter().next().cloned()
+		}
+	}
+
 	pub fn base(&self) -> &BaseInputAction<S> {
 		&self.base_action
 	}
