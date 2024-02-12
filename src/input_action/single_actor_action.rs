@@ -47,13 +47,19 @@ impl<S: InputActionState> SingleActorAction<S> {
 	pub fn update(&mut self, condition_action: Option<&mut BaseInputAction<S>>) {
 		let old_actor = self.actor.clone();
 
+		self.base_action.capture_on_trigger = self.capture_on_trigger;
 		match &mut self.actor {
 			// Action not active (e.g. object is not being grabbed)
 			None => {
-				self.actor = self.check_actor_starting(condition_action);
+				// self.base_action.capture_on_trigger = false;
+				if let Some(new_actor) = self.check_actor_starting(condition_action) {
+					// self.base_action.capture_on_trigger = self.capture_on_trigger;
+					self.actor.replace(new_actor);
+				}
 			}
 			// Action active (e.g. object is being grabbed)
 			Some(actor) => {
+				// self.base_action.capture_on_trigger = self.capture_on_trigger;
 				// If we stopped acting (e.g. stopped pinching)
 				if self.base_action.stopped_acting.contains(actor) {
 					// If the condition is still happening (e.g. your hand just unpinched but is still nearby)
