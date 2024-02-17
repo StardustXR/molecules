@@ -1,14 +1,15 @@
 use crate::{
 	input_action::{BaseInputAction, InputActionHandler},
-	lines::{self, make_line_points},
+	lines::{self, LineExt},
 	DebugSettings, VisualDebug,
 };
-use glam::{vec3, Vec3};
+use color::rgba_linear;
+use glam::{vec3, Mat4, Vec3};
 use map_range::MapRange;
 use mint::{Vector2, Vector3};
 use rustc_hash::FxHashSet;
 use stardust_xr_fusion::{
-	drawable::{Line, Lines},
+	drawable::Lines,
 	fields::{BoxField, BoxFieldAspect, UnknownField},
 	input::{InputData, InputDataType, InputHandler},
 	node::{NodeError, NodeType},
@@ -276,30 +277,24 @@ impl TouchPlane {
 impl VisualDebug for TouchPlane {
 	fn set_debug(&mut self, settings: Option<DebugSettings>) {
 		self.debug_lines = settings.and_then(|settings| {
-			let square = lines::rounded_rectangle(
+			let line_front = lines::rounded_rectangle(
 				self.size.x,
 				self.size.y,
 				settings.line_thickness * 0.5,
 				4,
-			);
-			let line_points =
-				make_line_points(square, settings.line_thickness, settings.line_color);
-			let line_back = Line {
-				points: line_points
-					.iter()
-					.cloned()
-					.map(|mut l| {
-						l.color.a = 0.5;
-						l.point.z = -self.thickness;
-						l
-					})
-					.collect::<Vec<_>>(),
-				cyclic: true,
-			};
-			let line_front = Line {
-				points: line_points,
-				cyclic: true,
-			};
+			)
+			.thickness(settings.line_thickness)
+			.color(settings.line_color);
+			let line_back = line_front
+				.clone()
+				.color(rgba_linear!(
+					settings.line_color.c.r,
+					settings.line_color.c.g,
+					settings.line_color.c.b,
+					settings.line_color.a * 0.5
+				))
+				.transform(Mat4::from_translation(vec3(0.0, 0.0, -self.thickness)));
+
 			let lines = Lines::create(
 				&self.root,
 				Transform::from_translation([0.0, 0.0, 0.0]),

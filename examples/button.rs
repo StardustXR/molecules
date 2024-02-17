@@ -10,7 +10,7 @@ use stardust_xr_fusion::{
 	client::{Client, ClientState, FrameInfo, RootHandler},
 	drawable::{Text, TextAspect, TextStyle, XAlign, YAlign},
 	node::NodeError,
-	spatial::Transform,
+	spatial::{SpatialAspect, Transform},
 };
 use stardust_xr_molecules::{
 	button::{Button, ButtonSettings},
@@ -47,6 +47,7 @@ struct ButtonDemo {
 }
 impl ButtonDemo {
 	fn new(client: &Client) -> Result<Self, NodeError> {
+		client.get_root().set_zoneable(true)?;
 		let mut button = Button::create(
 			client.get_root(),
 			Transform::none(),

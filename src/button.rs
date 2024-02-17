@@ -1,7 +1,7 @@
 use std::{array, f32::consts::PI};
 
 use crate::{
-	lines::{circle, lerp, make_line_points, rounded_rectangle},
+	lines::{circle, rounded_rectangle, LineExt},
 	touch_plane::TouchPlane,
 	VisualDebug,
 };
@@ -77,8 +77,8 @@ impl VisualDebug for Button {
 }
 
 struct ButtonVisuals {
-	circle_points: Vec<LinePoint>,
-	rounded_rectangle_points: Vec<LinePoint>,
+	circle: Line,
+	rounded_rectangle: Line,
 	outline: Lines,
 	_corner_lines: [UnboundedVolumeSignifier; 4],
 }
@@ -91,29 +91,20 @@ impl ButtonVisuals {
 		let half_size_x = size.x * 0.5;
 		let half_size_y = size.y * 0.5;
 		let segment_count = (size.x.min(size.y) * 1280.0) as usize / 4 * 4;
-		let mut circle_points = make_line_points(
-			circle(segment_count, PI * 0.5, half_size_x.min(half_size_y)),
-			0.0025,
-			rgba_linear!(1.0, 1.0, 1.0, 1.0),
-		);
-		circle_points.reverse();
-		let rounded_rectangle_points = make_line_points(
-			rounded_rectangle(
-				size.x,
-				size.y,
-				settings.line_thickness * 0.5,
-				segment_count / 4 - 1,
-			),
-			settings.line_thickness,
-			rgba_linear!(1.0, 1.0, 1.0, 1.0),
-		);
+		let mut circle =
+			circle(segment_count, PI * 0.5, half_size_x.min(half_size_y)).thickness(0.0025);
+		circle.points.reverse();
+		let rounded_rectangle = rounded_rectangle(
+			size.x,
+			size.y,
+			settings.line_thickness * 0.5,
+			segment_count / 4 - 1,
+		)
+		.thickness(settings.line_thickness);
 		let outline = Lines::create(
 			parent,
 			Transform::from_scale([1.0, 1.0, 0.0]),
-			&[Line {
-				points: circle_points.clone(),
-				cyclic: true,
-			}],
+			&[circle.clone()],
 		)?;
 		let corner_lines = array::from_fn(|n| {
 			let (corner_sin, corner_cos) = (settings.line_thickness * 0.5).sin_cos();
@@ -137,8 +128,8 @@ impl ButtonVisuals {
 		});
 
 		Ok(ButtonVisuals {
-			circle_points,
-			rounded_rectangle_points,
+			circle,
+			rounded_rectangle,
 			outline,
 			_corner_lines: corner_lines,
 		})
@@ -161,15 +152,13 @@ impl ButtonVisuals {
 				.clamp(0.0, 1.0);
 
 			let scale_morph = scale.map_range(0.5..1.0, 0.0..1.0);
-			let _ = self.outline.set_lines(&[Line {
-				points: lerp(
-					&self.circle_points,
-					&self.rounded_rectangle_points,
-					scale_morph,
-				)
-				.unwrap(),
-				cyclic: true,
-			}]);
+			let lines = self
+				.circle
+				.clone()
+				.lerp(&self.rounded_rectangle, scale_morph);
+			let _ = self
+				.outline
+				.set_lines(&lines.map(|m| vec![m]).unwrap_or_default());
 			let _ = self
 				.outline
 				.set_local_transform(Transform::from_translation_scale(
@@ -182,20 +171,8 @@ impl ButtonVisuals {
 				));
 		}
 		if touch_plane.touch_started() {
-			let points = self
-				.rounded_rectangle_points
-				.iter()
-				.map(|p| {
-					let mut point = p.clone();
-					point.color = settings.accent_color;
-					point
-				})
-				.collect::<Vec<_>>();
 			self.outline
-				.set_lines(&[Line {
-					points,
-					cyclic: true,
-				}])
+				.set_lines(&[self.rounded_rectangle.clone().color(settings.accent_color)])
 				.unwrap();
 		}
 		if touch_plane.touching() {

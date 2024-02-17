@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-use color::rgba_linear;
 use color_eyre::eyre::Result;
 use lazy_static::lazy_static;
 use manifest_dir_macros::directory_relative_path;
@@ -13,7 +12,7 @@ use stardust_xr_fusion::{
 	spatial::{SpatialAspect, Transform},
 };
 use stardust_xr_molecules::{
-	lines::{bounding_box, make_line_points},
+	lines::{bounding_box, LineExt},
 	Grabbable, GrabbableSettings, PointerMode,
 };
 use tracing_subscriber::EnvFilter;
@@ -57,10 +56,7 @@ impl GrabbableDemo {
 		let bounds = model.get_relative_bounding_box(client.get_root()).await?;
 		let bounding_lines: Vec<Line> = bounding_box(bounds.clone())
 			.into_iter()
-			.map(|l| Line {
-				points: make_line_points(l, 0.001, rgba_linear!(1.0, 1.0, 1.0, 1.0)),
-				cyclic: true,
-			})
+			.map(|l| l.thickness(0.001))
 			.collect();
 		let bounding_box = Lines::create(&model, Transform::identity(), &bounding_lines)?;
 		let field = BoxField::create(
