@@ -44,11 +44,11 @@ impl<S: InputActionState> SingleActorAction<S> {
 			actor: None,
 		}
 	}
-	pub fn update(&mut self, condition_action: Option<&mut BaseInputAction<S>>) {
+	pub fn update(&mut self, condition_action: Option<&BaseInputAction<S>>) {
 		let old_actor = self.actor.clone();
 
 		self.base_action.capture_on_trigger = self.capture_on_trigger;
-		match &mut self.actor {
+		match self.actor.clone() {
 			// Action not active (e.g. object is not being grabbed)
 			None => {
 				// self.base_action.capture_on_trigger = false;
@@ -61,7 +61,7 @@ impl<S: InputActionState> SingleActorAction<S> {
 			Some(actor) => {
 				// self.base_action.capture_on_trigger = self.capture_on_trigger;
 				// If we stopped acting (e.g. stopped pinching)
-				if self.base_action.stopped_acting.contains(actor) {
+				if self.base_action.stopped_acting.contains(&actor) {
 					// If the condition is still happening (e.g. your hand just unpinched but is still nearby)
 					if condition_action.is_some() {
 						self.actor.take();
@@ -72,13 +72,11 @@ impl<S: InputActionState> SingleActorAction<S> {
 					if self.change_actor {
 						if let Some(new_actor) = self.check_actor_starting(condition_action) {
 							self.actor.replace(new_actor);
+						} else {
+							self.update_actor(actor.clone())
 						}
 					} else {
-						if let Some(new_actor) =
-							self.base_action.currently_acting.get(actor).cloned()
-						{
-							self.actor.replace(new_actor);
-						}
+						self.update_actor(actor.clone())
 					}
 				}
 			}
@@ -89,9 +87,14 @@ impl<S: InputActionState> SingleActorAction<S> {
 		self.actor_acting = self.actor.is_some();
 		self.actor_stopped = old_actor.is_some() && self.actor.is_none();
 	}
+	fn update_actor(&mut self, actor: Arc<InputData>) {
+		if let Some(new_actor) = self.base_action.currently_acting.get(&actor).cloned() {
+			self.actor.replace(new_actor);
+		}
+	}
 	fn check_actor_starting(
 		&self,
-		condition_action: Option<&mut BaseInputAction<S>>,
+		condition_action: Option<&BaseInputAction<S>>,
 	) -> Option<Arc<InputData>> {
 		// If there's a condition (e.g. your hand has to be close to grab something)
 		if let Some(condition_action) = condition_action {
@@ -105,11 +108,17 @@ impl<S: InputActionState> SingleActorAction<S> {
 			self.base_action
 				.started_acting
 				.intersection(&condition_acting)
+				.filter(|d| d.captured)
 				.next()
 				.cloned()
 		} else {
 			// Pick the first thing that started acting
-			self.base_action.started_acting.iter().next().cloned()
+			self.base_action
+				.started_acting
+				.iter()
+				.filter(|d| d.captured)
+				.next()
+				.cloned()
 		}
 	}
 
