@@ -1,5 +1,4 @@
 use stardust_xr_fusion::{
-	client::{ClientState, FrameInfo, RootHandler},
 	core::values::Datamap,
 	data::{PulseReceiver, PulseReceiverHandler, PulseSenderHandler},
 	fields::UnknownField,
@@ -13,12 +12,6 @@ use stardust_xr_fusion::{
 use std::path::PathBuf;
 
 pub struct DummyHandler;
-impl RootHandler for DummyHandler {
-	fn frame(&mut self, _info: FrameInfo) {}
-	fn save_state(&mut self) -> ClientState {
-		ClientState::default()
-	}
-}
 
 // Input
 impl InputHandlerHandler for DummyHandler {

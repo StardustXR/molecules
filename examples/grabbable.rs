@@ -9,7 +9,7 @@ use stardust_xr_fusion::{
 	drawable::{Line, Lines, Model},
 	fields::BoxField,
 	node::{NodeError, NodeType},
-	spatial::{SpatialAspect, Transform},
+	spatial::{Spatial, SpatialAspect, Transform},
 };
 use stardust_xr_molecules::{
 	lines::{bounding_box, LineExt},
@@ -41,6 +41,7 @@ async fn main() -> Result<()> {
 }
 
 struct GrabbableDemo {
+	state_root: Spatial,
 	grabbable: Grabbable,
 	field: BoxField,
 	model: Model,
@@ -48,6 +49,7 @@ struct GrabbableDemo {
 }
 impl GrabbableDemo {
 	async fn new(client: &Client) -> Result<Self, NodeError> {
+		let state_root = Spatial::create(client.get_root(), Transform::identity(), false)?;
 		let model = Model::create(
 			client.get_root(),
 			Transform::from_scale([0.5; 3]),
@@ -74,11 +76,18 @@ impl GrabbableDemo {
 				..Default::default()
 			},
 		)?;
+		if let Some(content_parent_reference) = client.state().spatial_anchors.get("content_parent")
+		{
+			grabbable
+				.content_parent()
+				.set_relative_transform(content_parent_reference, Transform::identity())?;
+		}
 		model.set_spatial_parent(grabbable.content_parent())?;
 		field.set_spatial_parent(grabbable.content_parent())?;
 		bounding_box.set_spatial_parent(grabbable.content_parent())?;
 
 		Ok(GrabbableDemo {
+			state_root,
 			grabbable,
 			field,
 			model,
@@ -91,9 +100,21 @@ impl RootHandler for GrabbableDemo {
 		self.grabbable.update(&info).unwrap();
 	}
 	fn save_state(&mut self) -> ClientState {
+		self.state_root
+			.set_relative_transform(
+				self.grabbable.content_parent(),
+				Transform::from_translation([0.0; 3]),
+			)
+			.unwrap();
 		ClientState {
-			root: Some(self.grabbable.content_parent().alias()),
-			..Default::default()
+			data: Vec::new(),
+			root: self.state_root.alias(),
+			spatial_anchors: [(
+				"content_parent".to_string(),
+				self.grabbable.content_parent().alias(),
+			)]
+			.into_iter()
+			.collect(),
 		}
 	}
 }

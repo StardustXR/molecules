@@ -1,7 +1,5 @@
 #![allow(dead_code)]
 
-use std::f32::consts::PI;
-
 use color_eyre::eyre::Result;
 use glam::Quat;
 use manifest_dir_macros::directory_relative_path;
@@ -17,6 +15,7 @@ use stardust_xr_molecules::{
 	data::SimplePulseReceiver,
 	DebugSettings, VisualDebug,
 };
+use std::f32::consts::PI;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
@@ -94,6 +93,6 @@ impl RootHandler for ButtonDemo {
 		}
 	}
 	fn save_state(&mut self) -> ClientState {
-		ClientState::default()
+		ClientState::from_root(self.button.touch_plane().root())
 	}
 }
