@@ -3,7 +3,10 @@ pub use single_actor_action::*;
 
 use rustc_hash::FxHashSet;
 use stardust_xr_fusion::{
-	input::{InputData, InputHandler, InputHandlerHandler, UnknownInputMethod},
+	input::{
+		InputData, InputHandler, InputHandlerAspect, InputHandlerHandler, InputMethod,
+		InputMethodAspect,
+	},
 	node::{NodeResult, NodeType},
 	HandlerWrapper,
 };
@@ -133,7 +136,7 @@ impl<S: InputActionState> InputActionHandler<S> {
 	}
 }
 impl<S: InputActionState> InputHandlerHandler for InputActionHandler<S> {
-	fn input(&mut self, input: UnknownInputMethod, data: InputData) {
+	fn input(&mut self, input: InputMethod, data: InputData) {
 		let data = Arc::new(data);
 		let capture = self
 			.actions

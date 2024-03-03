@@ -2,7 +2,7 @@ use stardust_xr_fusion::{
 	core::values::Datamap,
 	data::{PulseReceiver, PulseReceiverHandler, PulseSenderHandler},
 	fields::UnknownField,
-	input::{InputData, InputHandlerHandler, UnknownInputMethod},
+	input::{InputData, InputHandlerHandler, InputMethod},
 	items::{
 		panel::{ChildInfo, Geometry, PanelItem, PanelItemHandler, PanelItemInitData},
 		EnvironmentItem, ItemAcceptorHandler,
@@ -15,7 +15,7 @@ pub struct DummyHandler;
 
 // Input
 impl InputHandlerHandler for DummyHandler {
-	fn input(&mut self, _input: UnknownInputMethod, _data: InputData) {}
+	fn input(&mut self, _input: InputMethod, _data: InputData) {}
 }
 
 // Data
