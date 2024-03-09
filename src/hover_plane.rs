@@ -20,6 +20,7 @@ use std::{ops::Range, sync::Arc};
 
 #[derive(Debug, Clone)]
 pub struct HoverPlaneSettings {
+	distance_range: Range<f32>,
 	line_start_thickness: f32,
 	line_start_color_hover: Rgba<f32, LinearRgb>,
 	line_start_color_interact: Rgba<f32, LinearRgb>,
@@ -30,6 +31,7 @@ pub struct HoverPlaneSettings {
 impl Default for HoverPlaneSettings {
 	fn default() -> Self {
 		HoverPlaneSettings {
+			distance_range: 0.025..f32::MAX,
 			line_start_thickness: 0.0,
 			line_start_color_hover: rgba_linear!(1.0, 1.0, 1.0, 1.0),
 			line_start_color_interact: rgba_linear!(0.0, 1.0, 0.75, 1.0),
@@ -40,9 +42,10 @@ impl Default for HoverPlaneSettings {
 	}
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct State {
 	size: Vector2<f32>,
+	settings: HoverPlaneSettings,
 }
 
 pub struct HoverPlane {
@@ -78,7 +81,10 @@ impl HoverPlane {
 		)?;
 		let input = InputActionHandler::wrap(
 			InputHandler::create(&root, Transform::none(), &field)?,
-			State { size },
+			State {
+				size,
+				settings: settings.clone(),
+			},
 		)?;
 
 		let hover_action = BaseInputAction::new(false, Self::hover_action);
@@ -109,15 +115,23 @@ impl HoverPlane {
 	fn hover_action(input: &InputData, state: &State) -> bool {
 		match &input.input {
 			InputDataType::Pointer(_) => false,
-			_ => Self::hover(state.size, Self::interact_point_local(input).into(), true),
+			_ => {
+				let interact_point = Self::interact_point_local(input);
+				input.order == 0
+					&& state
+						.settings
+						.distance_range
+						.contains(&interact_point.z.abs())
+					&& Self::hover(state.size, interact_point.into(), true)
+			}
 		}
 	}
 	fn interact_action(input: &InputData, _state: &State) -> bool {
 		match &input.input {
 			InputDataType::Hand(_) => input
 				.datamap
-				.with_data(|d| d.idx("pinch_strength").as_f32() > 0.9),
-			InputDataType::Tip(_) => input.datamap.with_data(|d| d.idx("select").as_f32() > 0.5),
+				.with_data(|d| d.idx("pinch_strength").as_f32() > 0.95),
+			InputDataType::Tip(_) => input.datamap.with_data(|d| d.idx("select").as_f32() > 0.9),
 			_ => false,
 		}
 	}
@@ -169,7 +183,10 @@ impl HoverPlane {
 	pub fn set_size(&mut self, size: impl Into<Vector2<f32>>) -> Result<(), NodeError> {
 		let size = size.into();
 		self.size = size;
-		self.input.lock_wrapped().update_state(State { size });
+		self.input.lock_wrapped().update_state(State {
+			size,
+			settings: self.settings.clone(),
+		});
 		self.field.set_size([size.x, size.y, self.thickness])?;
 		Ok(())
 	}
@@ -216,6 +233,7 @@ impl HoverPlane {
 				InputDataType::Pointer(_) => false,
 				_ => true,
 			})
+			.filter(|d| d.order == 0)
 			.map(|d| {
 				(
 					Self::interact_point_local(d),
