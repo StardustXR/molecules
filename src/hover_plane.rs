@@ -117,11 +117,10 @@ impl HoverPlane {
 			InputDataType::Pointer(_) => false,
 			_ => {
 				let interact_point = Self::interact_point_local(input);
-				input.order == 0
-					&& state
-						.settings
-						.distance_range
-						.contains(&interact_point.z.abs())
+				state
+					.settings
+					.distance_range
+					.contains(&interact_point.z.abs())
 					&& Self::hover(state.size, interact_point.into(), true)
 			}
 		}
