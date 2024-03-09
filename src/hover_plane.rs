@@ -20,13 +20,13 @@ use std::{ops::Range, sync::Arc};
 
 #[derive(Debug, Clone)]
 pub struct HoverPlaneSettings {
-	distance_range: Range<f32>,
-	line_start_thickness: f32,
-	line_start_color_hover: Rgba<f32, LinearRgb>,
-	line_start_color_interact: Rgba<f32, LinearRgb>,
-	line_end_thickness: f32,
-	line_end_color_hover: Rgba<f32, LinearRgb>,
-	line_end_color_interact: Rgba<f32, LinearRgb>,
+	pub distance_range: Range<f32>,
+	pub line_start_thickness: f32,
+	pub line_start_color_hover: Rgba<f32, LinearRgb>,
+	pub line_start_color_interact: Rgba<f32, LinearRgb>,
+	pub line_end_thickness: f32,
+	pub line_end_color_hover: Rgba<f32, LinearRgb>,
+	pub line_end_color_interact: Rgba<f32, LinearRgb>,
 }
 impl Default for HoverPlaneSettings {
 	fn default() -> Self {
