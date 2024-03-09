@@ -117,7 +117,8 @@ impl HoverPlane {
 			InputDataType::Hand(_) => input
 				.datamap
 				.with_data(|d| d.idx("pinch_strength").as_f32() > 0.9),
-			_ => input.datamap.with_data(|d| d.idx("select").as_f32() > 0.5),
+			InputDataType::Tip(_) => input.datamap.with_data(|d| d.idx("select").as_f32() > 0.5),
+			_ => false,
 		}
 	}
 	pub fn interact_point_local(input: &InputData) -> Vec3 {
