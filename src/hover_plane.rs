@@ -108,7 +108,7 @@ impl HoverPlane {
 	}
 	fn hover_action(input: &InputData, state: &State) -> bool {
 		match &input.input {
-			InputDataType::Pointer(_) => input.distance < 0.0,
+			InputDataType::Pointer(_) => false,
 			_ => Self::hover(state.size, Self::interact_point_local(input).into(), true),
 		}
 	}
