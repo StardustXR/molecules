@@ -29,6 +29,7 @@ pub struct TouchPlane {
 	field: BoxField,
 	hover_action: BaseInputAction<State>,
 	touch_action: BaseInputAction<State>,
+	touch_capture_action: BaseInputAction<State>,
 	size: Vector2<f32>,
 	pub x_range: Range<f32>,
 	pub y_range: Range<f32>,
@@ -61,13 +62,15 @@ impl TouchPlane {
 		)?;
 
 		let hover_action = BaseInputAction::new(false, Self::hover_action);
-		let touch_action = BaseInputAction::new(true, Self::touch_action);
+		let touch_action = BaseInputAction::new(false, Self::touch_action);
+		let touch_capture_action = BaseInputAction::new(true, Self::touch_action);
 		Ok(TouchPlane {
 			root,
 			input,
 			field,
 			hover_action,
 			touch_action,
+			touch_capture_action,
 			size,
 			x_range,
 			y_range,
@@ -230,9 +233,11 @@ impl TouchPlane {
 
 	/// Update the state of this touch plane. Run once every frame.
 	pub fn update(&mut self) {
-		self.input
-			.lock_wrapped()
-			.update_actions([&mut self.hover_action, &mut self.touch_action]);
+		self.input.lock_wrapped().update_actions([
+			&mut self.hover_action,
+			&mut self.touch_action,
+			&mut self.touch_capture_action,
+		]);
 
 		// Update the currently hovering stuff
 		self.currently_hovering = self.hover_action.currently_acting.clone();
