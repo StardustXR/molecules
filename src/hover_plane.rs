@@ -114,7 +114,7 @@ impl HoverPlane {
 	}
 	fn hover_action(input: &InputData, state: &State) -> bool {
 		match &input.input {
-			InputDataType::Pointer(_) => false,
+			InputDataType::Pointer(_) => input.distance <= 0.0,
 			_ => {
 				let interact_point = Self::interact_point_local(input);
 				state
@@ -130,8 +130,7 @@ impl HoverPlane {
 			InputDataType::Hand(_) => input
 				.datamap
 				.with_data(|d| d.idx("pinch_strength").as_f32() > 0.95),
-			InputDataType::Tip(_) => input.datamap.with_data(|d| d.idx("select").as_f32() > 0.9),
-			_ => false,
+			_ => input.datamap.with_data(|d| d.idx("select").as_f32() > 0.9),
 		}
 	}
 	pub fn interact_point_local(input: &InputData) -> Vec3 {
