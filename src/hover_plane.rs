@@ -232,7 +232,6 @@ impl HoverPlane {
 				InputDataType::Pointer(_) => false,
 				_ => true,
 			})
-			.filter(|d| d.order == 0)
 			.map(|d| {
 				(
 					Self::interact_point_local(d),
