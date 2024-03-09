@@ -3,6 +3,7 @@ pub mod data;
 mod dummy;
 mod exposure;
 mod grabbable;
+pub mod hover_plane;
 pub mod input_action;
 pub mod keyboard;
 pub mod lines;
