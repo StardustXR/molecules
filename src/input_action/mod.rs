@@ -145,7 +145,7 @@ impl<S: InputActionState> InputHandlerHandler for InputActionHandler<S> {
 			.reduce(|a, b| a || b)
 			.unwrap_or_default();
 		if capture {
-			let _ = input.capture(&self.handler);
+			let _ = input.request_capture(&self.handler);
 		}
 	}
 }
