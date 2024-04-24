@@ -54,16 +54,12 @@ impl<T: Serialize + DeserializeOwned + Default + 'static> PulseReceiverHandler
 }
 
 /// Pulse receiver that only acts as a tag, doesn't
-pub struct NodeTag(HandlerWrapper<PulseReceiver, DummyHandler>);
-impl NodeTag {
-	pub fn create<T: Serialize + Default>(
-		spatial_parent: &impl SpatialAspect,
-		transform: Transform,
-		field: &impl FieldAspect,
-	) -> Result<Self, NodeError> {
-		let mask = Datamap::from_typed(T::default()).map_err(|_| NodeError::Serialization)?;
-		Ok(NodeTag(
-			PulseReceiver::create(spatial_parent, transform, field, &mask)?.wrap(DummyHandler)?,
-		))
-	}
+pub type NodeTag = HandlerWrapper<PulseReceiver, DummyHandler>;
+pub fn create_node_tag<T: Serialize + Default>(
+	spatial_parent: &impl SpatialAspect,
+	transform: Transform,
+	field: &impl FieldAspect,
+) -> Result<NodeTag, NodeError> {
+	let mask = Datamap::from_typed(T::default()).map_err(|_| NodeError::Serialization)?;
+	Ok(PulseReceiver::create(spatial_parent, transform, field, &mask)?.wrap(DummyHandler)?)
 }

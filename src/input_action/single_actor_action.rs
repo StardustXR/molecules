@@ -59,14 +59,18 @@ impl<S: InputActionState> SingleActorAction<S> {
 			}
 			// Action active (e.g. object is being grabbed)
 			Some(actor) => {
-				// self.base_action.capture_on_trigger = self.capture_on_trigger;
 				// If we stopped acting (e.g. stopped pinching)
 				if self.base_action.stopped_acting.contains(&actor) {
-					// If the condition is still happening (e.g. your hand just unpinched but is still nearby)
-					if condition_action.is_some() {
-						self.actor.take();
+					if let Some(condition_action) = condition_action {
+						// If the condition is still happening (e.g. your hand just unpinched but is still nearby)
+						if condition_action.stopped_acting.contains(&actor) {
+							// Action is still active here but hand stopped being tracked or some other disruption, so don't do anything
+						} else {
+							self.actor.take();
+						}
 					} else {
-						// Action is still active here but hand stopped being tracked or some other disruption, so don't do anything
+						// if there's no condition action then just check for a regular deactivation
+						self.actor.take();
 					}
 				} else {
 					if self.change_actor {

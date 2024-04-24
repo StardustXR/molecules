@@ -80,7 +80,7 @@ struct ButtonVisuals {
 	circle: Line,
 	rounded_rectangle: Line,
 	outline: Lines,
-	_corner_lines: [UnboundedVolumeSignifier; 4],
+	_corner_lines: [Lines; 4],
 }
 impl ButtonVisuals {
 	fn create(
@@ -118,7 +118,7 @@ impl ButtonVisuals {
 				3 => [-half_size_x + corner_sin, -half_size_y + corner_cos],
 				_ => unimplemented!(),
 			};
-			UnboundedVolumeSignifier::create(
+			create_unbounded_volume_signifier(
 				&outline,
 				position,
 				settings.line_thickness,
@@ -188,40 +188,37 @@ impl ButtonVisuals {
 
 			let _ = self
 				.outline
-				.set_local_transform(Transform::from_scale([1.0, 1.0, distance]));
+				.set_local_transform(Transform::from_translation_scale(
+					[0.0; 3],
+					[1.0, 1.0, distance],
+				));
 		}
-		// if touch_plane.touch_stopped() {
-		// 	self.outline.update_points(&self.circle_points).unwrap();
-		// }
 	}
 }
 
-struct UnboundedVolumeSignifier(Lines);
-impl UnboundedVolumeSignifier {
-	pub fn create(
-		parent: &impl SpatialAspect,
-		position: impl Into<Vector2<f32>>,
-		thickness: f32,
-		color: Rgba<f32, LinearRgb>,
-	) -> Result<Self, NodeError> {
-		let position = position.into();
-		let start_point = LinePoint {
-			point: [0.0; 3].into(),
-			thickness,
-			color,
-		};
-		let end_point = LinePoint {
-			point: [0.0, 0.0, -1.0].into(),
-			thickness,
-			color: AlphaColor::new(color.rgb(), 0.0),
-		};
-		Ok(UnboundedVolumeSignifier(Lines::create(
-			parent,
-			Transform::from_translation([position.x, position.y, -thickness]),
-			&[Line {
-				points: vec![start_point, end_point],
-				cyclic: false,
-			}],
-		)?))
-	}
+fn create_unbounded_volume_signifier(
+	parent: &impl SpatialAspect,
+	position: impl Into<Vector2<f32>>,
+	thickness: f32,
+	color: Rgba<f32, LinearRgb>,
+) -> Result<Lines, NodeError> {
+	let position = position.into();
+	let start_point = LinePoint {
+		point: [0.0; 3].into(),
+		thickness,
+		color,
+	};
+	let end_point = LinePoint {
+		point: [0.0, 0.0, -1.0].into(),
+		thickness,
+		color: AlphaColor::new(color.rgb(), 0.0),
+	};
+	Lines::create(
+		parent,
+		Transform::from_translation([position.x, position.y, -thickness]),
+		&[Line {
+			points: vec![start_point, end_point],
+			cyclic: false,
+		}],
+	)
 }
