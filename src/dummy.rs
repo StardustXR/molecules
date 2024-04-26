@@ -1,15 +1,14 @@
 use stardust_xr_fusion::{
 	core::values::Datamap,
 	data::{PulseReceiver, PulseReceiverHandler, PulseSenderHandler},
-	fields::UnknownField,
+	fields::Field,
 	input::{InputData, InputHandlerHandler, InputMethod},
 	items::{
 		panel::{ChildInfo, Geometry, PanelItem, PanelItemHandler, PanelItemInitData},
-		EnvironmentItem, ItemAcceptorHandler,
+		ItemAcceptorHandler,
 	},
 	spatial::{Spatial, ZoneHandler},
 };
-use std::path::PathBuf;
 
 pub struct DummyHandler;
 
@@ -20,7 +19,7 @@ impl InputHandlerHandler for DummyHandler {
 
 // Data
 impl PulseSenderHandler for DummyHandler {
-	fn new_receiver(&mut self, _uid: String, _receiver: PulseReceiver, _field: UnknownField) {}
+	fn new_receiver(&mut self, _uid: String, _receiver: PulseReceiver, _field: Field) {}
 	fn drop_receiver(&mut self, _uid: String) {}
 }
 impl PulseReceiverHandler for DummyHandler {
@@ -28,10 +27,6 @@ impl PulseReceiverHandler for DummyHandler {
 }
 
 // Items
-impl ItemAcceptorHandler<EnvironmentItem> for DummyHandler {
-	fn captured(&mut self, _uid: String, _item: EnvironmentItem, _init_data: PathBuf) {}
-	fn released(&mut self, _uid: String) {}
-}
 impl ItemAcceptorHandler<PanelItem> for DummyHandler {
 	fn captured(&mut self, _uid: String, _item: PanelItem, _init_data: PanelItemInitData) {}
 	fn released(&mut self, _uid: String) {}

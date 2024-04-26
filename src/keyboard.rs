@@ -108,7 +108,7 @@ async fn keyboard_events() {
 			&mut self,
 			uid: String,
 			receiver: PulseReceiver,
-			field: stardust_xr_fusion::fields::UnknownField,
+			field: stardust_xr_fusion::fields::Field,
 		) {
 			println!(
 				"New pulse receiver {:?} with field {:?} and uid {uid}",

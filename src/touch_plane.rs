@@ -10,7 +10,7 @@ use mint::{Vector2, Vector3};
 use rustc_hash::FxHashSet;
 use stardust_xr_fusion::{
 	drawable::Lines,
-	fields::{BoxField, BoxFieldAspect, UnknownField},
+	fields::{BoxField, BoxFieldAspect, Field},
 	input::{InputData, InputDataType, InputHandler},
 	node::{NodeError, NodeType},
 	spatial::{Spatial, SpatialAspect, Transform},
@@ -149,8 +149,8 @@ impl TouchPlane {
 	pub fn input_handler(&self) -> &InputHandler {
 		self.input.node()
 	}
-	pub fn field(&self) -> UnknownField {
-		UnknownField::alias_field(&self.field)
+	pub fn field(&self) -> Field {
+		Field::alias_field(&self.field)
 	}
 
 	pub fn set_size(&mut self, size: impl Into<Vector2<f32>>) -> Result<(), NodeError> {

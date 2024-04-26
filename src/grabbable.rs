@@ -5,7 +5,7 @@ use glam::{vec3, Quat, Vec3};
 use mint::Vector3;
 use stardust_xr_fusion::{
 	client::FrameInfo,
-	fields::{FieldAspect, UnknownField},
+	fields::{Field, FieldAspect},
 	input::{InputData, InputDataType, InputHandler},
 	node::{NodeError, NodeType},
 	spatial::{Spatial, SpatialAspect, Transform},
@@ -85,7 +85,7 @@ pub struct Grabbable {
 	condition_action: BaseInputAction<GrabData>,
 	grab_action: SingleActorAction<GrabData>,
 	input_handler: HandlerWrapper<InputHandler, InputActionHandler<GrabData>>,
-	field: UnknownField,
+	field: Field,
 	pointer_distance: f32,
 	settings: GrabbableSettings,
 	frame: u32,
@@ -145,7 +145,7 @@ impl Grabbable {
 			condition_action,
 			grab_action,
 			input_handler,
-			field: UnknownField::alias_field(field),
+			field: Field::alias_field(field),
 			pointer_distance: 0.0,
 			settings,
 			frame: 0,
