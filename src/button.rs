@@ -1,18 +1,18 @@
-use std::{array, f32::consts::PI};
-
 use crate::{
 	lines::{circle, rounded_rectangle, LineExt},
 	touch_plane::TouchPlane,
 	VisualDebug,
 };
-use color::{color_space::LinearRgb, rgba_linear, AlphaColor, Rgba};
+use color::{color_space::LinearRgb, rgba_linear, Rgba};
+use glam::{vec3, Mat4};
 use map_range::MapRange;
 use mint::Vector2;
 use stardust_xr_fusion::{
-	drawable::{Line, LinePoint, Lines, LinesAspect},
+	drawable::{Lines, LinesAspect},
 	node::NodeError,
 	spatial::{SpatialAspect, Transform},
 };
+use std::f32::consts::PI;
 
 #[derive(Debug, Clone, Copy)]
 pub struct ButtonSettings {
@@ -49,13 +49,13 @@ impl Button {
 			parent,
 			transform,
 			size,
-			0.01,
+			0.015,
 			-half_size_x..half_size_x,
 			half_size_y..-half_size_y,
 		)?;
 
 		Ok(Button {
-			visuals: ButtonVisuals::create(touch_plane.root(), size, &settings)?,
+			visuals: ButtonVisuals::create(touch_plane.root(), size)?,
 			settings,
 			touch_plane,
 		})
@@ -69,6 +69,16 @@ impl Button {
 	pub fn touch_plane(&self) -> &TouchPlane {
 		&self.touch_plane
 	}
+
+	pub fn pressed(&self) -> bool {
+		!self.touch_plane.touching().current().is_empty()
+			&& self.touch_plane.touching().added().len()
+				== self.touch_plane.touching().current().len()
+	}
+	pub fn released(&self) -> bool {
+		self.touch_plane.touching().current().is_empty()
+			&& !self.touch_plane.touching().removed().is_empty()
+	}
 }
 impl VisualDebug for Button {
 	fn set_debug(&mut self, settings: Option<crate::DebugSettings>) {
@@ -77,148 +87,130 @@ impl VisualDebug for Button {
 }
 
 struct ButtonVisuals {
-	circle: Line,
-	rounded_rectangle: Line,
-	outline: Lines,
-	_corner_lines: [Lines; 4],
+	size: Vector2<f32>,
+	segment_count: usize,
+	lines: Lines,
 }
 impl ButtonVisuals {
-	fn create(
-		parent: &impl SpatialAspect,
-		size: Vector2<f32>,
-		settings: &ButtonSettings,
-	) -> Result<Self, NodeError> {
-		let half_size_x = size.x * 0.5;
-		let half_size_y = size.y * 0.5;
+	fn create(parent: &impl SpatialAspect, size: Vector2<f32>) -> Result<Self, NodeError> {
 		let segment_count = (size.x.min(size.y) * 1280.0) as usize / 4 * 4;
-		let mut circle =
-			circle(segment_count, PI * 0.5, half_size_x.min(half_size_y)).thickness(0.0025);
-		circle.points.reverse();
-		let rounded_rectangle = rounded_rectangle(
-			size.x,
-			size.y,
-			settings.line_thickness * 0.5,
-			segment_count / 4 - 1,
-		)
-		.thickness(settings.line_thickness);
-		let outline = Lines::create(
-			parent,
-			Transform::from_scale([1.0, 1.0, 0.0]),
-			&[circle.clone()],
-		)?;
-		let corner_lines = array::from_fn(|n| {
-			let (corner_sin, corner_cos) = (settings.line_thickness * 0.5).sin_cos();
-			let corner_sin = (1.0 - corner_sin) * settings.line_thickness * 0.5;
-			let corner_cos = (1.0 - corner_cos) * settings.line_thickness * 0.5;
-
-			let position = match n {
-				0 => [-half_size_x + corner_sin, half_size_y - corner_cos],
-				1 => [half_size_x - corner_sin, half_size_y - corner_cos],
-				2 => [half_size_x - corner_sin, -half_size_y + corner_cos],
-				3 => [-half_size_x + corner_sin, -half_size_y + corner_cos],
-				_ => unimplemented!(),
-			};
-			create_unbounded_volume_signifier(
-				&outline,
-				position,
-				settings.line_thickness,
-				settings.accent_color,
-			)
-			.unwrap()
-		});
+		let outline = Lines::create(parent, Transform::from_scale([1.0, 1.0, 0.0]), &[])?;
 
 		Ok(ButtonVisuals {
-			circle,
-			rounded_rectangle,
-			outline,
-			_corner_lines: corner_lines,
+			size,
+			segment_count,
+			lines: outline,
 		})
 	}
 
 	pub fn update(&self, touch_plane: &TouchPlane, settings: &ButtonSettings) {
-		if touch_plane.hovering_inputs().is_empty() && !touch_plane.touching() {
-			let _ = self
-				.outline
-				.set_local_transform(Transform::from_scale([0.0; 3]));
-		}
-		if let Some((hover_point, hover_distance)) = touch_plane
-			.hovering_inputs()
+		let closest_interaction = touch_plane
+			.hovering()
+			.current()
 			.into_iter()
+			.chain(touch_plane.touching().current().into_iter())
 			.map(|p| touch_plane.interact_point(&p))
-			.nth(0)
-		{
-			let scale = hover_distance
-				.map_range(settings.max_hover_distance..0.0, 0.0..1.0)
-				.clamp(0.0, 1.0);
+			.reduce(|(a_pos, a_distance), (b_pos, b_distance)| {
+				if a_distance < b_distance {
+					(a_pos, a_distance)
+				} else {
+					(b_pos, b_distance)
+				}
+			});
 
-			let scale_morph = scale.map_range(0.5..1.0, 0.0..1.0);
-			let lines = self
-				.circle
-				.clone()
-				.lerp(&self.rounded_rectangle, scale_morph);
-			let _ = self
-				.outline
-				.set_lines(&lines.map(|m| vec![m]).unwrap_or_default());
-			let _ = self
-				.outline
-				.set_local_transform(Transform::from_translation_scale(
-					[
-						hover_point.x * (1.0 - scale),
-						hover_point.y * (1.0 - scale),
+		let rounded_rectangle = rounded_rectangle(
+			self.size.x,
+			self.size.y,
+			settings.line_thickness * 0.5,
+			self.segment_count / 4 - 1,
+		)
+		.thickness(settings.line_thickness);
+		let _ = if let Some((interact_point, interact_distance)) = closest_interaction {
+			// if we're touching the plane
+			if !touch_plane.touching().current().is_empty() {
+				// then fill the rectangle
+				let lines = vec![rounded_rectangle.color(settings.accent_color)];
+				// create_unbounded_volume_signifiers(
+				// 	self.size,
+				// 	interact_distance,
+				// 	settings,
+				// 	&mut lines,
+				// );
+				self.lines.set_lines(&lines)
+			} else {
+				// if hovering
+				let blend = interact_distance
+					.map_range(settings.max_hover_distance..0.0, 0.0..1.0)
+					.clamp(0.0, 1.0);
+				let mut circle = circle(self.segment_count, PI * 0.5, 0.0)
+					.thickness(0.0025)
+					.transform(Mat4::from_translation(vec3(
+						interact_point.x,
+						interact_point.y,
 						0.0,
-					],
-					[scale, scale, 0.000],
-				));
-		}
-		if touch_plane.touch_started() {
-			self.outline
-				.set_lines(&[self.rounded_rectangle.clone().color(settings.accent_color)])
-				.unwrap();
-		}
-		if touch_plane.touching() {
-			let Some(distance) = touch_plane
-				.touching_inputs()
-				.into_iter()
-				.map(|i| touch_plane.interact_point(i).1)
-				.reduce(|a, b| a.abs().max(b.abs()))
-				.map(f32::abs)
-			else {
-				return;
-			};
+					)));
+				circle.points.reverse();
 
-			let _ = self
-				.outline
-				.set_local_transform(Transform::from_translation_scale(
-					[0.0; 3],
-					[1.0, 1.0, distance],
-				));
-		}
+				self.lines.set_lines(&[circle
+					.clone()
+					.lerp(&rounded_rectangle, blend)
+					.unwrap_or_default()])
+			}
+		} else {
+			// then nothing is in range
+			self.lines.set_lines(&[])
+		};
 	}
 }
 
-fn create_unbounded_volume_signifier(
-	parent: &impl SpatialAspect,
-	position: impl Into<Vector2<f32>>,
-	thickness: f32,
-	color: Rgba<f32, LinearRgb>,
-) -> Result<Lines, NodeError> {
-	let position = position.into();
-	let start_point = LinePoint {
-		point: [0.0; 3].into(),
-		thickness,
-		color,
-	};
-	let end_point = LinePoint {
-		point: [0.0, 0.0, -1.0].into(),
-		thickness,
-		color: AlphaColor::new(color.rgb(), 0.0),
-	};
-	Lines::create(
-		parent,
-		Transform::from_translation([position.x, position.y, -thickness]),
-		&[Line {
-			points: vec![start_point, end_point],
-			cyclic: false,
-		}],
-	)
-}
+// fn create_unbounded_volume_signifiers(
+// 	size: Vector2<f32>,
+// 	depth: f32,
+// 	settings: &ButtonSettings,
+// 	lines: &mut Vec<Line>,
+// ) {
+// 	let half_size_x = size.x * 0.5;
+// 	let half_size_y = size.y * 0.5;
+// 	let (corner_sin, corner_cos) = (settings.line_thickness * 0.5).sin_cos();
+// 	let corner_sin = (1.0 - corner_sin) * settings.line_thickness * 0.5;
+// 	let corner_cos = (1.0 - corner_cos) * settings.line_thickness * 0.5;
+// 	for n in 0..4 {
+// 		let position = match n {
+// 			0 => [-half_size_x + corner_sin, half_size_y - corner_cos],
+// 			1 => [half_size_x - corner_sin, half_size_y - corner_cos],
+// 			2 => [half_size_x - corner_sin, -half_size_y + corner_cos],
+// 			3 => [-half_size_x + corner_sin, -half_size_y + corner_cos],
+// 			_ => unimplemented!(),
+// 		};
+// 		lines.push(create_unbounded_volume_signifier(
+// 			position.into(),
+// 			settings.line_thickness,
+// 			depth,
+// 			settings.accent_color,
+// 		))
+// 	}
+// }
+// fn create_unbounded_volume_signifier(
+// 	position: Vector2<f32>,
+// 	thickness: f32,
+// 	depth: f32,
+// 	color: Rgba<f32, LinearRgb>,
+// ) -> Line {
+// 	let start_point = LinePoint {
+// 		point: [0.0; 3].into(),
+// 		thickness,
+// 		color,
+// 	};
+// 	let end_point = LinePoint {
+// 		point: [0.0, 0.0, -depth.abs()].into(),
+// 		thickness,
+// 		color: AlphaColor::new(color.rgb(), 0.0),
+// 	};
+// 	Line {
+// 		points: vec![start_point, end_point],
+// 		cyclic: false,
+// 	}
+// 	.transform(Mat4::from_translation(vec3(
+// 		position.x, position.y, -thickness,
+// 	)))
+// }

@@ -1,7 +1,9 @@
 mod single_actor_action;
 pub use single_actor_action::*;
+mod multi_actor_action;
+pub use multi_actor_action::*;
 
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use stardust_xr_fusion::{
 	input::{
 		InputData, InputHandler, InputHandlerAspect, InputHandlerHandler, InputMethod,
@@ -10,142 +12,116 @@ use stardust_xr_fusion::{
 	node::{NodeResult, NodeType},
 	HandlerWrapper,
 };
-use std::{fmt::Debug, mem::swap, sync::Arc};
+use std::{
+	fmt::{Debug, Formatter, Result},
+	hash::Hash,
+	sync::Arc,
+};
 
-pub trait InputActionState: Sized + Clone + Send + Sync + 'static {}
-impl<T: Sized + Clone + Send + Sync + 'static> InputActionState for T {}
-
-pub type ActiveCondition<S> = fn(&InputData, state: &S) -> bool;
-
-#[derive(Clone)]
-pub struct BaseInputAction<S: InputActionState> {
-	pub capture_on_trigger: bool,
-	pub active_condition: ActiveCondition<S>,
-
-	pub started_acting: FxHashSet<Arc<InputData>>,
-	pub currently_acting: FxHashSet<Arc<InputData>>,
-	pub stopped_acting: FxHashSet<Arc<InputData>>,
-	queued_inputs: FxHashSet<Arc<InputData>>,
+pub trait InputQueueable: Sized {
+	fn queue(self) -> NodeResult<InputQueue>;
 }
-impl<S: InputActionState> BaseInputAction<S> {
-	pub fn new(capture_on_trigger: bool, active_condition: ActiveCondition<S>) -> Self {
-		Self {
-			capture_on_trigger,
-			active_condition,
+impl InputQueueable for InputHandler {
+	fn queue(self) -> NodeResult<InputQueue> {
+		Ok(InputQueue(self.wrap(InputQueueInternal {
+			flush_queue: false,
+			queued_input: Default::default(),
+		})?))
+	}
+}
 
-			started_acting: FxHashSet::default(),
-			currently_acting: FxHashSet::default(),
-			stopped_acting: FxHashSet::default(),
-			queued_inputs: FxHashSet::default(),
+pub struct InputQueue(HandlerWrapper<InputHandler, InputQueueInternal>);
+impl InputQueue {
+	pub fn handler(&self) -> &InputHandler {
+		self.0.node()
+	}
+	pub fn input(&self) -> FxHashMap<Arc<InputData>, InputMethod> {
+		let mut locked = self.0.lock_wrapped();
+		FxHashMap::from_iter(
+			locked
+				.get_queued()
+				.iter()
+				.map(|(i, m)| (i.clone(), m.alias())),
+		)
+	}
+	pub fn flush_queue(&self) {
+		let mut lock = self.0.lock_wrapped();
+		lock.queued_input.clear();
+		lock.flush_queue = false;
+	}
+	pub fn request_capture(&self, data: &Arc<InputData>) {
+		let input = self.input();
+		let Some(method) = input.get(data) else {
+			return;
+		};
+		let _ = method.request_capture(self.handler());
+	}
+}
+impl Debug for InputQueue {
+	fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+		self.0.lock_wrapped().queued_input.keys().fmt(f)
+	}
+}
+
+#[derive(Default, Debug)]
+pub struct InputQueueInternal {
+	flush_queue: bool,
+	queued_input: FxHashMap<Arc<InputData>, InputMethod>,
+}
+impl InputQueueInternal {
+	fn get_queued<'a>(&mut self) -> &FxHashMap<Arc<InputData>, InputMethod> {
+		// make it so we can do any amount of update_action and not clear anything until we get next input
+		self.flush_queue = true;
+		&self.queued_input
+	}
+}
+impl InputHandlerHandler for InputQueueInternal {
+	fn input(&mut self, input: InputMethod, data: InputData) {
+		if self.flush_queue {
+			self.queued_input.clear();
+			self.flush_queue = false;
+		}
+		self.queued_input.insert(Arc::new(data), input);
+	}
+}
+
+pub struct DeltaSet<T: Clone + Hash + Eq> {
+	added: FxHashSet<T>,
+	current: FxHashSet<T>,
+	removed: FxHashSet<T>,
+}
+impl<T: Clone + Hash + Eq> Default for DeltaSet<T> {
+	fn default() -> Self {
+		DeltaSet {
+			added: Default::default(),
+			current: Default::default(),
+			removed: Default::default(),
 		}
 	}
-
-	fn update(&mut self, external: &mut BaseInputAction<S>) {
-		self.started_acting = FxHashSet::from_iter(
-			self.queued_inputs
-				.difference(&self.currently_acting)
-				.cloned(),
-		);
-		self.stopped_acting = FxHashSet::from_iter(
-			self.currently_acting
-				.difference(&self.queued_inputs)
-				.cloned(),
-		);
-		swap(&mut self.currently_acting, &mut self.queued_inputs);
-		self.queued_inputs.clear();
-
-		external.started_acting = self.started_acting.clone();
-		external.currently_acting = self.currently_acting.clone();
-		external.stopped_acting = self.stopped_acting.clone();
-		external.started_acting = self.started_acting.clone();
-
-		self.capture_on_trigger = external.capture_on_trigger;
-		self.active_condition = external.active_condition;
-	}
-
-	fn input_event(&mut self, data: &Arc<InputData>, state: &S) -> bool {
-		if (self.active_condition)(data, state) {
-			// if we want to capture this on trigger, then we shouldn't count it as triggered until it successfully captures
-			if !(self.capture_on_trigger && !data.captured) {
-				self.queued_inputs.insert(data.clone());
-			}
-			true
-		} else {
-			false
-		}
-	}
 }
-impl<S: InputActionState> PartialEq for BaseInputAction<S> {
-	fn eq(&self, other: &Self) -> bool {
-		self.capture_on_trigger == other.capture_on_trigger
-			&& self.active_condition as usize == other.active_condition as usize
-	}
-}
-impl<S: InputActionState> Debug for BaseInputAction<S> {
+impl<T: Clone + Hash + Eq + Debug> Debug for DeltaSet<T> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("InputAction")
-			.field("capture_on_trigger", &self.capture_on_trigger)
-			.field("started_acting", &self.started_acting)
-			.field("actively_acting", &self.currently_acting)
-			.field("stopped_acting", &self.stopped_acting)
-			.field("queued_inputs", &self.queued_inputs)
+		f.debug_struct("DeltaSet")
+			.field("added", &self.added)
+			.field("current", &self.current)
+			.field("removed", &self.removed)
 			.finish()
 	}
 }
-
-#[derive(Debug)]
-pub struct InputActionHandler<S: InputActionState> {
-	actions: Vec<BaseInputAction<S>>,
-	handler: InputHandler,
-	state: S,
-	back_state: S,
-}
-impl<S: InputActionState> InputActionHandler<S> {
-	pub fn wrap(handler: InputHandler, state: S) -> NodeResult<HandlerWrapper<InputHandler, Self>> {
-		let action_handler = Self {
-			actions: Vec::new(),
-			handler: handler.alias(),
-			back_state: state.clone(),
-			state,
-		};
-		handler.wrap(action_handler)
+impl<T: Clone + Hash + Eq> DeltaSet<T> {
+	pub fn push_new(&mut self, new: impl Iterator<Item = T>) {
+		let new = FxHashSet::from_iter(new);
+		self.added = FxHashSet::from_iter(new.difference(&self.current).cloned());
+		self.removed = FxHashSet::from_iter(self.current.difference(&new).cloned());
+		self.current = new;
 	}
-
-	pub fn update_actions<'a>(
-		&mut self,
-		actions: impl IntoIterator<Item = &'a mut BaseInputAction<S>>,
-	) {
-		self.back_state = self.state.clone();
-
-		self.actions = actions
-			.into_iter()
-			.map(|action| {
-				if let Some(internal_action) = self
-					.actions
-					.iter_mut()
-					.find(|internal_action| *internal_action == action)
-				{
-					internal_action.update(action);
-				}
-				action.clone()
-			})
-			.collect();
+	pub fn added(&self) -> &FxHashSet<T> {
+		&self.added
 	}
-	pub fn update_state(&mut self, state: S) {
-		self.state = state;
+	pub fn current(&self) -> &FxHashSet<T> {
+		&self.current
 	}
-}
-impl<S: InputActionState> InputHandlerHandler for InputActionHandler<S> {
-	fn input(&mut self, input: InputMethod, data: InputData) {
-		let data = Arc::new(data);
-		let capture = self
-			.actions
-			.iter_mut()
-			.map(|action| action.input_event(&data, &self.state) && action.capture_on_trigger)
-			.reduce(|a, b| a || b)
-			.unwrap_or_default();
-		if capture {
-			let _ = input.request_capture(&self.handler);
-		}
+	pub fn removed(&self) -> &FxHashSet<T> {
+		&self.removed
 	}
 }

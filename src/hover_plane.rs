@@ -1,5 +1,5 @@
 use crate::{
-	input_action::{BaseInputAction, InputActionHandler, SingleActorAction},
+	input_action::{InputQueue, InputQueueable, SingleActorAction},
 	lines::{self, LineExt},
 	DebugSettings, VisualDebug,
 };
@@ -14,7 +14,6 @@ use stardust_xr_fusion::{
 	input::{InputData, InputDataType, InputHandler},
 	node::{NodeError, NodeType},
 	spatial::{Spatial, SpatialAspect, Transform},
-	HandlerWrapper,
 };
 use std::{ops::Range, sync::Arc};
 
@@ -42,18 +41,11 @@ impl Default for HoverPlaneSettings {
 	}
 }
 
-#[derive(Debug, Clone)]
-pub struct State {
-	size: Vector2<f32>,
-	settings: HoverPlaneSettings,
-}
-
 pub struct HoverPlane {
 	root: Spatial,
-	input: HandlerWrapper<InputHandler, InputActionHandler<State>>,
+	input: InputQueue,
 	field: BoxField,
-	hover_action: BaseInputAction<State>,
-	interact_action: SingleActorAction<State>,
+	interact: SingleActorAction,
 	size: Vector2<f32>,
 	pub x_range: Range<f32>,
 	pub y_range: Range<f32>,
@@ -79,24 +71,16 @@ impl HoverPlane {
 			Transform::from_translation([0.0, 0.0, thickness * -0.5]),
 			[size.x, size.y, thickness],
 		)?;
-		let input = InputActionHandler::wrap(
-			InputHandler::create(&root, Transform::none(), &field)?,
-			State {
-				size,
-				settings: settings.clone(),
-			},
-		)?;
+		let input = InputHandler::create(&root, Transform::none(), &field)?.queue()?;
 
-		let hover_action = BaseInputAction::new(false, Self::hover_action);
-		let interact_action = SingleActorAction::new(true, Self::interact_action, false);
+		let interact_action = SingleActorAction::default();
 
 		let lines = Lines::create(&root, Transform::identity(), &[])?;
 		Ok(HoverPlane {
 			root,
 			input,
 			field,
-			hover_action,
-			interact_action,
+			interact: interact_action,
 			size,
 			x_range,
 			y_range,
@@ -111,27 +95,6 @@ impl HoverPlane {
 		point.x.abs() * 2.0 < size.x
 			&& point.y.abs() * 2.0 < size.y
 			&& point.z.is_sign_positive() == front
-	}
-	fn hover_action(input: &InputData, state: &State) -> bool {
-		match &input.input {
-			InputDataType::Pointer(_) => input.distance <= 0.0,
-			_ => {
-				let interact_point = Self::interact_point_local(input);
-				state
-					.settings
-					.distance_range
-					.contains(&interact_point.z.abs())
-					&& Self::hover(state.size, interact_point.into(), true)
-			}
-		}
-	}
-	fn interact_action(input: &InputData, _state: &State) -> bool {
-		match &input.input {
-			InputDataType::Hand(_) => input
-				.datamap
-				.with_data(|d| d.idx("pinch_strength").as_f32() > 0.95),
-			_ => input.datamap.with_data(|d| d.idx("select").as_f32() > 0.9),
-		}
 	}
 	pub fn interact_point_local(input: &InputData) -> Vec3 {
 		match &input.input {
@@ -172,7 +135,7 @@ impl HoverPlane {
 		&self.root
 	}
 	pub fn input_handler(&self) -> &InputHandler {
-		self.input.node()
+		self.input.handler()
 	}
 	pub fn field(&self) -> Field {
 		Field::alias_field(&self.field)
@@ -181,10 +144,6 @@ impl HoverPlane {
 	pub fn set_size(&mut self, size: impl Into<Vector2<f32>>) -> Result<(), NodeError> {
 		let size = size.into();
 		self.size = size;
-		self.input.lock_wrapped().update_state(State {
-			size,
-			settings: self.settings.clone(),
-		});
 		self.field.set_size([size.x, size.y, self.thickness])?;
 		Ok(())
 	}
@@ -198,35 +157,52 @@ impl HoverPlane {
 
 	/// Get all the raw inputs that are hovering
 	pub fn hovering_inputs(&self) -> FxHashSet<Arc<InputData>> {
-		self.hover_action.currently_acting.clone()
+		self.interact.condition().currently_acting().clone()
 	}
 	/// Get all the points hovering over the surface, in x_range and y_range
 	pub fn hover_points(&self) -> Vec<Vector2<f32>> {
-		self.input_to_points(self.hover_action.currently_acting.iter())
+		self.input_to_points(self.hovering_inputs().iter())
 	}
 
 	/// Get the input that's interacting
-	pub fn interact_status(&self) -> &SingleActorAction<State> {
-		&self.interact_action
+	pub fn interact_status(&self) -> &SingleActorAction {
+		&self.interact
 	}
 
 	/// Set whether this will receive input or not
 	pub fn set_enabled(&self, enabled: bool) -> Result<(), NodeError> {
-		self.input.node().set_enabled(enabled)
+		self.input.handler().set_enabled(enabled)
 	}
 
 	/// Update the state of this touch plane. Run once every frame.
 	pub fn update(&mut self) {
-		self.input
-			.lock_wrapped()
-			.update_actions([&mut self.hover_action, self.interact_action.base_mut()]);
-		self.interact_action.update(Some(&mut self.hover_action));
+		self.interact.update(
+			false,
+			&self.input,
+			|input| match &input.input {
+				InputDataType::Pointer(_) => input.distance <= 0.0,
+				_ => {
+					let interact_point = Self::interact_point_local(input);
+					self.settings
+						.distance_range
+						.contains(&interact_point.z.abs())
+						&& Self::hover(self.size, interact_point.into(), true)
+				}
+			},
+			|input| match &input.input {
+				InputDataType::Hand(_) => input
+					.datamap
+					.with_data(|d| d.idx("pinch_strength").as_f32() > 0.95),
+				_ => input.datamap.with_data(|d| d.idx("select").as_f32() > 0.9),
+			},
+		);
 
 		let hovered_lines = self
-			.hover_action
-			.currently_acting
+			.interact
+			.condition()
+			.currently_acting()
 			.iter()
-			.chain(self.interact_action.actor())
+			.chain(self.interact.actor())
 			.filter(|d| match &d.input {
 				InputDataType::Pointer(_) => false,
 				_ => true,
@@ -234,7 +210,7 @@ impl HoverPlane {
 			.map(|d| {
 				(
 					Self::interact_point_local(d),
-					self.interact_action.actor() == Some(d),
+					self.interact.actor() == Some(d),
 				)
 			})
 			.map(|(p, i)| Line {
@@ -267,6 +243,7 @@ impl HoverPlane {
 			})
 			.collect::<Vec<_>>();
 		self.lines.set_lines(&hovered_lines).unwrap();
+		self.input.flush_queue();
 	}
 }
 impl VisualDebug for HoverPlane {

@@ -85,10 +85,10 @@ impl ButtonDemo {
 impl RootHandler for ButtonDemo {
 	fn frame(&mut self, _info: FrameInfo) {
 		self.button.update();
-		if self.button.touch_plane().touch_started() {
+		if self.button.pressed() {
 			self.text.set_text("Pressed").unwrap();
 		}
-		if self.button.touch_plane().touch_stopped() {
+		if self.button.released() {
 			self.text.set_text("Unpressed").unwrap();
 		}
 	}

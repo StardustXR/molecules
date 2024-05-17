@@ -1,6 +1,6 @@
 use std::f32::consts::PI;
 
-use crate::input_action::{BaseInputAction, InputActionHandler, SingleActorAction};
+use crate::input_action::{InputQueue, InputQueueable, SingleActorAction};
 use glam::{vec3, Quat, Vec3};
 use mint::Vector3;
 use stardust_xr_fusion::{
@@ -9,7 +9,6 @@ use stardust_xr_fusion::{
 	input::{InputData, InputDataType, InputHandler},
 	node::{NodeError, NodeType},
 	spatial::{Spatial, SpatialAspect, Transform},
-	HandlerWrapper,
 };
 use tokio::sync::mpsc;
 use tracing::{debug, trace};
@@ -82,10 +81,9 @@ pub struct GrabData {
 pub struct Grabbable {
 	root: Spatial,
 	content_parent: Spatial,
-	condition_action: BaseInputAction<GrabData>,
-	grab_action: SingleActorAction<GrabData>,
-	input_handler: HandlerWrapper<InputHandler, InputActionHandler<GrabData>>,
 	field: Field,
+	input: InputQueue,
+	grab_action: SingleActorAction,
 	pointer_distance: f32,
 	settings: GrabbableSettings,
 	frame: u32,
@@ -107,44 +105,21 @@ impl Grabbable {
 		field: &impl FieldAspect,
 		settings: GrabbableSettings,
 	) -> Result<Self, NodeError> {
-		let input_handler = InputActionHandler::wrap(
-			InputHandler::create(content_space.client()?.get_root(), Transform::none(), field)?,
-			GrabData { settings },
-		)?;
-		let condition_action = BaseInputAction::new(false, |input, data: &GrabData| {
-			let max_distance = data.settings.max_distance;
-			match &input.input {
-				InputDataType::Hand(h) => {
-					h.thumb.tip.distance < max_distance && h.index.tip.distance < max_distance
-				}
-				_ => input.distance < max_distance,
-			}
-		});
-		let grab_action = SingleActorAction::new(
-			true,
-			|data, _| {
-				data.datamap.with_data(|datamap| match &data.input {
-					InputDataType::Hand(_) => datamap.idx("pinch_strength").as_f32() > 0.90,
-					_ => datamap.idx("grab").as_f32() > 0.90,
-				})
-			},
-			false,
-		);
-		let root = Spatial::create(input_handler.node().as_ref(), Transform::none(), false)?;
-		let content_parent = Spatial::create(
-			input_handler.node().as_ref(),
-			Transform::none(),
-			settings.zoneable,
-		)?;
+		let input =
+			InputHandler::create(content_space.client()?.get_root(), Transform::none(), field)?
+				.queue()?;
+		let grab_action = SingleActorAction::default();
+		let root = Spatial::create(input.handler(), Transform::none(), false)?;
+		let content_parent =
+			Spatial::create(input.handler(), Transform::none(), settings.zoneable)?;
 		content_parent.set_relative_transform(content_space, content_transform)?;
 
 		let (closest_point_tx, closest_point_rx) = mpsc::channel(1);
 		Ok(Grabbable {
 			root,
 			content_parent,
-			condition_action,
+			input,
 			grab_action,
-			input_handler,
 			field: Field::alias_field(field),
 			pointer_distance: 0.0,
 			settings,
@@ -162,16 +137,30 @@ impl Grabbable {
 		})
 	}
 	pub fn update(&mut self, info: &FrameInfo) -> Result<(), NodeError> {
-		// update input actions
-		self.input_handler
-			.lock_wrapped()
-			.update_actions([&mut self.condition_action, self.grab_action.base_mut()]);
-		self.grab_action.update(Some(&mut self.condition_action));
+		self.grab_action.update(
+			true,
+			&self.input,
+			|input| {
+				let max_distance = self.settings.max_distance;
+				match &input.input {
+					InputDataType::Hand(h) => {
+						h.thumb.tip.distance < max_distance && h.index.tip.distance < max_distance
+					}
+					_ => input.distance < max_distance,
+				}
+			},
+			|data| {
+				data.datamap.with_data(|datamap| match &data.input {
+					InputDataType::Hand(_) => datamap.idx("pinch_strength").as_f32() > 0.90,
+					_ => datamap.idx("grab").as_f32() > 0.90,
+				})
+			},
+		);
 
 		if self.grab_action.actor_started() {
 			// Make sure we can directly apply the grab data to the content parent
 			self.content_parent
-				.set_spatial_parent_in_place(self.input_handler.node().as_ref())?;
+				.set_spatial_parent_in_place(self.input.handler())?;
 			let actor = self.grab_action.actor().unwrap();
 			if let InputDataType::Pointer(pointer) = &actor.input {
 				// store the pointer distance so we can keep it at the correct point
@@ -196,7 +185,7 @@ impl Grabbable {
 				_ => &self.root,
 			};
 			transform_spatial.set_relative_transform(
-				self.input_handler.node().as_ref(),
+				self.input.handler(),
 				Transform::from_translation_rotation(position, rotation),
 			)?;
 
@@ -267,13 +256,14 @@ impl Grabbable {
 
 			if self.linear_velocity.is_some() || self.angular_velocity.is_some() {
 				self.root.set_relative_transform(
-					self.input_handler.node().as_ref(),
+					self.input.handler(),
 					Transform::from_translation_rotation(self.pose.0, self.pose.1),
 				)?;
 			}
 		}
 
 		self.frame += 1;
+		self.input.flush_queue();
 		Ok(())
 	}
 	fn input_position_rotation(&mut self, input: &InputData) -> (Vec3, Quat) {
@@ -353,7 +343,7 @@ impl Grabbable {
 			&& self.angular_velocity.unwrap().1 < Self::ANGULAR_VELOCITY_STOP_THRESHOLD
 	}
 
-	pub fn grab_action(&self) -> &SingleActorAction<GrabData> {
+	pub fn grab_action(&self) -> &SingleActorAction {
 		&self.grab_action
 	}
 	pub fn content_parent(&self) -> &Spatial {
@@ -361,6 +351,6 @@ impl Grabbable {
 	}
 
 	pub fn set_enabled(&self, enabled: bool) -> Result<(), NodeError> {
-		self.input_handler.node().set_enabled(enabled)
+		self.input.handler().set_enabled(enabled)
 	}
 }
