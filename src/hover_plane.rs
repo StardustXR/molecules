@@ -3,12 +3,14 @@ use crate::{
 	lines::{self, LineExt},
 	DebugSettings, VisualDebug,
 };
-use color::{color_space::LinearRgb, rgba_linear, Rgba};
 use glam::{vec3, Mat4, Vec3};
 use map_range::MapRange;
-use mint::{Vector2, Vector3};
 use rustc_hash::FxHashSet;
 use stardust_xr_fusion::{
+	core::values::{
+		color::{color_space::LinearRgb, rgba_linear, Rgba},
+		Vector2, Vector3,
+	},
 	drawable::{Line, LinePoint, Lines, LinesAspect},
 	fields::{BoxField, BoxFieldAspect, Field},
 	input::{InputData, InputDataType, InputHandler},

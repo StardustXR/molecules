@@ -7,7 +7,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use stardust_xr_fusion::{
 	input::{
 		InputData, InputHandler, InputHandlerAspect, InputHandlerHandler, InputMethod,
-		InputMethodAspect,
+		InputMethodRefAspect,
 	},
 	node::{NodeResult, NodeType},
 	HandlerWrapper,

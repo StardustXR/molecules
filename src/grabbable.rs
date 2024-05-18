@@ -2,9 +2,9 @@ use std::f32::consts::PI;
 
 use crate::input_action::{InputQueue, InputQueueable, SingleActorAction};
 use glam::{vec3, Quat, Vec3};
-use mint::Vector3;
 use stardust_xr_fusion::{
 	client::FrameInfo,
+	core::values::Vector3,
 	fields::{Field, FieldAspect},
 	input::{InputData, InputDataType, InputHandler},
 	node::{NodeError, NodeType},

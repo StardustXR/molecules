@@ -1,5 +1,5 @@
 use stardust_xr_fusion::{
-	core::values::Datamap,
+	core::values::{Datamap, Vector2},
 	data::{PulseReceiver, PulseReceiverHandler, PulseSenderHandler},
 	fields::Field,
 	input::{InputData, InputHandlerHandler, InputMethod},
@@ -7,7 +7,7 @@ use stardust_xr_fusion::{
 		panel::{ChildInfo, Geometry, PanelItem, PanelItemHandler, PanelItemInitData},
 		ItemAcceptorHandler,
 	},
-	spatial::{Spatial, ZoneHandler},
+	spatial::{SpatialRef, ZoneHandler},
 };
 
 pub struct DummyHandler;
@@ -32,7 +32,7 @@ impl ItemAcceptorHandler<PanelItem> for DummyHandler {
 	fn released(&mut self, _uid: String) {}
 }
 impl PanelItemHandler for DummyHandler {
-	fn toplevel_size_changed(&mut self, _size: mint::Vector2<u32>) {}
+	fn toplevel_size_changed(&mut self, _size: Vector2<u32>) {}
 	fn new_child(&mut self, _uid: &str, _info: ChildInfo) {}
 	fn reposition_child(&mut self, _uid: &str, _geometry: Geometry) {}
 	fn drop_child(&mut self, _uid: &str) {}
@@ -40,7 +40,7 @@ impl PanelItemHandler for DummyHandler {
 
 // Spatial
 impl ZoneHandler for DummyHandler {
-	fn enter(&mut self, _uid: String, _spatial: Spatial) {}
+	fn enter(&mut self, _uid: String, _spatial: SpatialRef) {}
 	fn capture(&mut self, _uid: String) {}
 	fn release(&mut self, _uid: String) {}
 	fn leave(&mut self, _uid: String) {}

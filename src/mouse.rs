@@ -1,8 +1,10 @@
-use mint::Vector2;
 use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
 use stardust_xr_fusion::{
-	core::{schemas::flex::flexbuffers, values::Datamap},
+	core::{
+		schemas::flex::flexbuffers,
+		values::{Datamap, Vector2},
+	},
 	data::{PulseReceiver, PulseReceiverAspect, PulseSender},
 };
 

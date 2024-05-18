@@ -3,11 +3,13 @@ use crate::{
 	touch_plane::TouchPlane,
 	VisualDebug,
 };
-use color::{color_space::LinearRgb, rgba_linear, Rgba};
 use glam::{vec3, Mat4};
 use map_range::MapRange;
-use mint::Vector2;
 use stardust_xr_fusion::{
+	core::values::{
+		color::{color_space::LinearRgb, rgba_linear, Rgba},
+		Vector2,
+	},
 	drawable::{Lines, LinesAspect},
 	node::NodeError,
 	spatial::{SpatialAspect, Transform},

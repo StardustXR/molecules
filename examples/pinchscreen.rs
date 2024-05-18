@@ -1,11 +1,11 @@
 #![allow(dead_code)]
 
-use color::rgba_linear;
 use color_eyre::eyre::Result;
 use glam::Quat;
 use manifest_dir_macros::directory_relative_path;
 use stardust_xr_fusion::{
 	client::{Client, ClientState, FrameInfo, RootHandler},
+	core::values::color::rgba_linear,
 	drawable::{Text, TextAspect, TextStyle, XAlign, YAlign},
 	node::NodeError,
 	spatial::{SpatialAspect, Transform},

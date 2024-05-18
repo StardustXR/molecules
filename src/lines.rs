@@ -1,8 +1,10 @@
-use color::{color_space::LinearRgb, Rgba};
 use glam::{vec3, Mat4, Vec3, Vec3A};
 use lerp::Lerp;
-use mint::{RowMatrix4, Vector3};
 use stardust_xr_fusion::{
+	core::values::{
+		color::{color_space::LinearRgb, Rgba},
+		RowMatrix4, Vector3,
+	},
 	drawable::{Line, LinePoint},
 	spatial::BoundingBox,
 };

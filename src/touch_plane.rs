@@ -3,16 +3,15 @@ use crate::{
 	lines::{self, LineExt},
 	DebugSettings, VisualDebug,
 };
-use color::rgba_linear;
 use glam::{vec3, Mat4, Vec3};
 use map_range::MapRange;
-use mint::{Vector2, Vector3};
 use rustc_hash::FxHashMap;
 use stardust_xr_fusion::{
+	core::values::{color::rgba_linear, Vector2, Vector3},
 	drawable::Lines,
 	fields::{BoxField, BoxFieldAspect, Field},
-	input::{InputData, InputDataType, InputHandler, InputMethodAspect},
-	node::{NodeAspect, NodeError},
+	input::{InputData, InputDataType, InputHandler, InputMethodRefAspect},
+	node::{NodeError, NodeType},
 	spatial::{Spatial, SpatialAspect, Transform},
 };
 use std::{ops::Range, sync::Arc};

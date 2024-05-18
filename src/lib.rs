@@ -11,14 +11,15 @@ pub mod mouse;
 pub mod multi;
 pub mod touch_plane;
 
-use color::{color_space::LinearRgb, rgba_linear};
 pub use exposure::*;
 pub use grabbable::*;
+
+use stardust_xr_fusion::core::values::color::{color_space::LinearRgb, rgba_linear, Rgba};
 
 #[derive(Debug, Clone, Copy)]
 pub struct DebugSettings {
 	pub line_thickness: f32,
-	pub line_color: color::Rgba<f32, LinearRgb>,
+	pub line_color: Rgba<f32, LinearRgb>,
 }
 impl Default for DebugSettings {
 	fn default() -> Self {

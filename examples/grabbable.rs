@@ -9,7 +9,7 @@ use stardust_xr_fusion::{
 	drawable::{Line, Lines, Model},
 	fields::BoxField,
 	node::{NodeError, NodeType},
-	spatial::{Spatial, SpatialAspect, Transform},
+	spatial::{Spatial, SpatialAspect, SpatialRefAspect, Transform},
 };
 use stardust_xr_molecules::{
 	lines::{bounding_box, LineExt},

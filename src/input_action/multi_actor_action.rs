@@ -1,6 +1,6 @@
 use super::{DeltaSet, InputQueue};
 use rustc_hash::FxHashSet;
-use stardust_xr_fusion::input::{InputData, InputMethodAspect};
+use stardust_xr_fusion::input::{InputData, InputMethodRefAspect};
 use std::sync::Arc;
 
 #[derive(Default, Debug)]
