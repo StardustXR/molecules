@@ -17,17 +17,29 @@ use stardust_xr_fusion::{
 use std::f32::consts::PI;
 
 #[derive(Debug, Clone, Copy)]
-pub struct ButtonSettings {
-	pub max_hover_distance: f32,
+pub struct ButtonVisualSettings {
 	pub line_thickness: f32,
 	pub accent_color: Rgba<f32, LinearRgb>,
+}
+impl Default for ButtonVisualSettings {
+	fn default() -> Self {
+		Self {
+			line_thickness: 0.005,
+			accent_color: rgba_linear!(0.0, 1.0, 0.75, 1.0),
+		}
+	}
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ButtonSettings {
+	pub max_hover_distance: f32,
+	pub visuals: Option<ButtonVisualSettings>,
 }
 impl Default for ButtonSettings {
 	fn default() -> Self {
 		Self {
 			max_hover_distance: 0.025,
-			line_thickness: 0.005,
-			accent_color: rgba_linear!(0.0, 1.0, 0.75, 1.0),
+			visuals: Some(ButtonVisualSettings::default()),
 		}
 	}
 }
@@ -35,7 +47,7 @@ impl Default for ButtonSettings {
 pub struct Button {
 	settings: ButtonSettings,
 	touch_plane: TouchPlane,
-	visuals: ButtonVisuals,
+	visuals: Option<ButtonVisuals>,
 }
 impl Button {
 	pub fn create(
@@ -57,7 +69,10 @@ impl Button {
 		)?;
 
 		Ok(Button {
-			visuals: ButtonVisuals::create(touch_plane.root(), size)?,
+			visuals: settings
+				.visuals
+				.map(|v| ButtonVisuals::create(touch_plane.root(), size, v))
+				.transpose()?,
 			settings,
 			touch_plane,
 		})
@@ -65,7 +80,9 @@ impl Button {
 
 	pub fn update(&mut self) {
 		self.touch_plane.update();
-		self.visuals.update(&self.touch_plane, &self.settings);
+		if let Some(visuals) = &mut self.visuals {
+			visuals.update(&self.touch_plane, &self.settings);
+		}
 	}
 
 	pub fn touch_plane(&self) -> &TouchPlane {
@@ -90,16 +107,22 @@ impl VisualDebug for Button {
 
 struct ButtonVisuals {
 	size: Vector2<f32>,
+	visual_settings: ButtonVisualSettings,
 	segment_count: usize,
 	lines: Lines,
 }
 impl ButtonVisuals {
-	fn create(parent: &impl SpatialAspect, size: Vector2<f32>) -> Result<Self, NodeError> {
+	fn create(
+		parent: &impl SpatialAspect,
+		size: Vector2<f32>,
+		settings: ButtonVisualSettings,
+	) -> Result<Self, NodeError> {
 		let segment_count = (size.x.min(size.y) * 1280.0) as usize / 4 * 4;
 		let outline = Lines::create(parent, Transform::from_scale([1.0, 1.0, 0.0]), &[])?;
 
 		Ok(ButtonVisuals {
 			size,
+			visual_settings: settings,
 			segment_count,
 			lines: outline,
 		})
@@ -123,15 +146,15 @@ impl ButtonVisuals {
 		let rounded_rectangle = rounded_rectangle(
 			self.size.x,
 			self.size.y,
-			settings.line_thickness * 0.5,
+			self.visual_settings.line_thickness * 0.5,
 			self.segment_count / 4 - 1,
 		)
-		.thickness(settings.line_thickness);
+		.thickness(self.visual_settings.line_thickness);
 		let _ = if let Some((interact_point, interact_distance)) = closest_interaction {
 			// if we're touching the plane
 			if !touch_plane.touching().current().is_empty() {
 				// then fill the rectangle
-				let lines = vec![rounded_rectangle.color(settings.accent_color)];
+				let lines = vec![rounded_rectangle.color(self.visual_settings.accent_color)];
 				// create_unbounded_volume_signifiers(
 				// 	self.size,
 				// 	interact_distance,
