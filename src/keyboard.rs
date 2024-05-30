@@ -5,7 +5,7 @@ use stardust_xr_fusion::{
 	core::values::Datamap,
 	data::{PulseReceiver, PulseReceiverAspect, PulseSender},
 	fields::FieldAspect,
-	items::panel::{PanelItem, SurfaceID},
+	items::panel::{PanelItem, PanelItemAspect, SurfaceId},
 	node::{NodeError, NodeType},
 	spatial::{SpatialAspect, Transform},
 };
@@ -64,12 +64,9 @@ impl KeyboardEvent {
 	// 	}
 	// }
 
-	pub fn send_to_panel(self, panel: &PanelItem, surface: &SurfaceID) -> Result<(), NodeError> {
-		panel.keyboard_keys(
-			surface,
-			&self.keymap_id,
-			self.keys.iter().cloned().collect(),
-		)
+	pub fn send_to_panel(self, panel: &PanelItem, surface: SurfaceId) -> Result<(), NodeError> {
+		let keys = self.keys.iter().cloned().collect::<Vec<_>>();
+		panel.keyboard_keys(surface, &self.keymap_id, &keys)
 	}
 }
 
@@ -79,7 +76,7 @@ pub fn create_keyboard_panel_handler(
 	transform: Transform,
 	field: &impl FieldAspect,
 	panel: &PanelItem,
-	focus: SurfaceID,
+	focus: SurfaceId,
 ) -> Result<KeyboardPanelHandler, NodeError> {
 	let panel = panel.alias();
 	SimplePulseReceiver::create(
@@ -87,7 +84,7 @@ pub fn create_keyboard_panel_handler(
 		transform,
 		field,
 		move |_uid, data: KeyboardEvent| {
-			let _ = data.send_to_panel(&panel, &focus);
+			let _ = data.send_to_panel(&panel, focus.clone());
 		},
 	)
 }
@@ -122,12 +119,8 @@ async fn keyboard_events() {
 		}
 	}
 
-	let field = stardust_xr_fusion::fields::SphereField::create(
-		client.get_root(),
-		mint::Vector3::from([0.0; 3]),
-		0.1,
-	)
-	.unwrap();
+	let field =
+		stardust_xr_fusion::fields::SphereField::create(client.get_root(), [0.0; 3], 0.1).unwrap();
 
 	let keyboard_event = KeyboardEvent {
 		keyboard: (),
