@@ -3,7 +3,7 @@ use lerp::Lerp;
 use stardust_xr_fusion::{
 	core::values::{
 		color::{color_space::LinearRgb, Rgba},
-		RowMatrix4, Vector3,
+		Mat4 as Matrix4, Vector3,
 	},
 	drawable::{Line, LinePoint},
 	spatial::BoundingBox,
@@ -15,7 +15,7 @@ pub trait LineExt: Sized {
 	fn color(self, color: Rgba<f32, LinearRgb>) -> Self;
 	// fn trace(self, amount: f32) -> Self;
 	fn lerp(self, other: &Self, amount: f32) -> Option<Self>;
-	fn transform(self, transform: impl Into<RowMatrix4<f32>>) -> Self;
+	fn transform(self, transform: impl Into<Matrix4>) -> Self;
 }
 
 impl LineExt for Line {
@@ -130,7 +130,7 @@ impl LineExt for Line {
 		})
 	}
 
-	fn transform(self, transform: impl Into<RowMatrix4<f32>>) -> Self {
+	fn transform(self, transform: impl Into<Matrix4>) -> Self {
 		let transform: Mat4 = transform.into().into();
 		Line {
 			points: self
