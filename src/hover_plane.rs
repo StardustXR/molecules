@@ -15,7 +15,7 @@ use stardust_xr_fusion::{
 	fields::{BoxField, BoxFieldAspect, Field},
 	input::{InputData, InputDataType, InputHandler},
 	node::{NodeError, NodeType},
-	spatial::{Spatial, SpatialAspect, Transform},
+	spatial::{Spatial, SpatialAspect, SpatialRefAspect, Transform},
 };
 use std::{ops::Range, sync::Arc};
 
@@ -58,7 +58,7 @@ pub struct HoverPlane {
 }
 impl HoverPlane {
 	pub fn create(
-		parent: &impl SpatialAspect,
+		parent: &impl SpatialRefAspect,
 		transform: Transform,
 		size: impl Into<Vector2<f32>>,
 		thickness: f32,

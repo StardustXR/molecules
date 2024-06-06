@@ -70,20 +70,18 @@ async fn mouse_events() {
 	impl stardust_xr_fusion::data::PulseSenderHandler for PulseSenderTest {
 		fn new_receiver(
 			&mut self,
-			uid: String,
 			receiver: PulseReceiver,
 			field: stardust_xr_fusion::fields::Field,
 		) {
 			println!(
-				"New pulse receiver {:?} with field {:?} and uid {:?}",
-				receiver.node().get_path(),
-				field.node().get_path(),
-				uid
+				"New pulse receiver {:?} with field {:?}",
+				receiver.node().get_id(),
+				field.node().get_id(),
 			);
 			receiver.send_data(&self.node, &self.data).unwrap();
 		}
-		fn drop_receiver(&mut self, uid: String) {
-			println!("Pulse receiver {} dropped", uid);
+		fn drop_receiver(&mut self, id: u64) {
+			println!("Pulse receiver {} dropped", id);
 		}
 	}
 
@@ -100,7 +98,13 @@ async fn mouse_events() {
 		client.get_root(),
 		Transform::none(),
 		&field,
-		|uid, mouse_event: MouseEvent| println!("Pulse sender {} sent {:#?}", uid, mouse_event),
+		|sender, mouse_event: MouseEvent| {
+			println!(
+				"Pulse sender {} sent {:#?}",
+				sender.node().get_id().unwrap(),
+				mouse_event
+			)
+		},
 	);
 
 	tokio::select! {

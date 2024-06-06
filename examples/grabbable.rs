@@ -4,12 +4,13 @@ use color_eyre::eyre::Result;
 use lazy_static::lazy_static;
 use manifest_dir_macros::directory_relative_path;
 use stardust_xr_fusion::{
-	client::{Client, ClientState, FrameInfo, RootHandler},
+	client::Client,
 	core::values::ResourceID,
 	drawable::{Line, Lines, Model},
 	fields::BoxField,
 	node::{NodeError, NodeType},
-	spatial::{Spatial, SpatialAspect, SpatialRefAspect, Transform},
+	root::{ClientState, FrameInfo, RootAspect, RootHandler},
+	spatial::{Spatial, SpatialAspect, SpatialRef, SpatialRefAspect, Transform},
 };
 use stardust_xr_molecules::{
 	lines::{bounding_box, LineExt},
@@ -29,9 +30,12 @@ async fn main() -> Result<()> {
 		.with_env_filter(EnvFilter::from_env("LOG_LEVEL"))
 		.init();
 	let (client, event_loop) = Client::connect_with_async_loop().await?;
-	client.set_base_prefixes(&[directory_relative_path!("res")]);
+	client.set_base_prefixes(&[directory_relative_path!("res")])?;
 
-	let _wrapped_root = client.wrap_root(GrabbableDemo::new(&client).await?)?;
+	let _wrapped_root = client
+		.get_root()
+		.alias()
+		.wrap(GrabbableDemo::new(&client).await?)?;
 
 	tokio::select! {
 		_ = tokio::signal::ctrl_c() => (),
@@ -41,7 +45,7 @@ async fn main() -> Result<()> {
 }
 
 struct GrabbableDemo {
-	state_root: Spatial,
+	root: Spatial,
 	grabbable: Grabbable,
 	field: BoxField,
 	model: Model,
@@ -68,7 +72,7 @@ impl GrabbableDemo {
 		)?;
 
 		let grabbable = Grabbable::create(
-			client.get_root(),
+			&state_root,
 			Transform::none(),
 			&field,
 			GrabbableSettings {
@@ -76,18 +80,12 @@ impl GrabbableDemo {
 				..Default::default()
 			},
 		)?;
-		if let Some(content_parent_reference) = client.state().spatial_anchors.get("content_parent")
-		{
-			grabbable
-				.content_parent()
-				.set_relative_transform(content_parent_reference, Transform::identity())?;
-		}
 		model.set_spatial_parent(grabbable.content_parent())?;
 		field.set_spatial_parent(grabbable.content_parent())?;
 		bounding_box.set_spatial_parent(grabbable.content_parent())?;
 
 		Ok(GrabbableDemo {
-			state_root,
+			root: state_root,
 			grabbable,
 			field,
 			model,
@@ -99,22 +97,36 @@ impl RootHandler for GrabbableDemo {
 	fn frame(&mut self, info: FrameInfo) {
 		self.grabbable.update(&info).unwrap();
 	}
-	fn save_state(&mut self) -> ClientState {
-		self.state_root
+	fn save_state(&mut self) -> Result<ClientState> {
+		self.root
 			.set_relative_transform(
 				self.grabbable.content_parent(),
 				Transform::from_translation([0.0; 3]),
 			)
 			.unwrap();
-		ClientState {
-			data: Vec::new(),
-			root: self.state_root.alias(),
+		Ok(ClientState {
+			data: None,
+			root: self.root.node().get_id().unwrap(),
 			spatial_anchors: [(
 				"content_parent".to_string(),
-				self.grabbable.content_parent().alias(),
+				self.grabbable.content_parent().node().get_id().unwrap(),
 			)]
 			.into_iter()
 			.collect(),
+		})
+	}
+
+	fn restore_state(&mut self, state: ClientState) {
+		if let Some(content_parent_reference) = state.spatial_anchors.get("content_parent") {
+			let spatial_ref = SpatialRef::from_id(
+				&self.root.client().unwrap(),
+				*content_parent_reference,
+				false,
+			);
+			self.grabbable
+				.content_parent()
+				.set_relative_transform(&spatial_ref, Transform::identity())
+				.unwrap();
 		}
 	}
 }

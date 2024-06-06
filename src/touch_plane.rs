@@ -12,7 +12,7 @@ use stardust_xr_fusion::{
 	fields::{BoxField, BoxFieldAspect, Field},
 	input::{InputData, InputDataType, InputHandler, InputMethodRefAspect},
 	node::{NodeError, NodeType},
-	spatial::{Spatial, SpatialAspect, Transform},
+	spatial::{Spatial, SpatialAspect, SpatialRefAspect, Transform},
 };
 use std::{ops::Range, sync::Arc};
 
@@ -33,7 +33,7 @@ pub struct TouchPlane {
 	field: BoxField,
 	hover_action: MultiActorAction,
 	touch_action: MultiActorAction,
-	input_states: FxHashMap<String, (Arc<InputData>, InputState)>,
+	input_states: FxHashMap<u64, (Arc<InputData>, InputState)>,
 	hovering: DeltaSet<Arc<InputData>>,
 	touching: DeltaSet<Arc<InputData>>,
 
@@ -41,7 +41,7 @@ pub struct TouchPlane {
 }
 impl TouchPlane {
 	pub fn create(
-		parent: &impl SpatialAspect,
+		parent: &impl SpatialRefAspect,
 		transform: Transform,
 		size: impl Into<Vector2<f32>>,
 		thickness: f32,
@@ -99,9 +99,9 @@ impl TouchPlane {
 
 		// add all the newly hovered stuff to the input states
 		for (data, _) in self.input.input() {
-			if !self.input_states.contains_key(&data.uid) {
+			if !self.input_states.contains_key(&data.id) {
 				self.input_states
-					.insert(data.uid.clone(), (data, InputState::None));
+					.insert(data.id.clone(), (data, InputState::None));
 			}
 		}
 

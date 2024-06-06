@@ -3,12 +3,12 @@ use std::f32::consts::PI;
 use crate::input_action::{InputQueue, InputQueueable, SingleActorAction};
 use glam::{vec3, Quat, Vec3};
 use stardust_xr_fusion::{
-	client::FrameInfo,
 	core::values::Vector3,
 	fields::{Field, FieldAspect},
 	input::{InputData, InputDataType, InputHandler},
 	node::{NodeError, NodeType},
-	spatial::{Spatial, SpatialAspect, Transform},
+	root::FrameInfo,
+	spatial::{Spatial, SpatialAspect, SpatialRefAspect, Transform},
 };
 use tokio::sync::mpsc;
 use tracing::{debug, trace};
@@ -100,7 +100,7 @@ pub struct Grabbable {
 }
 impl Grabbable {
 	pub fn create(
-		content_space: &impl SpatialAspect,
+		content_space: &impl SpatialRefAspect,
 		content_transform: Transform,
 		field: &impl FieldAspect,
 		settings: GrabbableSettings,
@@ -172,7 +172,7 @@ impl Grabbable {
 
 		if let Some(actor) = self.grab_action.actor().cloned() {
 			let (mut position, rotation) = self.input_position_rotation(&actor);
-			debug!(?position, ?rotation, uid = actor.uid, "Currently grabbing");
+			debug!(?position, ?rotation, id = actor.id, "Currently grabbing");
 
 			if self.settings.magnet {
 				if let Ok(closest_point) = self.closest_point_rx.try_recv() {
@@ -211,7 +211,7 @@ impl Grabbable {
 
 		if self.grab_action.actor_started() {
 			debug!(
-				uid = self.grab_action.actor().as_ref().unwrap().uid,
+				id = self.grab_action.actor().as_ref().unwrap().id,
 				"Started grabbing"
 			);
 			self.content_parent.set_zoneable(false)?;

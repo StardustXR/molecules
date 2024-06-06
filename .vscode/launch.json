@@ -45,21 +45,21 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in example 'grabbable'",
+            "name": "Debug example 'button'",
             "cargo": {
                 "args": [
-                    "test",
-                    "--no-run",
-                    "--example=grabbable",
+                    "build",
+                    "--example=button",
                     "--package=stardust-xr-molecules"
                 ],
                 "filter": {
-                    "name": "grabbable",
+                    "name": "button",
                     "kind": "example"
                 }
             },
             "args": [],
-            "cwd": "${workspaceFolder}"
+            "cwd": "${workspaceFolder}",
+            "env": {"LOG_LEVEL": "debug"}
         }
     ]
 }

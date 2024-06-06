@@ -7,7 +7,7 @@ use stardust_xr_fusion::{
 	fields::FieldAspect,
 	items::panel::{PanelItem, PanelItemAspect, SurfaceId},
 	node::{NodeError, NodeType},
-	spatial::{SpatialAspect, Transform},
+	spatial::{SpatialRefAspect, Transform},
 };
 
 lazy_static::lazy_static! {
@@ -18,7 +18,7 @@ lazy_static::lazy_static! {
 pub struct KeyboardEvent {
 	pub keyboard: (),
 	pub xkbv1: (),
-	pub keymap_id: String,
+	pub keymap_id: u64,
 	pub keys: FxHashSet<i32>,
 }
 impl Default for KeyboardEvent {
@@ -66,13 +66,13 @@ impl KeyboardEvent {
 
 	pub fn send_to_panel(self, panel: &PanelItem, surface: SurfaceId) -> Result<(), NodeError> {
 		let keys = self.keys.iter().cloned().collect::<Vec<_>>();
-		panel.keyboard_keys(surface, &self.keymap_id, &keys)
+		panel.keyboard_keys(surface, self.keymap_id, &keys)
 	}
 }
 
 pub type KeyboardPanelHandler = SimplePulseReceiver<KeyboardEvent>;
 pub fn create_keyboard_panel_handler(
-	parent: &impl SpatialAspect,
+	parent: &impl SpatialRefAspect,
 	transform: Transform,
 	field: &impl FieldAspect,
 	panel: &PanelItem,
@@ -103,19 +103,18 @@ async fn keyboard_events() {
 	impl stardust_xr_fusion::data::PulseSenderHandler for PulseSenderTest {
 		fn new_receiver(
 			&mut self,
-			uid: String,
 			receiver: PulseReceiver,
 			field: stardust_xr_fusion::fields::Field,
 		) {
 			println!(
-				"New pulse receiver {:?} with field {:?} and uid {uid}",
-				receiver.node().get_path(),
-				field.node().get_path(),
+				"New pulse receiver {:?} with field {:?}",
+				receiver.node().get_id(),
+				field.node().get_id(),
 			);
 			receiver.send_data(&self.node, &self.data).unwrap();
 		}
-		fn drop_receiver(&mut self, uid: String) {
-			println!("Pulse receiver {} dropped", uid);
+		fn drop_receiver(&mut self, id: u64) {
+			println!("Pulse receiver {} dropped", id);
 		}
 	}
 
@@ -125,7 +124,7 @@ async fn keyboard_events() {
 	let keyboard_event = KeyboardEvent {
 		keyboard: (),
 		xkbv1: (),
-		keymap_id: "".to_string(),
+		keymap_id: 0,
 		keys: [1, -1].into_iter().collect(),
 	};
 	let pulse_sender =
@@ -139,8 +138,12 @@ async fn keyboard_events() {
 		client.get_root(),
 		Transform::none(),
 		&field,
-		move |uid, keyboard_event: KeyboardEvent| {
-			println!("Pulse sender {} sent {:#?}", uid, keyboard_event);
+		move |sender, keyboard_event: KeyboardEvent| {
+			println!(
+				"Pulse sender {} sent {:#?}",
+				sender.node().get_id().unwrap(),
+				keyboard_event
+			);
 		},
 	)
 	.unwrap();

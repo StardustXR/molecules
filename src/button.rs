@@ -12,7 +12,7 @@ use stardust_xr_fusion::{
 	},
 	drawable::{Lines, LinesAspect},
 	node::NodeError,
-	spatial::{SpatialAspect, Transform},
+	spatial::{SpatialRefAspect, Transform},
 };
 use std::f32::consts::PI;
 
@@ -51,7 +51,7 @@ pub struct Button {
 }
 impl Button {
 	pub fn create(
-		parent: &impl SpatialAspect,
+		parent: &impl SpatialRefAspect,
 		transform: Transform,
 		size: impl Into<Vector2<f32>>,
 		settings: ButtonSettings,
@@ -113,7 +113,7 @@ struct ButtonVisuals {
 }
 impl ButtonVisuals {
 	fn create(
-		parent: &impl SpatialAspect,
+		parent: &impl SpatialRefAspect,
 		size: Vector2<f32>,
 		settings: ButtonVisualSettings,
 	) -> Result<Self, NodeError> {

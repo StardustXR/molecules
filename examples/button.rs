@@ -5,10 +5,11 @@ use glam::Quat;
 use manifest_dir_macros::directory_relative_path;
 use serde::{Deserialize, Serialize};
 use stardust_xr_fusion::{
-	client::{Client, ClientState, FrameInfo, RootHandler},
+	client::Client,
 	drawable::{Text, TextAspect, TextStyle, XAlign, YAlign},
-	node::NodeError,
-	spatial::{SpatialAspect, Transform},
+	node::{NodeError, NodeType},
+	root::{ClientState, FrameInfo, RootAspect, RootHandler},
+	spatial::{Spatial, Transform},
 };
 use stardust_xr_molecules::{
 	button::{Button, ButtonSettings},
@@ -21,9 +22,9 @@ use std::f32::consts::PI;
 async fn main() -> Result<()> {
 	color_eyre::install()?;
 	let (client, event_loop) = Client::connect_with_async_loop().await?;
-	client.set_base_prefixes(&[directory_relative_path!("res")]);
+	client.set_base_prefixes(&[directory_relative_path!("res")])?;
 
-	let _wrapped_root = client.wrap_root(ButtonDemo::new(&client)?)?;
+	let _wrapped_root = client.get_root().alias().wrap(ButtonDemo::new(&client)?)?;
 
 	tokio::select! {
 		_ = tokio::signal::ctrl_c() => (),
@@ -40,15 +41,16 @@ pub struct ButtonAction {
 }
 
 struct ButtonDemo {
+	root: Spatial,
 	button: Button,
 	reciever: SimplePulseReceiver<ButtonAction>,
 	text: Text,
 }
 impl ButtonDemo {
 	fn new(client: &Client) -> Result<Self, NodeError> {
-		client.get_root().set_zoneable(true)?;
+		let root = Spatial::create(client.get_root(), Transform::identity(), true)?;
 		let mut button = Button::create(
-			client.get_root(),
+			&root,
 			Transform::none(),
 			[0.1; 2],
 			ButtonSettings::default(),
@@ -76,6 +78,7 @@ impl ButtonDemo {
 			},
 		)?;
 		Ok(ButtonDemo {
+			root,
 			button,
 			reciever,
 			text,
@@ -92,7 +95,7 @@ impl RootHandler for ButtonDemo {
 			self.text.set_text("Unpressed").unwrap();
 		}
 	}
-	fn save_state(&mut self) -> ClientState {
-		ClientState::from_root(self.button.touch_plane().root())
+	fn save_state(&mut self) -> Result<ClientState> {
+		ClientState::from_data_root(None::<()>, self.button.touch_plane().root())
 	}
 }
