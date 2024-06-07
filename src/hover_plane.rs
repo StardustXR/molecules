@@ -245,7 +245,6 @@ impl HoverPlane {
 			})
 			.collect::<Vec<_>>();
 		self.lines.set_lines(&hovered_lines).unwrap();
-		self.input.flush_queue();
 	}
 }
 impl VisualDebug for HoverPlane {

@@ -263,7 +263,6 @@ impl Grabbable {
 		}
 
 		self.frame += 1;
-		self.input.flush_queue();
 		Ok(())
 	}
 	fn input_position_rotation(&mut self, input: &InputData) -> (Vec3, Quat) {

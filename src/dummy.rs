@@ -4,7 +4,10 @@ use stardust_xr_fusion::{
 	core::values::{Datamap, Vector2},
 	data::{PulseReceiver, PulseReceiverHandler, PulseSenderHandler},
 	fields::Field,
-	input::{InputData, InputHandler, InputHandlerHandler, InputMethod, InputMethodHandler},
+	input::{
+		InputData, InputHandler, InputHandlerHandler, InputMethod, InputMethodHandler,
+		InputMethodRef,
+	},
 	items::{
 		camera::{CameraItem, CameraItemAcceptor, CameraItemAcceptorHandler, CameraItemUiHandler},
 		panel::{
@@ -20,7 +23,7 @@ pub struct DummyHandler;
 
 // Input
 impl InputHandlerHandler for DummyHandler {
-	fn input(&mut self, _input: InputMethod, _data: InputData) {}
+	fn input(&mut self, _input: Vec<InputMethodRef>, _data: Vec<InputData>) {}
 }
 impl InputMethodHandler for DummyHandler {
 	fn create_handler(&mut self, handler: InputHandler, field: Field) {}

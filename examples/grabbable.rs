@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use std::sync::Arc;
+
 use color_eyre::eyre::Result;
 use lazy_static::lazy_static;
 use manifest_dir_macros::directory_relative_path;
@@ -10,7 +12,7 @@ use stardust_xr_fusion::{
 	fields::BoxField,
 	node::{NodeError, NodeType},
 	root::{ClientState, FrameInfo, RootAspect, RootHandler},
-	spatial::{Spatial, SpatialAspect, SpatialRef, SpatialRefAspect, Transform},
+	spatial::{Spatial, SpatialAspect, SpatialRefAspect, Transform},
 };
 use stardust_xr_molecules::{
 	lines::{bounding_box, LineExt},
@@ -26,8 +28,7 @@ lazy_static! {
 async fn main() -> Result<()> {
 	color_eyre::install()?;
 	tracing_subscriber::fmt()
-		.compact()
-		.with_env_filter(EnvFilter::from_env("LOG_LEVEL"))
+		.with_env_filter(EnvFilter::from_default_env())
 		.init();
 	let (client, event_loop) = Client::connect_with_async_loop().await?;
 	client.set_base_prefixes(&[directory_relative_path!("res")])?;
@@ -52,7 +53,7 @@ struct GrabbableDemo {
 	bounding_box: Lines,
 }
 impl GrabbableDemo {
-	async fn new(client: &Client) -> Result<Self, NodeError> {
+	async fn new(client: &Arc<Client>) -> Result<Self, NodeError> {
 		let state_root = Spatial::create(client.get_root(), Transform::identity(), false)?;
 		let model = Model::create(
 			client.get_root(),
@@ -84,6 +85,17 @@ impl GrabbableDemo {
 		field.set_spatial_parent(grabbable.content_parent())?;
 		bounding_box.set_spatial_parent(grabbable.content_parent())?;
 
+		if let Some(content_parent_reference) = client
+			.get_state()
+			.spatial_anchors(client)
+			.get("content_parent")
+		{
+			grabbable
+				.content_parent()
+				.set_relative_transform(content_parent_reference, Transform::identity())
+				.unwrap();
+		}
+
 		Ok(GrabbableDemo {
 			root: state_root,
 			grabbable,
@@ -114,19 +126,5 @@ impl RootHandler for GrabbableDemo {
 			.into_iter()
 			.collect(),
 		})
-	}
-
-	fn restore_state(&mut self, state: ClientState) {
-		if let Some(content_parent_reference) = state.spatial_anchors.get("content_parent") {
-			let spatial_ref = SpatialRef::from_id(
-				&self.root.client().unwrap(),
-				*content_parent_reference,
-				false,
-			);
-			self.grabbable
-				.content_parent()
-				.set_relative_transform(&spatial_ref, Transform::identity())
-				.unwrap();
-		}
 	}
 }

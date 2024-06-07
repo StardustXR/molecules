@@ -6,7 +6,7 @@ pub use multi_actor_action::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use stardust_xr_fusion::{
 	input::{
-		InputData, InputHandler, InputHandlerAspect, InputHandlerHandler, InputMethod,
+		InputData, InputHandler, InputHandlerAspect, InputHandlerHandler, InputMethodRef,
 		InputMethodRefAspect,
 	},
 	node::{NodeResult, NodeType},
@@ -23,10 +23,7 @@ pub trait InputQueueable: Sized {
 }
 impl InputQueueable for InputHandler {
 	fn queue(self) -> NodeResult<InputQueue> {
-		Ok(InputQueue(self.wrap(InputQueueInternal {
-			flush_queue: false,
-			queued_input: Default::default(),
-		})?))
+		Ok(InputQueue(self.wrap(InputQueueInternal::default())?))
 	}
 }
 
@@ -35,7 +32,7 @@ impl InputQueue {
 	pub fn handler(&self) -> &InputHandler {
 		self.0.node()
 	}
-	pub fn input(&self) -> FxHashMap<Arc<InputData>, InputMethod> {
+	pub fn input(&self) -> FxHashMap<Arc<InputData>, InputMethodRef> {
 		let mut locked = self.0.lock_wrapped();
 		FxHashMap::from_iter(
 			locked
@@ -43,11 +40,6 @@ impl InputQueue {
 				.iter()
 				.map(|(i, m)| (i.clone(), m.alias())),
 		)
-	}
-	pub fn flush_queue(&self) {
-		let mut lock = self.0.lock_wrapped();
-		lock.queued_input.clear();
-		lock.flush_queue = false;
 	}
 	pub fn request_capture(&self, data: &Arc<InputData>) {
 		let input = self.input();
@@ -59,29 +51,25 @@ impl InputQueue {
 }
 impl Debug for InputQueue {
 	fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-		self.0.lock_wrapped().queued_input.keys().fmt(f)
+		self.0.lock_wrapped().0.keys().fmt(f)
 	}
 }
 
 #[derive(Default, Debug)]
-pub struct InputQueueInternal {
-	flush_queue: bool,
-	queued_input: FxHashMap<Arc<InputData>, InputMethod>,
-}
+pub struct InputQueueInternal(FxHashMap<Arc<InputData>, InputMethodRef>);
 impl InputQueueInternal {
-	fn get_queued<'a>(&mut self) -> &FxHashMap<Arc<InputData>, InputMethod> {
-		// make it so we can do any amount of update_action and not clear anything until we get next input
-		self.flush_queue = true;
-		&self.queued_input
+	fn get_queued<'a>(&mut self) -> &FxHashMap<Arc<InputData>, InputMethodRef> {
+		&self.0
 	}
 }
 impl InputHandlerHandler for InputQueueInternal {
-	fn input(&mut self, input: InputMethod, data: InputData) {
-		if self.flush_queue {
-			self.queued_input.clear();
-			self.flush_queue = false;
-		}
-		self.queued_input.insert(Arc::new(data), input);
+	// TODO: put all input handling and reaction in here
+	fn input(&mut self, input: Vec<InputMethodRef>, data: Vec<InputData>) {
+		self.0 = data
+			.into_iter()
+			.map(Arc::new)
+			.zip(input.into_iter())
+			.collect();
 	}
 }
 

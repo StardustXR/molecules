@@ -16,10 +16,14 @@ use stardust_xr_molecules::{
 	DebugSettings, VisualDebug,
 };
 use std::f32::consts::PI;
+use tracing_subscriber::EnvFilter;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
 	color_eyre::install()?;
+	tracing_subscriber::fmt()
+		.with_env_filter(EnvFilter::from_default_env())
+		.init();
 	let (client, event_loop) = Client::connect_with_async_loop().await?;
 	client.set_base_prefixes(&[directory_relative_path!("res")])?;
 
