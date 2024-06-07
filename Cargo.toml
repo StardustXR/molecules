@@ -10,11 +10,11 @@ repository = "https://github.com/StardustXR/stardust-xr-molecules/"
 homepage = "https://stardustxr.org"
 
 [dependencies]
-glam = { version = "0.25.0", features = ["mint"] }
+glam = { version = "0.27.0", features = ["mint"] }
 lazy_static = "1.4.0"
 rustc-hash = "1.1.0"
-serde = { version = "1.0.196", features = ["derive"] }
-tokio = { version = "1.36.0", features = ["rt"] }
+serde = { version = "1.0.203", features = ["derive"] }
+tokio = { version = "1.38.0", features = ["rt"] }
 # xkbcommon = { version = "0.6.0", default-features = false, features = [] }
 tracing = "0.1.40"
 map-range = "0.1.2"
@@ -22,10 +22,10 @@ lerp = "0.5.0"
 
 [dependencies.stardust-xr-fusion]
 git = "https://github.com/StardustXR/core.git"
-branch="dev"
+# branch="dev"
 
 [dev-dependencies]
-tokio = { version = "1.25.0", features = ["full"] }
-color-eyre = { version = "0.6.2", default-features = false }
-manifest-dir-macros = "0.1.16"
-tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
+tokio = { version = "1.38.0", features = ["full"] }
+color-eyre = { version = "0.6.3", default-features = false }
+manifest-dir-macros = "0.1.18"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
