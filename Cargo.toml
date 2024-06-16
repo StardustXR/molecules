@@ -22,7 +22,7 @@ lerp = "0.5.0"
 
 [dependencies.stardust-xr-fusion]
 git = "https://github.com/StardustXR/core.git"
-# branch="dev"
+branch = "dev"
 
 [dev-dependencies]
 tokio = { version = "1.38.0", features = ["full"] }
