@@ -9,7 +9,7 @@ use rustc_hash::FxHashMap;
 use stardust_xr_fusion::{
 	core::values::{color::rgba_linear, Vector2, Vector3},
 	drawable::Lines,
-	fields::{BoxField, BoxFieldAspect, Field},
+	fields::{Field, FieldAspect, Shape},
 	input::{InputData, InputDataType, InputHandler, InputMethodRefAspect},
 	node::{NodeError, NodeType},
 	spatial::{Spatial, SpatialAspect, SpatialRefAspect, Transform},
@@ -30,7 +30,7 @@ pub struct TouchPlane {
 
 	root: Spatial,
 	input: InputQueue,
-	field: BoxField,
+	field: Field,
 	hover_action: MultiActorAction,
 	touch_action: MultiActorAction,
 	input_states: FxHashMap<u64, (Arc<InputData>, InputState)>,
@@ -50,10 +50,10 @@ impl TouchPlane {
 	) -> Result<Self, NodeError> {
 		let size = size.into();
 		let root = Spatial::create(parent, transform, false)?;
-		let field = BoxField::create(
+		let field = Field::create(
 			&root,
 			Transform::from_translation([0.0, 0.0, thickness * -0.5]),
-			[size.x, size.y, thickness],
+			Shape::Box([size.x, size.y, thickness].into()),
 		)?;
 		let input = InputHandler::create(&root, Transform::none(), &field)?.queue()?;
 
@@ -193,21 +193,23 @@ impl TouchPlane {
 	pub fn root(&self) -> &Spatial {
 		&self.root
 	}
-	pub fn field(&self) -> Field {
-		Field::alias_field(&self.field)
+	pub fn field(&self) -> &Field {
+		&self.field
 	}
 
 	pub fn set_size(&mut self, size: impl Into<Vector2<f32>>) -> Result<(), NodeError> {
 		let size = size.into();
 		self.size = size;
-		self.field.set_size([size.x, size.y, self.thickness])?;
+		self.field
+			.set_shape(Shape::Box([size.x, size.y, self.thickness].into()))?;
 		Ok(())
 	}
 	pub fn set_thickness(&mut self, thickness: f32) -> Result<(), NodeError> {
 		self.thickness = thickness;
 		self.field
 			.set_local_transform(Transform::from_translation([0.0, 0.0, thickness * -0.5]))?;
-		self.field.set_size([self.size.x, self.size.y, thickness])?;
+		self.field
+			.set_shape(Shape::Box([self.size.x, self.size.y, thickness].into()))?;
 		Ok(())
 	}
 

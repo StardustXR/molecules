@@ -12,7 +12,7 @@ use stardust_xr_fusion::{
 		Vector2, Vector3,
 	},
 	drawable::{Line, LinePoint, Lines, LinesAspect},
-	fields::{BoxField, BoxFieldAspect, Field},
+	fields::{Field, FieldAspect, Shape},
 	input::{InputData, InputDataType, InputHandler},
 	node::{NodeError, NodeType},
 	spatial::{Spatial, SpatialAspect, SpatialRefAspect, Transform},
@@ -46,7 +46,7 @@ impl Default for HoverPlaneSettings {
 pub struct HoverPlane {
 	root: Spatial,
 	input: InputQueue,
-	field: BoxField,
+	field: Field,
 	interact: SingleActorAction,
 	size: Vector2<f32>,
 	pub x_range: Range<f32>,
@@ -68,10 +68,10 @@ impl HoverPlane {
 	) -> Result<Self, NodeError> {
 		let size = size.into();
 		let root = Spatial::create(parent, transform, false)?;
-		let field = BoxField::create(
+		let field = Field::create(
 			&root,
 			Transform::from_translation([0.0, 0.0, thickness * -0.5]),
-			[size.x, size.y, thickness],
+			Shape::Box([size.x, size.y, thickness].into()),
 		)?;
 		let input = InputHandler::create(&root, Transform::none(), &field)?.queue()?;
 
@@ -139,21 +139,23 @@ impl HoverPlane {
 	pub fn input_handler(&self) -> &InputHandler {
 		self.input.handler()
 	}
-	pub fn field(&self) -> Field {
-		Field::alias_field(&self.field)
+	pub fn field(&self) -> &Field {
+		&self.field
 	}
 
 	pub fn set_size(&mut self, size: impl Into<Vector2<f32>>) -> Result<(), NodeError> {
 		let size = size.into();
 		self.size = size;
-		self.field.set_size([size.x, size.y, self.thickness])?;
+		self.field
+			.set_shape(Shape::Box([size.x, size.y, self.thickness].into()))?;
 		Ok(())
 	}
 	pub fn set_thickness(&mut self, thickness: f32) -> Result<(), NodeError> {
 		self.thickness = thickness;
 		self.field
 			.set_local_transform(Transform::from_translation([0.0, 0.0, thickness * -0.5]))?;
-		self.field.set_size([self.size.x, self.size.y, thickness])?;
+		self.field
+			.set_shape(Shape::Box([self.size.x, self.size.y, thickness].into()))?;
 		Ok(())
 	}
 

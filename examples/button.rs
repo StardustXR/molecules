@@ -63,7 +63,7 @@ impl ButtonDemo {
 		let reciever = SimplePulseReceiver::create(
 			button.touch_plane().root(),
 			Transform::none(),
-			&button.touch_plane().field(),
+			button.touch_plane().field(),
 			|_uid, data: ButtonAction| {
 				if data.press {
 					dbg!(data);

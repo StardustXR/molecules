@@ -4,7 +4,7 @@ use crate::input_action::{InputQueue, InputQueueable, SingleActorAction};
 use glam::{vec3, Quat, Vec3};
 use stardust_xr_fusion::{
 	core::values::Vector3,
-	fields::{Field, FieldAspect},
+	fields::{Field, FieldRefAspect},
 	input::{InputData, InputDataType, InputHandler},
 	node::{NodeError, NodeType},
 	root::FrameInfo,
@@ -102,7 +102,7 @@ impl Grabbable {
 	pub fn create(
 		content_space: &impl SpatialRefAspect,
 		content_transform: Transform,
-		field: &impl FieldAspect,
+		field: &Field,
 		settings: GrabbableSettings,
 	) -> Result<Self, NodeError> {
 		let input =
@@ -120,7 +120,7 @@ impl Grabbable {
 			content_parent,
 			input,
 			grab_action,
-			field: Field::alias_field(field),
+			field: field.alias(),
 			pointer_distance: 0.0,
 			settings,
 			frame: 0,

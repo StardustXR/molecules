@@ -85,8 +85,12 @@ async fn mouse_events() {
 		}
 	}
 
-	let field =
-		stardust_xr_fusion::fields::SphereField::create(client.get_root(), [0.0; 3], 0.1).unwrap();
+	let field = stardust_xr_fusion::fields::Field::create(
+		client.get_root(),
+		Transform::identity(),
+		stardust_xr_fusion::fields::Shape::Sphere(0.1),
+	)
+	.unwrap();
 	let pulse_sender =
 		PulseSender::create(client.get_root(), Transform::none(), &MOUSE_MASK).unwrap();
 	let pulse_sender_test = PulseSenderTest {

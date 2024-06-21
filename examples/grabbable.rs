@@ -9,7 +9,7 @@ use stardust_xr_fusion::{
 	client::Client,
 	core::values::ResourceID,
 	drawable::{Line, Lines, Model},
-	fields::BoxField,
+	fields::{Field, Shape},
 	node::{NodeError, NodeType},
 	root::{ClientState, FrameInfo, RootAspect, RootHandler},
 	spatial::{Spatial, SpatialAspect, SpatialRefAspect, Transform},
@@ -48,7 +48,7 @@ async fn main() -> Result<()> {
 struct GrabbableDemo {
 	root: Spatial,
 	grabbable: Grabbable,
-	field: BoxField,
+	field: Field,
 	model: Model,
 	bounding_box: Lines,
 }
@@ -66,10 +66,10 @@ impl GrabbableDemo {
 			.map(|l| l.thickness(0.001))
 			.collect();
 		let bounding_box = Lines::create(&model, Transform::identity(), &bounding_lines)?;
-		let field = BoxField::create(
+		let field = Field::create(
 			&model,
 			Transform::from_translation(bounds.center),
-			bounds.size,
+			Shape::Box(bounds.size),
 		)?;
 
 		let grabbable = Grabbable::create(
