@@ -1,11 +1,10 @@
 use crate::{
-	input_action::{InputQueue, InputQueueable, SingleActorAction},
+	input_action::{DeltaSet, InputQueue, InputQueueable, SingleAction},
 	lines::{self, LineExt},
 	DebugSettings, VisualDebug,
 };
 use glam::{vec3, Mat4, Vec3};
 use map_range::MapRange;
-use rustc_hash::FxHashSet;
 use stardust_xr_fusion::{
 	core::values::{
 		color::{color_space::LinearRgb, rgba_linear, Rgba},
@@ -47,7 +46,7 @@ pub struct HoverPlane {
 	root: Spatial,
 	input: InputQueue,
 	field: Field,
-	interact: SingleActorAction,
+	interact: SingleAction,
 	size: Vector2<f32>,
 	pub x_range: Range<f32>,
 	pub y_range: Range<f32>,
@@ -75,7 +74,7 @@ impl HoverPlane {
 		)?;
 		let input = InputHandler::create(&root, Transform::none(), &field)?.queue()?;
 
-		let interact_action = SingleActorAction::default();
+		let interact_action = SingleAction::default();
 
 		let lines = Lines::create(&root, Transform::identity(), &[])?;
 		Ok(HoverPlane {
@@ -160,16 +159,16 @@ impl HoverPlane {
 	}
 
 	/// Get all the raw inputs that are hovering
-	pub fn hovering_inputs(&self) -> FxHashSet<Arc<InputData>> {
-		self.interact.condition().currently_acting().clone()
+	pub fn hovering(&self) -> &DeltaSet<Arc<InputData>> {
+		self.interact.hovering()
 	}
 	/// Get all the points hovering over the surface, in x_range and y_range
-	pub fn hover_points(&self) -> Vec<Vector2<f32>> {
-		self.input_to_points(self.hovering_inputs().iter())
+	pub fn current_hover_points(&self) -> Vec<Vector2<f32>> {
+		self.input_to_points(self.hovering().current().iter())
 	}
 
 	/// Get the input that's interacting
-	pub fn interact_status(&self) -> &SingleActorAction {
+	pub fn interact_status(&self) -> &SingleAction {
 		&self.interact
 	}
 
@@ -201,52 +200,56 @@ impl HoverPlane {
 			},
 		);
 
-		let hovered_lines = self
-			.interact
-			.condition()
-			.currently_acting()
+		let mut hovered_lines = self
+			.hovering()
+			.current()
 			.iter()
-			.chain(self.interact.actor())
-			.filter(|d| match &d.input {
-				InputDataType::Pointer(_) => false,
-				_ => true,
-			})
-			.map(|d| {
-				(
-					Self::interact_point_local(d),
-					self.interact.actor() == Some(d),
-				)
-			})
-			.map(|(p, i)| Line {
-				points: vec![
-					LinePoint {
-						point: [
-							p.x.clamp(self.size.x * -0.5, self.size.x * 0.5),
-							p.y.clamp(self.size.y * -0.5, self.size.y * 0.5),
-							0.0,
-						]
-						.into(),
-						thickness: self.settings.line_start_thickness,
-						color: if i {
-							self.settings.line_start_color_interact
-						} else {
-							self.settings.line_start_color_hover
-						},
-					},
-					LinePoint {
-						point: p.into(),
-						thickness: self.settings.line_end_thickness,
-						color: if i {
-							self.settings.line_end_color_interact
-						} else {
-							self.settings.line_end_color_hover
-						},
-					},
-				],
-				cyclic: false,
-			})
+			.filter_map(|i| self.line_from_input(i, false))
 			.collect::<Vec<_>>();
+		if let Some(input) = self.interact.actor().cloned() {
+			if let Some(line) = self.line_from_input(&input, true) {
+				hovered_lines.push(line);
+			}
+		}
 		self.lines.set_lines(&hovered_lines).unwrap();
+	}
+
+	fn line_from_input(&self, input: &InputData, interacting: bool) -> Option<Line> {
+		if let InputDataType::Pointer(_) = &input.input {
+			None
+		} else {
+			Some(self.line_from_point(Self::interact_point_local(input), interacting))
+		}
+	}
+	fn line_from_point(&self, point: Vec3, interacting: bool) -> Line {
+		Line {
+			points: vec![
+				LinePoint {
+					point: [
+						point.x.clamp(self.size.x * -0.5, self.size.x * 0.5),
+						point.y.clamp(self.size.y * -0.5, self.size.y * 0.5),
+						0.0,
+					]
+					.into(),
+					thickness: self.settings.line_start_thickness,
+					color: if interacting {
+						self.settings.line_start_color_interact
+					} else {
+						self.settings.line_start_color_hover
+					},
+				},
+				LinePoint {
+					point: point.into(),
+					thickness: self.settings.line_end_thickness,
+					color: if interacting {
+						self.settings.line_end_color_interact
+					} else {
+						self.settings.line_end_color_hover
+					},
+				},
+			],
+			cyclic: false,
+		}
 	}
 }
 impl VisualDebug for HoverPlane {

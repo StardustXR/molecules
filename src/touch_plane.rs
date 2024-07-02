@@ -1,26 +1,19 @@
 use crate::{
-	input_action::{DeltaSet, InputQueue, InputQueueable, MultiActorAction},
+	input_action::{InputQueue, InputQueueable, MultiAction},
 	lines::{self, LineExt},
 	DebugSettings, VisualDebug,
 };
 use glam::{vec3, Mat4, Vec3};
 use map_range::MapRange;
-use rustc_hash::FxHashMap;
 use stardust_xr_fusion::{
 	core::values::{color::rgba_linear, Vector2, Vector3},
 	drawable::Lines,
 	fields::{Field, FieldAspect, Shape},
-	input::{InputData, InputDataType, InputHandler, InputMethodRefAspect},
+	input::{InputData, InputDataType, InputHandler},
 	node::{NodeError, NodeType},
 	spatial::{Spatial, SpatialAspect, SpatialRefAspect, Transform},
 };
 use std::{ops::Range, sync::Arc};
-
-enum InputState {
-	None,
-	Hovering,
-	Touching { confirmed: bool },
-}
 
 pub struct TouchPlane {
 	size: Vector2<f32>,
@@ -31,11 +24,7 @@ pub struct TouchPlane {
 	root: Spatial,
 	input: InputQueue,
 	field: Field,
-	hover_action: MultiActorAction,
-	touch_action: MultiActorAction,
-	input_states: FxHashMap<u64, (Arc<InputData>, InputState)>,
-	hovering: DeltaSet<Arc<InputData>>,
-	touching: DeltaSet<Arc<InputData>>,
+	action: MultiAction,
 
 	debug_lines: Option<Lines>,
 }
@@ -66,11 +55,7 @@ impl TouchPlane {
 			root,
 			input,
 			field,
-			hover_action: Default::default(),
-			touch_action: Default::default(),
-			input_states: Default::default(),
-			hovering: Default::default(),
-			touching: Default::default(),
+			action: Default::default(),
 			debug_lines: None,
 		})
 	}
@@ -80,84 +65,23 @@ impl TouchPlane {
 			&& point.x.abs() * 2.0 < size.x
 			&& point.y.abs() * 2.0 < size.y
 	}
+
 	/// Update the state of this touch plane. Run once every frame.
 	pub fn update(&mut self) {
-		self.hover_action
-			.update(false, &self.input, |input| match &input.input {
+		self.action.update(
+			&self.input,
+			|input| match &input.input {
 				InputDataType::Pointer(_) => input.distance < 0.0,
 				InputDataType::Hand(h) => Self::hover(self.size, h.index.tip.position, true),
 				InputDataType::Tip(t) => Self::hover(self.size, t.origin, true),
-			});
-		self.touch_action
-			.update(false, &self.input, |input| match &input.input {
+			},
+			|input| match &input.input {
 				InputDataType::Pointer(_) => {
 					input.datamap.with_data(|d| d.idx("select").as_f32() > 0.5)
 				}
 				InputDataType::Hand(h) => Self::hover(self.size, h.index.tip.position, false),
 				InputDataType::Tip(t) => Self::hover(self.size, t.origin, false),
-			});
-
-		// add all the newly hovered stuff to the input states
-		for (data, _) in self.input.input() {
-			if !self.input_states.contains_key(&data.id) {
-				self.input_states
-					.insert(data.id.clone(), (data, InputState::None));
-			}
-		}
-
-		// update all the input data
-		let input = self.input.input();
-		for (_, (data, state)) in &mut self.input_states {
-			let Some((new_data, method)) = input.get_key_value(data) else {
-				continue;
-			};
-			*data = new_data.clone();
-			match state {
-				InputState::None => {
-					if self.hover_action.started_acting().contains(data) {
-						*state = InputState::Hovering;
-					}
-				}
-				InputState::Hovering => {
-					if self.touch_action.started_acting().contains(data) {
-						let _ = method.request_capture(self.input.handler());
-						*state = InputState::Touching { confirmed: false };
-					} else if self.hover_action.stopped_acting().contains(data) {
-						*state = InputState::None;
-					}
-				}
-				InputState::Touching { confirmed } => {
-					let _ = method.request_capture(self.input.handler());
-					*confirmed = data.captured;
-					// transition state back
-					if self.touch_action.stopped_acting().contains(data) {
-						if self.hover_action.currently_acting().contains(data) {
-							*state = InputState::Hovering;
-						} else {
-							*state = InputState::None;
-						}
-					}
-				}
-			}
-		}
-
-		self.hovering.push_new(
-			self.input_states
-				.values()
-				.filter(|(_, state)| match state {
-					InputState::Hovering => true,
-					_ => false,
-				})
-				.map(|(data, _)| data.clone()),
-		);
-		self.touching.push_new(
-			self.input_states
-				.values()
-				.filter(|(_, state)| match state {
-					InputState::Touching { confirmed } => *confirmed,
-					_ => false,
-				})
-				.map(|(data, _)| data.clone()),
+			},
 		);
 	}
 	pub fn interact_point(&self, input: &InputData) -> (Vector2<f32>, f32) {
@@ -196,6 +120,9 @@ impl TouchPlane {
 	pub fn field(&self) -> &Field {
 		&self.field
 	}
+	pub fn action(&self) -> &MultiAction {
+		&self.action
+	}
 
 	pub fn set_size(&mut self, size: impl Into<Vector2<f32>>) -> Result<(), NodeError> {
 		let size = size.into();
@@ -211,13 +138,6 @@ impl TouchPlane {
 		self.field
 			.set_shape(Shape::Box([self.size.x, self.size.y, thickness].into()))?;
 		Ok(())
-	}
-
-	pub fn hovering(&self) -> &DeltaSet<Arc<InputData>> {
-		&self.hovering
-	}
-	pub fn touching(&self) -> &DeltaSet<Arc<InputData>> {
-		&self.touching
 	}
 
 	/// Set whether this will receive input or not

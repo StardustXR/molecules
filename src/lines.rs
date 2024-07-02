@@ -7,6 +7,7 @@ use stardust_xr_fusion::{
 	},
 	drawable::{Line, LinePoint},
 	spatial::BoundingBox,
+	values::color::rgba_linear,
 };
 use std::f32::consts::{PI, TAU};
 
@@ -232,6 +233,36 @@ pub fn arc(segments: usize, start_angle: f32, end_angle: f32, radius: f32) -> Li
 		points,
 		cyclic: false,
 	}
+}
+
+pub fn line_from_points(points: Vec<impl Into<Vector3<f32>>>) -> Line {
+	Line {
+		points: points
+			.into_iter()
+			.map(|p| LinePoint {
+				point: p.into(),
+				..Default::default()
+			})
+			.collect(),
+		cyclic: false,
+	}
+}
+
+pub fn axes(length: f32, thickness: f32) -> Vec<Line> {
+	let r = rgba_linear!(1.0, 0.0, 0.0, 1.0);
+	let g = rgba_linear!(0.0, 1.0, 0.0, 1.0);
+	let b = rgba_linear!(0.0, 0.0, 1.0, 1.0);
+	vec![
+		line_from_points(vec![Vec3::ZERO, Vec3::X * length])
+			.color(r)
+			.thickness(thickness),
+		line_from_points(vec![Vec3::ZERO, Vec3::Y * length])
+			.color(g)
+			.thickness(thickness),
+		line_from_points(vec![Vec3::ZERO, Vec3::Z * length])
+			.color(b)
+			.thickness(thickness),
+	]
 }
 
 pub fn bounding_box(bounding_box: BoundingBox) -> Vec<Line> {

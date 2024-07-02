@@ -1,7 +1,9 @@
-mod single_actor_action;
-pub use single_actor_action::*;
-mod multi_actor_action;
-pub use multi_actor_action::*;
+mod single_action;
+pub use single_action::*;
+mod simple_action;
+pub use simple_action::*;
+mod multi_action;
+pub use multi_action::*;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 use stardust_xr_fusion::{

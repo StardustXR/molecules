@@ -1,23 +1,21 @@
 #![allow(dead_code)]
 
-use std::sync::Arc;
-
 use color_eyre::eyre::Result;
 use lazy_static::lazy_static;
 use manifest_dir_macros::directory_relative_path;
 use stardust_xr_fusion::{
 	client::Client,
 	core::values::ResourceID,
-	drawable::{Line, Lines, Model},
+	drawable::Model,
 	fields::{Field, Shape},
 	node::{NodeError, NodeType},
 	root::{ClientState, FrameInfo, RootAspect, RootHandler},
 	spatial::{Spatial, SpatialAspect, SpatialRefAspect, Transform},
 };
 use stardust_xr_molecules::{
-	lines::{bounding_box, LineExt},
-	Grabbable, GrabbableSettings, PointerMode,
+	DebugSettings, Grabbable, GrabbableSettings, PointerMode, VisualDebug,
 };
+use std::sync::Arc;
 use tracing_subscriber::EnvFilter;
 
 lazy_static! {
@@ -50,7 +48,6 @@ struct GrabbableDemo {
 	grabbable: Grabbable,
 	field: Field,
 	model: Model,
-	bounding_box: Lines,
 }
 impl GrabbableDemo {
 	async fn new(client: &Arc<Client>) -> Result<Self, NodeError> {
@@ -61,29 +58,25 @@ impl GrabbableDemo {
 			&*GRABBABLE_MODEL,
 		)?;
 		let bounds = model.get_relative_bounding_box(client.get_root()).await?;
-		let bounding_lines: Vec<Line> = bounding_box(bounds.clone())
-			.into_iter()
-			.map(|l| l.thickness(0.001))
-			.collect();
-		let bounding_box = Lines::create(&model, Transform::identity(), &bounding_lines)?;
 		let field = Field::create(
 			&model,
 			Transform::from_translation(bounds.center),
 			Shape::Box(bounds.size),
 		)?;
 
-		let grabbable = Grabbable::create(
+		let mut grabbable = Grabbable::create(
 			&state_root,
 			Transform::none(),
 			&field,
 			GrabbableSettings {
 				pointer_mode: PointerMode::Align,
+				magnet: true,
 				..Default::default()
 			},
 		)?;
+		grabbable.set_debug(Some(DebugSettings::default()));
 		model.set_spatial_parent(grabbable.content_parent())?;
 		field.set_spatial_parent(grabbable.content_parent())?;
-		bounding_box.set_spatial_parent(grabbable.content_parent())?;
 
 		if let Some(content_parent_reference) = client
 			.get_state()
@@ -101,7 +94,6 @@ impl GrabbableDemo {
 			grabbable,
 			field,
 			model,
-			bounding_box,
 		})
 	}
 }

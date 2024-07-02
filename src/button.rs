@@ -90,13 +90,13 @@ impl Button {
 	}
 
 	pub fn pressed(&self) -> bool {
-		!self.touch_plane.touching().current().is_empty()
-			&& self.touch_plane.touching().added().len()
-				== self.touch_plane.touching().current().len()
+		!self.touch_plane.action().interact().current().is_empty()
+			&& self.touch_plane.action().interact().added().len()
+				== self.touch_plane.action().interact().current().len()
 	}
 	pub fn released(&self) -> bool {
-		self.touch_plane.touching().current().is_empty()
-			&& !self.touch_plane.touching().removed().is_empty()
+		self.touch_plane.action().interact().current().is_empty()
+			&& !self.touch_plane.action().interact().removed().is_empty()
 	}
 }
 impl VisualDebug for Button {
@@ -130,10 +130,11 @@ impl ButtonVisuals {
 
 	pub fn update(&self, touch_plane: &TouchPlane, settings: &ButtonSettings) {
 		let closest_interaction = touch_plane
-			.hovering()
+			.action()
+			.hover()
 			.current()
 			.into_iter()
-			.chain(touch_plane.touching().current().into_iter())
+			.chain(touch_plane.action().interact().current().into_iter())
 			.map(|p| touch_plane.interact_point(&p))
 			.reduce(|(a_pos, a_distance), (b_pos, b_distance)| {
 				if a_distance < b_distance {
@@ -152,7 +153,7 @@ impl ButtonVisuals {
 		.thickness(self.visual_settings.line_thickness);
 		let _ = if let Some((interact_point, interact_distance)) = closest_interaction {
 			// if we're touching the plane
-			if !touch_plane.touching().current().is_empty() {
+			if !touch_plane.action().interact().current().is_empty() {
 				// then fill the rectangle
 				let lines = vec![rounded_rectangle.color(self.visual_settings.accent_color)];
 				// create_unbounded_volume_signifiers(
