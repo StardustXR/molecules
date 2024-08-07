@@ -135,8 +135,8 @@ impl HoverPlane {
 	pub fn root(&self) -> &Spatial {
 		&self.root
 	}
-	pub fn input_handler(&self) -> &InputHandler {
-		self.input.handler()
+	pub fn input_queue(&self) -> &InputQueue {
+		&self.input
 	}
 	pub fn field(&self) -> &Field {
 		&self.field
