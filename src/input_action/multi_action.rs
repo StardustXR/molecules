@@ -31,18 +31,19 @@ impl MultiAction {
 		{
 			queue.request_capture(input);
 		}
-		// keep capturing when interacting and already captured
-		for input in self
+		let interacting_inputs = self
 			.interact_condition
 			.currently_acting()
 			.into_iter()
 			.filter(|k| k.captured)
-		{
+			.cloned()
+			.collect::<Vec<_>>();
+		// keep capturing when interacting and already captured
+		for input in &interacting_inputs {
 			queue.request_capture(input);
 		}
 		// only something that's been captured can count as interactable to ensure a valid interaction
-		self.interact
-			.push_new(input.keys().filter(|i| i.captured).cloned());
+		self.interact.push_new(interacting_inputs.into_iter());
 
 		// TOOD: make this code not stupid
 		let current_hover_state = self.hover.current.clone();
