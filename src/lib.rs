@@ -17,7 +17,7 @@ pub use grabbable::*;
 
 use stardust_xr_fusion::core::values::color::{color_space::LinearRgb, rgba_linear, Rgba};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DebugSettings {
 	pub line_thickness: f32,
 	pub line_color: Rgba<f32, LinearRgb>,
