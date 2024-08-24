@@ -133,9 +133,9 @@ impl ButtonVisuals {
 			.action()
 			.hover()
 			.current()
-			.into_iter()
-			.chain(touch_plane.action().interact().current().into_iter())
-			.map(|p| touch_plane.interact_point(&p))
+			.iter()
+			.chain(touch_plane.action().interact().current())
+			.map(|p| touch_plane.interact_point(p))
 			.reduce(|(a_pos, a_distance), (b_pos, b_distance)| {
 				if a_distance < b_distance {
 					(a_pos, a_distance)

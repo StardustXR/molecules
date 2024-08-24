@@ -51,7 +51,7 @@ impl MouseEvent {
 
 	pub fn send_event(&self, sender: &PulseSender, receivers: &[&PulseReceiver]) {
 		let data = Datamap::from_typed(self).unwrap();
-		for receiver in receivers.into_iter() {
+		for receiver in receivers.iter() {
 			let _ = receiver.send_data(sender, &data);
 		}
 	}

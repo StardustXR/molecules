@@ -199,7 +199,7 @@ impl Grabbable {
 			self.prev_pose = self.pose;
 			self.pose = (position, rotation);
 
-			let delta = info.delta as f32;
+			let delta = info.delta;
 			if let Some(momentum_settings) = &self.settings.linear_momentum {
 				let linear_velocity = self.pose.0 - self.prev_pose.0;
 				let above_threshold =
@@ -296,7 +296,7 @@ impl Grabbable {
 		let Some(velocity) = &mut self.linear_velocity else {
 			return;
 		};
-		let delta = info.delta as f32;
+		let delta = info.delta;
 		if velocity.length_squared() < Self::LINEAR_VELOCITY_STOP_THRESHOLD {
 			self.linear_velocity.take();
 
@@ -315,7 +315,7 @@ impl Grabbable {
 		let Some((axis, angle)) = &mut self.angular_velocity else {
 			return;
 		};
-		let delta = info.delta as f32;
+		let delta = info.delta;
 		if *angle < Self::ANGULAR_VELOCITY_STOP_THRESHOLD {
 			self.angular_velocity.take();
 		} else {

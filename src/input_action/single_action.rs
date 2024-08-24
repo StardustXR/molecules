@@ -50,7 +50,7 @@ impl SingleAction {
 	}
 
 	pub fn hovering(&self) -> &DeltaSet<Arc<InputData>> {
-		&self.multi.hover()
+		self.multi.hover()
 	}
 	pub fn actor_started(&self) -> bool {
 		self.actor_started

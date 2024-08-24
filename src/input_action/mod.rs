@@ -60,18 +60,14 @@ impl Debug for InputQueue {
 #[derive(Default, Debug)]
 pub struct InputQueueInternal(FxHashMap<Arc<InputData>, InputMethodRef>);
 impl InputQueueInternal {
-	fn get_queued<'a>(&mut self) -> &FxHashMap<Arc<InputData>, InputMethodRef> {
+	fn get_queued(&mut self) -> &FxHashMap<Arc<InputData>, InputMethodRef> {
 		&self.0
 	}
 }
 impl InputHandlerHandler for InputQueueInternal {
 	// TODO: put all input handling and reaction in here
 	fn input(&mut self, input: Vec<InputMethodRef>, data: Vec<InputData>) {
-		self.0 = data
-			.into_iter()
-			.map(Arc::new)
-			.zip(input.into_iter())
-			.collect();
+		self.0 = data.into_iter().map(Arc::new).zip(input).collect();
 	}
 }
 

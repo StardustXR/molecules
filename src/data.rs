@@ -61,5 +61,5 @@ pub fn create_node_tag<T: Serialize + Default>(
 	field: &impl FieldAspect,
 ) -> Result<NodeTag, NodeError> {
 	let mask = Datamap::from_typed(T::default()).map_err(|_| NodeError::Serialization)?;
-	Ok(PulseReceiver::create(spatial_parent, transform, field, &mask)?.wrap(DummyHandler)?)
+	PulseReceiver::create(spatial_parent, transform, field, &mask)?.wrap(DummyHandler)
 }

@@ -15,26 +15,17 @@ lazy_static::lazy_static! {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Default)]
 pub struct KeyboardEvent {
 	pub keyboard: (),
 	pub xkbv1: (),
 	pub keymap_id: u64,
 	pub keys: FxHashSet<i32>,
 }
-impl Default for KeyboardEvent {
-	fn default() -> Self {
-		Self {
-			keyboard: (),
-			xkbv1: (),
-			keymap_id: Default::default(),
-			keys: Default::default(),
-		}
-	}
-}
 impl KeyboardEvent {
 	pub fn send_event(&self, sender: &PulseSender, receivers: &[&PulseReceiver]) {
 		let data = Datamap::from_typed(self).unwrap();
-		for receiver in receivers.into_iter() {
+		for receiver in receivers.iter() {
 			let _ = receiver.send_data(sender, &data);
 		}
 	}

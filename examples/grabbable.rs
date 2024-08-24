@@ -55,7 +55,7 @@ impl GrabbableDemo {
 		let model = Model::create(
 			client.get_root(),
 			Transform::from_scale([0.5; 3]),
-			&*GRABBABLE_MODEL,
+			&GRABBABLE_MODEL,
 		)?;
 		let bounds = model.get_relative_bounding_box(client.get_root()).await?;
 		let field = Field::create(

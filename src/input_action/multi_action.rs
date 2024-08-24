@@ -23,7 +23,7 @@ impl MultiAction {
 		for input in self
 			.interact_condition
 			.started_acting()
-			.into_iter()
+			.iter()
 			// gotta make sure it only tries to capture it when hovering
 			.filter(|i| self.hover.current.contains(*i))
 			// but not if it started hovering at the same time (this means it just got "focus")
@@ -34,7 +34,7 @@ impl MultiAction {
 		let interacting_inputs = self
 			.interact_condition
 			.currently_acting()
-			.into_iter()
+			.iter()
 			.filter(|k| k.captured)
 			.cloned()
 			.collect::<Vec<_>>();
