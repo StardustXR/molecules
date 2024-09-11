@@ -14,8 +14,7 @@ lazy_static::lazy_static! {
 	pub static ref KEYBOARD_MASK: Datamap = Datamap::from_typed(KeyboardEvent::default()).unwrap();
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct KeyboardEvent {
 	pub keyboard: (),
 	pub xkbv1: (),
