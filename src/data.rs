@@ -35,7 +35,9 @@ impl<T: Serialize + DeserializeOwned + Default + 'static> SimplePulseReceiver<T>
 impl<T: Serialize + DeserializeOwned + Default + 'static> UIElement for SimplePulseReceiver<T> {
 	fn handle_events(&mut self) -> bool {
 		let mut handled = false;
-		while let Some(PulseReceiverEvent::Data { sender, data }) = self.receiver.recv_event() {
+		while let Some(PulseReceiverEvent::Data { sender, data }) =
+			self.receiver.recv_pulse_receiver_event()
+		{
 			handled = true;
 			let Ok(data) = data.deserialize() else {
 				return true;

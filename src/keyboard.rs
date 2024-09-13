@@ -132,7 +132,7 @@ async fn keyboard_events() {
 		});
 		pulse_receiver.handle_events();
 
-		match pulse_sender.recv_event() {
+		match pulse_sender.recv_pulse_sender_event() {
 			Some(PulseSenderEvent::NewReceiver { receiver, field }) => {
 				println!(
 					"New pulse receiver {:?} with field {:?}",

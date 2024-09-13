@@ -53,7 +53,9 @@ impl InputQueue {
 	// check this as often as possible, will return true when input has been updated
 	pub fn handle_events(&mut self) -> bool {
 		let mut updated = false;
-		while let Some(InputHandlerEvent::Input { methods, data }) = self.handler.recv_event() {
+		while let Some(InputHandlerEvent::Input { methods, data }) =
+			self.handler.recv_input_handler_event()
+		{
 			updated = true;
 			self.input = data.into_iter().map(Arc::new).zip(methods).collect();
 		}

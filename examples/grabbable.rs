@@ -86,7 +86,7 @@ async fn main() {
 	client
 		.event_loop(|client, _flow| {
 			grabbable.handle_events();
-			match client.get_root().recv_event() {
+			match client.get_root().recv_root_event() {
 				Some(RootEvent::Frame { info }) => grabbable.frame(&info),
 				Some(RootEvent::SaveState { response }) => response.wrap(|| {
 					root.set_relative_transform(

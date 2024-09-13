@@ -56,7 +56,7 @@ async fn main() {
 			if hover_plane.interact_status().actor_stopped() {
 				text.set_text("Unpressed").unwrap();
 			}
-			if let Some(RootEvent::SaveState { response }) = client.get_root().recv_event() {
+			if let Some(RootEvent::SaveState { response }) = client.get_root().recv_root_event() {
 				response.wrap(|| Ok(ClientState::default()))
 			}
 		})
