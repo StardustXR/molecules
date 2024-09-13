@@ -1,34 +1,48 @@
-use crate::dummy::DummyHandler;
 use serde::{de::DeserializeOwned, Serialize};
 use stardust_xr_fusion::{
 	core::values::Datamap,
-	data::{PulseReceiver, PulseReceiverAspect, PulseReceiverHandler},
+	data::{PulseReceiver, PulseReceiverAspect, PulseReceiverEvent},
 	fields::FieldAspect,
 	node::NodeError,
 	spatial::{SpatialRef, SpatialRefAspect, Transform},
-	HandlerWrapper,
 };
 
+use crate::UIElement;
+
 /// A simple pulse receiver that runs a closure whenever it gets data, type for schema convenience.
-pub struct SimplePulseReceiver<T: Serialize + DeserializeOwned + Default + 'static>(
-	HandlerWrapper<PulseReceiver, InlineHandler<T>>,
-);
+pub struct SimplePulseReceiver<T: Serialize + DeserializeOwned + Default + 'static> {
+	receiver: PulseReceiver,
+	handler: Box<dyn FnMut(SpatialRef, T) + Send + Sync + 'static>,
+}
 impl<T: Serialize + DeserializeOwned + Default + 'static> SimplePulseReceiver<T> {
 	pub fn create<F: FnMut(SpatialRef, T) + Send + Sync + 'static>(
 		spatial_parent: &impl SpatialRefAspect,
 		transform: Transform,
 		field: &impl FieldAspect,
-		on_data: F,
+		handler: F,
 	) -> Result<Self, NodeError> {
-		Ok(SimplePulseReceiver(
-			PulseReceiver::create(
+		Ok(SimplePulseReceiver {
+			receiver: PulseReceiver::create(
 				spatial_parent,
 				transform,
 				field,
 				&Datamap::from_typed(T::default()).map_err(|_| NodeError::Serialization)?,
-			)?
-			.wrap(InlineHandler(Box::new(on_data)))?,
-		))
+			)?,
+			handler: Box::new(handler),
+		})
+	}
+}
+impl<T: Serialize + DeserializeOwned + Default + 'static> UIElement for SimplePulseReceiver<T> {
+	fn handle_events(&mut self) -> bool {
+		let mut handled = false;
+		while let Some(PulseReceiverEvent::Data { sender, data }) = self.receiver.recv_event() {
+			handled = true;
+			let Ok(data) = data.deserialize() else {
+				return true;
+			};
+			(self.handler)(sender, data)
+		}
+		handled
 	}
 }
 impl<T: Serialize + DeserializeOwned + Default + 'static> std::ops::Deref
@@ -37,29 +51,17 @@ impl<T: Serialize + DeserializeOwned + Default + 'static> std::ops::Deref
 	type Target = PulseReceiver;
 
 	fn deref(&self) -> &Self::Target {
-		self.0.node()
-	}
-}
-
-struct InlineHandler<T: Serialize + DeserializeOwned + Default + 'static>(
-	Box<dyn FnMut(SpatialRef, T) + Send + Sync + 'static>,
-);
-impl<T: Serialize + DeserializeOwned + Default + 'static> PulseReceiverHandler
-	for InlineHandler<T>
-{
-	fn data(&mut self, sender: SpatialRef, data: Datamap) {
-		let Ok(data) = data.deserialize() else { return };
-		(self.0)(sender, data)
+		&self.receiver
 	}
 }
 
 /// Pulse receiver that only acts as a tag, doesn't
-pub type NodeTag = HandlerWrapper<PulseReceiver, DummyHandler>;
+pub type NodeTag = PulseReceiver;
 pub fn create_node_tag<T: Serialize + Default>(
 	spatial_parent: &impl SpatialRefAspect,
 	transform: Transform,
 	field: &impl FieldAspect,
 ) -> Result<NodeTag, NodeError> {
 	let mask = Datamap::from_typed(T::default()).map_err(|_| NodeError::Serialization)?;
-	PulseReceiver::create(spatial_parent, transform, field, &mask)?.wrap(DummyHandler)
+	PulseReceiver::create(spatial_parent, transform, field, &mask)
 }

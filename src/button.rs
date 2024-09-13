@@ -1,7 +1,7 @@
 use crate::{
 	lines::{circle, rounded_rectangle, LineExt},
 	touch_plane::TouchPlane,
-	VisualDebug,
+	UIElement, VisualDebug,
 };
 use glam::{vec3, Mat4};
 use map_range::MapRange;
@@ -78,13 +78,6 @@ impl Button {
 		})
 	}
 
-	pub fn update(&mut self) {
-		self.touch_plane.update();
-		if let Some(visuals) = &mut self.visuals {
-			visuals.update(&self.touch_plane, &self.settings);
-		}
-	}
-
 	pub fn touch_plane(&self) -> &TouchPlane {
 		&self.touch_plane
 	}
@@ -97,6 +90,17 @@ impl Button {
 	pub fn released(&self) -> bool {
 		self.touch_plane.action().interact().current().is_empty()
 			&& !self.touch_plane.action().interact().removed().is_empty()
+	}
+}
+impl UIElement for Button {
+	fn handle_events(&mut self) -> bool {
+		if !self.touch_plane.handle_events() {
+			return false;
+		}
+		if let Some(visuals) = &mut self.visuals {
+			visuals.update(&self.touch_plane, &self.settings);
+		}
+		true
 	}
 }
 impl VisualDebug for Button {

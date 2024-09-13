@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::data::SimplePulseReceiver;
 use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
@@ -6,7 +8,7 @@ use stardust_xr_fusion::{
 	data::{PulseReceiver, PulseReceiverAspect, PulseSender},
 	fields::FieldAspect,
 	items::panel::{PanelItem, PanelItemAspect, SurfaceId},
-	node::{NodeError, NodeType},
+	node::NodeError,
 	spatial::{SpatialRefAspect, Transform},
 };
 
@@ -65,10 +67,10 @@ pub fn create_keyboard_panel_handler(
 	parent: &impl SpatialRefAspect,
 	transform: Transform,
 	field: &impl FieldAspect,
-	panel: &PanelItem,
+	panel: &Arc<PanelItem>,
 	focus: SurfaceId,
 ) -> Result<KeyboardPanelHandler, NodeError> {
-	let panel = panel.alias();
+	let panel = panel.clone();
 	SimplePulseReceiver::create(
 		parent,
 		transform,
@@ -81,39 +83,20 @@ pub fn create_keyboard_panel_handler(
 
 #[tokio::test]
 async fn keyboard_events() {
+	use crate::UIElement;
 	use stardust_xr_fusion::data::PulseSenderAspect;
-	let (client, event_loop) = stardust_xr_fusion::client::Client::connect_with_async_loop()
-		.await
-		.unwrap();
+	use stardust_xr_fusion::data::PulseSenderEvent;
+	use stardust_xr_fusion::node::NodeType;
+	let mut client = stardust_xr_fusion::Client::connect().await.unwrap();
 
-	struct PulseSenderTest {
-		data: Datamap,
-		node: PulseSender,
-	}
-	impl stardust_xr_fusion::data::PulseSenderHandler for PulseSenderTest {
-		fn new_receiver(
-			&mut self,
-			receiver: PulseReceiver,
-			field: stardust_xr_fusion::fields::Field,
-		) {
-			println!(
-				"New pulse receiver {:?} with field {:?}",
-				receiver.node().get_id(),
-				field.node().get_id(),
-			);
-			receiver.send_data(&self.node, &self.data).unwrap();
-		}
-		fn drop_receiver(&mut self, id: u64) {
-			println!("Pulse receiver {} dropped", id);
-		}
-	}
-
-	let field = stardust_xr_fusion::fields::Field::create(
-		client.get_root(),
-		Transform::identity(),
-		stardust_xr_fusion::fields::Shape::Sphere(0.1),
-	)
-	.unwrap();
+	let field = Arc::new(
+		stardust_xr_fusion::fields::Field::create(
+			client.get_root(),
+			Transform::identity(),
+			stardust_xr_fusion::fields::Shape::Sphere(0.1),
+		)
+		.unwrap(),
+	);
 
 	let keyboard_event = KeyboardEvent {
 		keyboard: (),
@@ -123,27 +106,50 @@ async fn keyboard_events() {
 	};
 	let pulse_sender =
 		PulseSender::create(client.get_root(), Transform::none(), &KEYBOARD_MASK).unwrap();
-	let pulse_sender_test = PulseSenderTest {
-		data: Datamap::from_typed(keyboard_event).unwrap(),
-		node: pulse_sender.alias(),
-	};
-	let _pulse_sender = pulse_sender.wrap(pulse_sender_test).unwrap();
-	let _pulse_receiver = SimplePulseReceiver::create(
-		client.get_root(),
-		Transform::none(),
-		&field,
-		move |sender, keyboard_event: KeyboardEvent| {
-			println!(
-				"Pulse sender {} sent {:#?}",
-				sender.node().get_id().unwrap(),
-				keyboard_event
-			);
-		},
-	)
-	.unwrap();
 
-	tokio::select! {
-		_ = tokio::time::sleep(core::time::Duration::from_secs(60)) => panic!("Timed Out"),
-		e = event_loop => e.unwrap().unwrap(),
-	}
+	let mut pulse_receiver = None;
+	let data = Datamap::from_typed(keyboard_event.clone()).unwrap();
+
+	let event_loop = client.event_loop(move |client, _flow| {
+		let pulse_receiver = pulse_receiver.get_or_insert_with({
+			let client = client.clone();
+			let field = field.clone();
+			move || {
+				SimplePulseReceiver::create(
+					client.get_root(),
+					Transform::none(),
+					field.as_ref(),
+					move |sender, keyboard_event: KeyboardEvent| {
+						println!(
+							"Pulse sender {} sent {:#?}",
+							sender.node().get_id().unwrap(),
+							keyboard_event
+						);
+					},
+				)
+				.unwrap()
+			}
+		});
+		pulse_receiver.handle_events();
+
+		match pulse_sender.recv_event() {
+			Some(PulseSenderEvent::NewReceiver { receiver, field }) => {
+				println!(
+					"New pulse receiver {:?} with field {:?}",
+					receiver.node().get_id(),
+					field.node().get_id(),
+				);
+				receiver.send_data(&pulse_sender, &data).unwrap();
+			}
+			Some(PulseSenderEvent::DropReceiver { id }) => {
+				println!("Pulse receiver {} dropped", id);
+			}
+			_ => (),
+		}
+	});
+
+	tokio::time::timeout(core::time::Duration::from_secs(60), event_loop)
+		.await
+		.unwrap()
+		.unwrap()
 }

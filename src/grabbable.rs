@@ -1,7 +1,7 @@
 use crate::{
 	input_action::{InputQueue, InputQueueable, SingleAction},
 	lines::{axes, bounding_box, LineExt},
-	VisualDebug,
+	FrameSensitive, UIElement, VisualDebug,
 };
 use glam::{vec3, Quat, Vec3};
 use stardust_xr_fusion::{
@@ -13,7 +13,7 @@ use stardust_xr_fusion::{
 	root::FrameInfo,
 	spatial::{Spatial, SpatialAspect, SpatialRefAspect, Transform},
 };
-use std::f32::consts::PI;
+use std::{f32::consts::PI, sync::Arc};
 use tokio::sync::mpsc;
 use tracing::{debug, trace};
 
@@ -78,13 +78,13 @@ impl Default for GrabbableSettings {
 }
 
 pub struct Grabbable {
-	root: Spatial,
-	content_parent: Spatial,
-	field: Field,
+	root: Arc<Spatial>,
+	content_parent: Arc<Spatial>,
+	field: Arc<Field>,
 	input: InputQueue,
 	grab_action: SingleAction,
 
-	content_lines: Lines,
+	content_lines: Arc<Lines>,
 	root_lines: Lines,
 	settings: GrabbableSettings,
 
@@ -102,19 +102,29 @@ impl Grabbable {
 	pub fn create(
 		content_space: &impl SpatialRefAspect,
 		content_transform: Transform,
-		field: &Field,
+		field: &Arc<Field>,
 		settings: GrabbableSettings,
 	) -> Result<Self, NodeError> {
-		let input =
-			InputHandler::create(content_space.client()?.get_root(), Transform::none(), field)?
-				.queue()?;
-		let root = Spatial::create(input.handler(), Transform::none(), false)?;
-		let content_parent =
-			Spatial::create(input.handler(), Transform::none(), settings.zoneable)?;
+		let input = InputHandler::create(
+			content_space.client()?.get_root(),
+			Transform::none(),
+			field.as_ref(),
+		)?
+		.queue()?;
+		let root = Arc::new(Spatial::create(input.handler(), Transform::none(), false)?);
+		let content_parent = Arc::new(Spatial::create(
+			input.handler(),
+			Transform::none(),
+			settings.zoneable,
+		)?);
 		content_parent.set_relative_transform(content_space, content_transform)?;
 
-		let content_lines = Lines::create(&content_parent, Transform::identity(), &[])?;
-		let root_lines = Lines::create(&root, Transform::identity(), &[])?;
+		let content_lines = Arc::new(Lines::create(
+			content_parent.as_ref(),
+			Transform::identity(),
+			&[],
+		)?);
+		let root_lines = Lines::create(root.as_ref(), Transform::identity(), &[])?;
 
 		let (closest_point_tx, closest_point_rx) = mpsc::channel(1);
 		Ok(Grabbable {
@@ -122,7 +132,7 @@ impl Grabbable {
 			content_parent,
 			input,
 			grab_action: SingleAction::default(),
-			field: field.alias(),
+			field: field.clone(),
 
 			content_lines,
 			root_lines,
@@ -138,136 +148,6 @@ impl Grabbable {
 			linear_velocity: None,
 			angular_velocity: None,
 		})
-	}
-	pub fn update(&mut self, info: &FrameInfo) -> Result<(), NodeError> {
-		self.grab_action.update(
-			true,
-			&self.input,
-			|input| {
-				let max_distance = self.settings.max_distance;
-				match &input.input {
-					InputDataType::Hand(h) => {
-						h.thumb.tip.distance < max_distance && h.index.tip.distance < max_distance
-					}
-					_ => input.distance < max_distance,
-				}
-			},
-			|data| {
-				data.datamap.with_data(|datamap| match &data.input {
-					InputDataType::Hand(_) => datamap.idx("pinch_strength").as_f32() > 0.90,
-					_ => datamap.idx("grab").as_f32() > 0.90,
-				})
-			},
-		);
-
-		if self.grab_action.actor_started() {
-			// Make sure we can directly apply the grab data to the content parent
-			let actor = self.grab_action.actor().unwrap();
-			if let InputDataType::Pointer(pointer) = &actor.input {
-				// store the pointer distance so we can keep it at the correct point
-				self.pointer_distance =
-					Vec3::from(pointer.origin).distance(pointer.deepest_point.into());
-			}
-
-			// gotta reparent to the handler to set the root offset without moving it
-			self.content_parent
-				.set_spatial_parent_in_place(self.input.handler())
-				.unwrap();
-		}
-
-		if let Some(actor) = self.grab_action.actor().cloned() {
-			let (mut position, rotation) = self.input_position_rotation(&actor);
-			debug!(?position, ?rotation, id = actor.id, "Currently grabbing");
-
-			if self.settings.magnet {
-				if let Ok(closest_point) = self.closest_point_rx.try_recv() {
-					position -= rotation * closest_point;
-					let _ = self.closest_point_tx.try_send(closest_point);
-				}
-			}
-			let transform_spatial = match (self.settings.pointer_mode, &actor.input) {
-				(PointerMode::Align, InputDataType::Pointer(_)) => self.content_parent(),
-				_ => &self.root,
-			};
-			transform_spatial
-				.set_relative_transform(
-					self.input.handler(),
-					Transform::from_translation_rotation(position, rotation),
-				)
-				.unwrap();
-
-			self.prev_pose = self.pose;
-			self.pose = (position, rotation);
-
-			let delta = info.delta;
-			if let Some(momentum_settings) = &self.settings.linear_momentum {
-				let linear_velocity = self.pose.0 - self.prev_pose.0;
-				let above_threshold =
-					linear_velocity.length_squared() > momentum_settings.threshold.powf(2.0);
-				self.linear_velocity = above_threshold.then(|| linear_velocity / delta);
-			}
-			if let Some(momentum_settings) = &self.settings.angular_momentum {
-				let (axis, angle) = (self.pose.1 * self.prev_pose.1.inverse()).to_axis_angle();
-				let above_threshold = angle > momentum_settings.threshold;
-				self.angular_velocity = above_threshold.then(|| (axis, angle / delta));
-			}
-		}
-
-		if self.grab_action.actor_started() {
-			debug!(
-				id = self.grab_action.actor().as_ref().unwrap().id,
-				"Started grabbing"
-			);
-			self.content_parent.set_zoneable(false).unwrap();
-			self.content_parent
-				.set_spatial_parent_in_place(&self.root)
-				.unwrap();
-
-			'magnet: {
-				if self.settings.magnet {
-					// if we have magnet strength, store the closest point so we can lerp that to the grab point
-					let grab_data = self.grab_action.actor().unwrap().clone();
-					// pointers are just too unstable to magnet
-					if let InputDataType::Pointer(_) = &grab_data.input {
-						break 'magnet;
-					}
-					let field = self.field.alias();
-					let root = self.root.alias();
-					let closest_point_tx = self.closest_point_tx.clone();
-					tokio::task::spawn(async move {
-						let result = field.closest_point(&root, [0.0; 3]).await.unwrap();
-						// if let Ok(result) = result {
-						let _ = closest_point_tx.send(result.into()).await;
-						// }
-					});
-				}
-			}
-		}
-
-		if self.grab_action.actor_stopped() {
-			debug!("Stopped grabbing");
-
-			// drain the closest point queue
-			let _ = self.closest_point_rx.try_recv();
-		}
-
-		if !self.grab_action.actor_acting() {
-			if let Some(settings) = self.settings.linear_momentum {
-				self.apply_linear_momentum(info, settings);
-			}
-			if let Some(settings) = self.settings.angular_momentum {
-				self.apply_angular_momentum(info, settings);
-			}
-
-			if self.linear_velocity.is_some() || self.angular_velocity.is_some() {
-				self.root.set_relative_transform(
-					self.input.handler(),
-					Transform::from_translation_rotation(self.pose.0, self.pose.1),
-				)?;
-			}
-		}
-
-		Ok(())
 	}
 	fn input_position_rotation(&mut self, input: &InputData) -> (Vec3, Quat) {
 		match &input.input {
@@ -354,12 +234,151 @@ impl Grabbable {
 	pub fn grab_action(&self) -> &SingleAction {
 		&self.grab_action
 	}
-	pub fn content_parent(&self) -> &Spatial {
+	pub fn content_parent(&self) -> &Arc<Spatial> {
 		&self.content_parent
 	}
 
 	pub fn set_enabled(&self, enabled: bool) -> Result<(), NodeError> {
 		self.input.handler().set_enabled(enabled)
+	}
+}
+impl UIElement for Grabbable {
+	fn handle_events(&mut self) -> bool {
+		if !self.input.handle_events() {
+			return false;
+		}
+		self.grab_action.update(
+			true,
+			&self.input,
+			|input| {
+				let max_distance = self.settings.max_distance;
+				match &input.input {
+					InputDataType::Hand(h) => {
+						h.thumb.tip.distance < max_distance && h.index.tip.distance < max_distance
+					}
+					_ => input.distance < max_distance,
+				}
+			},
+			|data| {
+				data.datamap.with_data(|datamap| match &data.input {
+					InputDataType::Hand(_) => datamap.idx("pinch_strength").as_f32() > 0.90,
+					_ => datamap.idx("grab").as_f32() > 0.90,
+				})
+			},
+		);
+
+		if self.grab_action.actor_started() {
+			// Make sure we can directly apply the grab data to the content parent
+			let actor = self.grab_action.actor().unwrap();
+			if let InputDataType::Pointer(pointer) = &actor.input {
+				// store the pointer distance so we can keep it at the correct point
+				self.pointer_distance =
+					Vec3::from(pointer.origin).distance(pointer.deepest_point.into());
+			}
+
+			// gotta reparent to the handler to set the root offset without moving it
+			self.content_parent
+				.set_spatial_parent_in_place(self.input.handler())
+				.unwrap();
+		}
+
+		if let Some(actor) = self.grab_action.actor().cloned() {
+			let (mut position, rotation) = self.input_position_rotation(&actor);
+			debug!(?position, ?rotation, id = actor.id, "Currently grabbing");
+
+			if self.settings.magnet {
+				if let Ok(closest_point) = self.closest_point_rx.try_recv() {
+					position -= rotation * closest_point;
+					let _ = self.closest_point_tx.try_send(closest_point);
+				}
+			}
+			let transform_spatial = match (self.settings.pointer_mode, &actor.input) {
+				(PointerMode::Align, InputDataType::Pointer(_)) => self.content_parent(),
+				_ => &self.root,
+			};
+			transform_spatial
+				.set_relative_transform(
+					self.input.handler(),
+					Transform::from_translation_rotation(position, rotation),
+				)
+				.unwrap();
+			self.pose = (position, rotation);
+		}
+
+		if self.grab_action.actor_started() {
+			debug!(
+				id = self.grab_action.actor().as_ref().unwrap().id,
+				"Started grabbing"
+			);
+			self.content_parent.set_zoneable(false).unwrap();
+			self.content_parent
+				.set_spatial_parent_in_place(self.root.as_ref())
+				.unwrap();
+
+			'magnet: {
+				if self.settings.magnet {
+					// if we have magnet strength, store the closest point so we can lerp that to the grab point
+					let grab_data = self.grab_action.actor().unwrap().clone();
+					// pointers are just too unstable to magnet
+					if let InputDataType::Pointer(_) = &grab_data.input {
+						break 'magnet;
+					}
+					let field = self.field.clone();
+					let root = self.root.clone();
+					let closest_point_tx = self.closest_point_tx.clone();
+					tokio::task::spawn(async move {
+						let result = field.closest_point(root.as_ref(), [0.0; 3]).await.unwrap();
+						// if let Ok(result) = result {
+						let _ = closest_point_tx.send(result.into()).await;
+						// }
+					});
+				}
+			}
+		}
+
+		if self.grab_action.actor_stopped() {
+			debug!("Stopped grabbing");
+
+			// drain the closest point queue
+			let _ = self.closest_point_rx.try_recv();
+		}
+		true
+	}
+}
+impl FrameSensitive for Grabbable {
+	fn frame(&mut self, info: &FrameInfo) {
+		if self.grab_action.actor_acting() {
+			let delta = info.delta;
+			if let Some(momentum_settings) = &self.settings.linear_momentum {
+				let linear_velocity = self.pose.0 - self.prev_pose.0;
+				let above_threshold =
+					linear_velocity.length_squared() > momentum_settings.threshold.powf(2.0);
+				self.linear_velocity = above_threshold.then(|| linear_velocity / delta);
+			}
+			if let Some(momentum_settings) = &self.settings.angular_momentum {
+				let (axis, angle) = (self.pose.1 * self.prev_pose.1.inverse()).to_axis_angle();
+				let above_threshold = angle > momentum_settings.threshold;
+				self.angular_velocity = above_threshold.then(|| (axis, angle / delta));
+			}
+			self.prev_pose = self.pose;
+		}
+		if !self.grab_action.actor_acting() {
+			if let Some(settings) = self.settings.linear_momentum {
+				self.apply_linear_momentum(info, settings);
+			}
+			if let Some(settings) = self.settings.angular_momentum {
+				self.apply_angular_momentum(info, settings);
+			}
+
+			if self.linear_velocity.is_some() || self.angular_velocity.is_some() {
+				self.root
+					.set_relative_transform(
+						self.input.handler(),
+						Transform::from_translation_rotation(self.pose.0, self.pose.1),
+					)
+					.unwrap();
+			}
+		}
 	}
 }
 impl VisualDebug for Grabbable {
@@ -368,8 +387,8 @@ impl VisualDebug for Grabbable {
 			let _ = self
 				.root_lines
 				.set_lines(&axes(0.01, settings.line_thickness));
-			let content_lines = self.content_lines.alias();
-			let content_parent = self.content_parent.alias();
+			let content_lines = self.content_lines.clone();
+			let content_parent = self.content_parent.clone();
 			tokio::task::spawn(async move {
 				if let Ok(bounds) = content_parent.get_local_bounding_box().await {
 					let _ = content_lines.set_lines(

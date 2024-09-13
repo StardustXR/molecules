@@ -59,60 +59,64 @@ impl MouseEvent {
 
 #[tokio::test]
 async fn mouse_events() {
-	let (client, event_loop) = stardust_xr_fusion::client::Client::connect_with_async_loop()
-		.await
-		.unwrap();
-	use stardust_xr_fusion::{data::PulseSenderAspect, node::NodeType, spatial::Transform};
-	struct PulseSenderTest {
-		data: Datamap,
-		node: PulseSender,
-	}
-	impl stardust_xr_fusion::data::PulseSenderHandler for PulseSenderTest {
-		fn new_receiver(
-			&mut self,
-			receiver: PulseReceiver,
-			field: stardust_xr_fusion::fields::Field,
-		) {
-			println!(
-				"New pulse receiver {:?} with field {:?}",
-				receiver.node().get_id(),
-				field.node().get_id(),
-			);
-			receiver.send_data(&self.node, &self.data).unwrap();
-		}
-		fn drop_receiver(&mut self, id: u64) {
-			println!("Pulse receiver {} dropped", id);
-		}
-	}
+	use crate::data::SimplePulseReceiver;
+	use crate::UIElement;
+	use stardust_xr_fusion::data::PulseSenderAspect;
+	use stardust_xr_fusion::data::PulseSenderEvent;
+	use stardust_xr_fusion::fields::{Field, Shape};
+	use stardust_xr_fusion::node::NodeType;
+	use stardust_xr_fusion::spatial::Transform;
+	use std::sync::Arc;
 
-	let field = stardust_xr_fusion::fields::Field::create(
-		client.get_root(),
-		Transform::identity(),
-		stardust_xr_fusion::fields::Shape::Sphere(0.1),
-	)
-	.unwrap();
-	let pulse_sender =
-		PulseSender::create(client.get_root(), Transform::none(), &MOUSE_MASK).unwrap();
-	let pulse_sender_test = PulseSenderTest {
-		data: MOUSE_MASK.clone(),
-		node: pulse_sender.alias(),
-	};
-	let _pulse_sender = pulse_sender.wrap(pulse_sender_test).unwrap();
-	let _pulse_receiver = crate::data::SimplePulseReceiver::create(
-		client.get_root(),
-		Transform::none(),
-		&field,
-		|sender, mouse_event: MouseEvent| {
-			println!(
-				"Pulse sender {} sent {:#?}",
-				sender.node().get_id().unwrap(),
-				mouse_event
-			)
-		},
+	let mut client = stardust_xr_fusion::Client::connect().await.unwrap();
+
+	let field = Arc::new(
+		Field::create(client.get_root(), Transform::identity(), Shape::Sphere(0.1)).unwrap(),
 	);
 
-	tokio::select! {
-		_ = tokio::time::sleep(core::time::Duration::from_secs(60)) => panic!("Timed Out"),
-		e = event_loop => e.unwrap().unwrap(),
-	}
+	let pulse_sender =
+		PulseSender::create(client.get_root(), Transform::none(), &MOUSE_MASK).unwrap();
+	let mut pulse_receiver = None;
+	let event_loop = client.event_loop(move |client, _flow| {
+		let pulse_receiver = pulse_receiver.get_or_insert_with({
+			let client = client.clone();
+			let field = field.clone();
+			move || {
+				SimplePulseReceiver::create(
+					client.get_root(),
+					Transform::none(),
+					field.as_ref(),
+					move |sender, mouse_event: MouseEvent| {
+						println!(
+							"Pulse sender {} sent {:#?}",
+							sender.node().get_id().unwrap(),
+							mouse_event
+						);
+					},
+				)
+				.unwrap()
+			}
+		});
+		pulse_receiver.handle_events();
+
+		match pulse_sender.recv_event() {
+			Some(PulseSenderEvent::NewReceiver { receiver, field }) => {
+				println!(
+					"New pulse receiver {:?} with field {:?}",
+					receiver.node().get_id(),
+					field.node().get_id(),
+				);
+				receiver.send_data(&pulse_sender, &MOUSE_MASK).unwrap();
+			}
+			Some(PulseSenderEvent::DropReceiver { id }) => {
+				println!("Pulse receiver {} dropped", id);
+			}
+			_ => (),
+		}
+	});
+
+	tokio::time::timeout(core::time::Duration::from_secs(60), event_loop)
+		.await
+		.unwrap()
+		.unwrap()
 }

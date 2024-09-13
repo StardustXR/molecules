@@ -179,6 +179,7 @@ impl HoverPlane {
 
 	/// Update the state of this touch plane. Run once every frame.
 	pub fn update(&mut self) {
+		self.input.handle_events();
 		self.interact.update(
 			false,
 			&self.input,

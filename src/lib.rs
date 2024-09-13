@@ -1,6 +1,5 @@
 pub mod button;
 pub mod data;
-mod dummy;
 mod exposure;
 mod grabbable;
 pub mod hover_plane;
@@ -15,7 +14,10 @@ pub mod touch_plane;
 pub use exposure::*;
 pub use grabbable::*;
 
-use stardust_xr_fusion::core::values::color::{color_space::LinearRgb, rgba_linear, Rgba};
+use stardust_xr_fusion::{
+	core::values::color::{color_space::LinearRgb, rgba_linear, Rgba},
+	root::FrameInfo,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DebugSettings {
@@ -35,4 +37,12 @@ impl Default for DebugSettings {
 pub trait VisualDebug {
 	/// Enable or disable the visual debugging using the provided settings.
 	fn set_debug(&mut self, settings: Option<DebugSettings>);
+}
+
+pub trait UIElement {
+	// Handle events, returns true if events were handled (e.g. when input has been updated)
+	fn handle_events(&mut self) -> bool;
+}
+pub trait FrameSensitive {
+	fn frame(&mut self, info: &FrameInfo);
 }

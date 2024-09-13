@@ -1,7 +1,7 @@
 use crate::{
 	input_action::{InputQueue, InputQueueable, MultiAction},
 	lines::{self, LineExt},
-	DebugSettings, VisualDebug,
+	DebugSettings, UIElement, VisualDebug,
 };
 use glam::{vec3, Mat4, Vec3};
 use map_range::MapRange;
@@ -66,24 +66,6 @@ impl TouchPlane {
 			&& point.y.abs() * 2.0 < size.y
 	}
 
-	/// Update the state of this touch plane. Run once every frame.
-	pub fn update(&mut self) {
-		self.action.update(
-			&self.input,
-			|input| match &input.input {
-				InputDataType::Pointer(_) => input.distance < 0.0,
-				InputDataType::Hand(h) => Self::hover(self.size, h.index.tip.position, true),
-				InputDataType::Tip(t) => Self::hover(self.size, t.origin, true),
-			},
-			|input| match &input.input {
-				InputDataType::Pointer(_) => {
-					input.datamap.with_data(|d| d.idx("select").as_f32() > 0.5)
-				}
-				InputDataType::Hand(h) => Self::hover(self.size, h.index.tip.position, false),
-				InputDataType::Tip(t) => Self::hover(self.size, t.origin, false),
-			},
-		);
-	}
 	pub fn interact_point(&self, input: &InputData) -> (Vector2<f32>, f32) {
 		let interact_point = match &input.input {
 			InputDataType::Pointer(p) => {
@@ -143,6 +125,29 @@ impl TouchPlane {
 	/// Set whether this will receive input or not
 	pub fn set_enabled(&self, enabled: bool) -> Result<(), NodeError> {
 		self.input.handler().set_enabled(enabled)
+	}
+}
+impl UIElement for TouchPlane {
+	fn handle_events(&mut self) -> bool {
+		if !self.input.handle_events() {
+			return false;
+		}
+		self.action.update(
+			&self.input,
+			|input| match &input.input {
+				InputDataType::Pointer(_) => input.distance < 0.0,
+				InputDataType::Hand(h) => Self::hover(self.size, h.index.tip.position, true),
+				InputDataType::Tip(t) => Self::hover(self.size, t.origin, true),
+			},
+			|input| match &input.input {
+				InputDataType::Pointer(_) => {
+					input.datamap.with_data(|d| d.idx("select").as_f32() > 0.5)
+				}
+				InputDataType::Hand(h) => Self::hover(self.size, h.index.tip.position, false),
+				InputDataType::Tip(t) => Self::hover(self.size, t.origin, false),
+			},
+		);
+		true
 	}
 }
 impl VisualDebug for TouchPlane {
