@@ -89,7 +89,7 @@ async fn mouse_events() {
 					move |sender, mouse_event: MouseEvent| {
 						println!(
 							"Pulse sender {} sent {:#?}",
-							sender.node().get_id().unwrap(),
+							sender.node().id(),
 							mouse_event
 						);
 					},
@@ -103,8 +103,8 @@ async fn mouse_events() {
 			Some(PulseSenderEvent::NewReceiver { receiver, field }) => {
 				println!(
 					"New pulse receiver {:?} with field {:?}",
-					receiver.node().get_id(),
-					field.node().get_id(),
+					receiver.node().id(),
+					field.node().id(),
 				);
 				receiver.send_data(&pulse_sender, &MOUSE_MASK).unwrap();
 			}

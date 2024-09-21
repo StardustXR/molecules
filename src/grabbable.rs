@@ -13,7 +13,7 @@ use stardust_xr_fusion::{
 	root::FrameInfo,
 	spatial::{Spatial, SpatialAspect, SpatialRefAspect, Transform},
 };
-use std::{f32::consts::PI, sync::Arc};
+use std::f32::consts::PI;
 use tokio::sync::mpsc;
 use tracing::{debug, trace};
 
@@ -78,13 +78,13 @@ impl Default for GrabbableSettings {
 }
 
 pub struct Grabbable {
-	root: Arc<Spatial>,
-	content_parent: Arc<Spatial>,
-	field: Arc<Field>,
+	root: Spatial,
+	content_parent: Spatial,
+	field: Field,
 	input: InputQueue,
 	grab_action: SingleAction,
 
-	content_lines: Arc<Lines>,
+	content_lines: Lines,
 	root_lines: Lines,
 	settings: GrabbableSettings,
 
@@ -102,29 +102,19 @@ impl Grabbable {
 	pub fn create(
 		content_space: &impl SpatialRefAspect,
 		content_transform: Transform,
-		field: &Arc<Field>,
+		field: &Field,
 		settings: GrabbableSettings,
 	) -> Result<Self, NodeError> {
-		let input = InputHandler::create(
-			content_space.client()?.get_root(),
-			Transform::none(),
-			field.as_ref(),
-		)?
-		.queue()?;
-		let root = Arc::new(Spatial::create(input.handler(), Transform::none(), false)?);
-		let content_parent = Arc::new(Spatial::create(
-			input.handler(),
-			Transform::none(),
-			settings.zoneable,
-		)?);
+		let input =
+			InputHandler::create(content_space.client()?.get_root(), Transform::none(), field)?
+				.queue()?;
+		let root = Spatial::create(input.handler(), Transform::none(), false)?;
+		let content_parent =
+			Spatial::create(input.handler(), Transform::none(), settings.zoneable)?;
 		content_parent.set_relative_transform(content_space, content_transform)?;
 
-		let content_lines = Arc::new(Lines::create(
-			content_parent.as_ref(),
-			Transform::identity(),
-			&[],
-		)?);
-		let root_lines = Lines::create(root.as_ref(), Transform::identity(), &[])?;
+		let content_lines = Lines::create(&content_parent, Transform::identity(), &[])?;
+		let root_lines = Lines::create(&root, Transform::identity(), &[])?;
 
 		let (closest_point_tx, closest_point_rx) = mpsc::channel(1);
 		Ok(Grabbable {
@@ -234,7 +224,7 @@ impl Grabbable {
 	pub fn grab_action(&self) -> &SingleAction {
 		&self.grab_action
 	}
-	pub fn content_parent(&self) -> &Arc<Spatial> {
+	pub fn content_parent(&self) -> &Spatial {
 		&self.content_parent
 	}
 
@@ -312,7 +302,7 @@ impl UIElement for Grabbable {
 			);
 			self.content_parent.set_zoneable(false).unwrap();
 			self.content_parent
-				.set_spatial_parent_in_place(self.root.as_ref())
+				.set_spatial_parent_in_place(&self.root)
 				.unwrap();
 
 			'magnet: {
@@ -327,7 +317,7 @@ impl UIElement for Grabbable {
 					let root = self.root.clone();
 					let closest_point_tx = self.closest_point_tx.clone();
 					tokio::task::spawn(async move {
-						let result = field.closest_point(root.as_ref(), [0.0; 3]).await.unwrap();
+						let result = field.closest_point(&root, [0.0; 3]).await.unwrap();
 						// if let Ok(result) = result {
 						let _ = closest_point_tx.send(result.into()).await;
 						// }

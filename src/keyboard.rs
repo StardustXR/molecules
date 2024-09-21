@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::data::SimplePulseReceiver;
 use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
@@ -67,10 +65,9 @@ pub fn create_keyboard_panel_handler(
 	parent: &impl SpatialRefAspect,
 	transform: Transform,
 	field: &impl FieldAspect,
-	panel: &Arc<PanelItem>,
+	panel: PanelItem,
 	focus: SurfaceId,
 ) -> Result<KeyboardPanelHandler, NodeError> {
-	let panel = panel.clone();
 	SimplePulseReceiver::create(
 		parent,
 		transform,
@@ -89,14 +86,12 @@ async fn keyboard_events() {
 	use stardust_xr_fusion::node::NodeType;
 	let mut client = stardust_xr_fusion::Client::connect().await.unwrap();
 
-	let field = Arc::new(
-		stardust_xr_fusion::fields::Field::create(
-			client.get_root(),
-			Transform::identity(),
-			stardust_xr_fusion::fields::Shape::Sphere(0.1),
-		)
-		.unwrap(),
-	);
+	let field = stardust_xr_fusion::fields::Field::create(
+		client.get_root(),
+		Transform::identity(),
+		stardust_xr_fusion::fields::Shape::Sphere(0.1),
+	)
+	.unwrap();
 
 	let keyboard_event = KeyboardEvent {
 		keyboard: (),
@@ -118,11 +113,11 @@ async fn keyboard_events() {
 				SimplePulseReceiver::create(
 					client.get_root(),
 					Transform::none(),
-					field.as_ref(),
+					&field,
 					move |sender, keyboard_event: KeyboardEvent| {
 						println!(
 							"Pulse sender {} sent {:#?}",
-							sender.node().get_id().unwrap(),
+							sender.node().id(),
 							keyboard_event
 						);
 					},
@@ -136,8 +131,8 @@ async fn keyboard_events() {
 			Some(PulseSenderEvent::NewReceiver { receiver, field }) => {
 				println!(
 					"New pulse receiver {:?} with field {:?}",
-					receiver.node().get_id(),
-					field.node().get_id(),
+					receiver.node().id(),
+					field.node().id(),
 				);
 				receiver.send_data(&pulse_sender, &data).unwrap();
 			}

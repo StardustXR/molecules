@@ -61,10 +61,10 @@ async fn main() {
 	.unwrap();
 	grabbable.set_debug(Some(DebugSettings::default()));
 	model
-		.set_spatial_parent(grabbable.content_parent().as_ref())
+		.set_spatial_parent(grabbable.content_parent())
 		.unwrap();
 	field
-		.set_spatial_parent(grabbable.content_parent().as_ref())
+		.set_spatial_parent(grabbable.content_parent())
 		.unwrap();
 
 	let client_state = client
@@ -90,16 +90,16 @@ async fn main() {
 				Some(RootEvent::Frame { info }) => grabbable.frame(&info),
 				Some(RootEvent::SaveState { response }) => response.wrap(|| {
 					root.set_relative_transform(
-						grabbable.content_parent().as_ref(),
+						grabbable.content_parent(),
 						Transform::from_translation([0.0; 3]),
 					)
 					.unwrap();
 					Ok(ClientState {
 						data: None,
-						root: root.node().get_id().unwrap(),
+						root: root.node().id(),
 						spatial_anchors: [(
 							"content_parent".to_string(),
-							grabbable.content_parent().node().get_id().unwrap(),
+							grabbable.content_parent().node().id(),
 						)]
 						.into_iter()
 						.collect(),
