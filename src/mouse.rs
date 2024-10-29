@@ -77,7 +77,7 @@ async fn mouse_events() {
 	let pulse_sender =
 		PulseSender::create(client.get_root(), Transform::none(), &MOUSE_MASK).unwrap();
 	let mut pulse_receiver = None;
-	let event_loop = client.event_loop(move |client, _flow| {
+	let event_loop = client.sync_event_loop(move |client, _flow| {
 		let pulse_receiver = pulse_receiver.get_or_insert_with({
 			let client = client.clone();
 			let field = field.clone();

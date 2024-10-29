@@ -1,5 +1,5 @@
 use crate::{
-	input_action::{InputQueue, InputQueueable, SingleAction},
+	input_action::{grab_pinch_interact, InputQueue, InputQueueable, SingleAction},
 	lines::{axes, bounding_box, LineExt},
 	FrameSensitive, UIElement, VisualDebug,
 };
@@ -249,12 +249,7 @@ impl UIElement for Grabbable {
 					_ => input.distance < max_distance,
 				}
 			},
-			|data| {
-				data.datamap.with_data(|datamap| match &data.input {
-					InputDataType::Hand(_) => datamap.idx("pinch_strength").as_f32() > 0.90,
-					_ => datamap.idx("grab").as_f32() > 0.90,
-				})
-			},
+			grab_pinch_interact,
 		);
 
 		if self.grab_action.actor_started() {

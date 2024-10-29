@@ -40,7 +40,7 @@ pub trait VisualDebug {
 }
 
 pub trait UIElement {
-	// Handle events, returns true if events were handled (e.g. when input has been updated)
+	/// Handle events, returns true if events were handled (e.g. when input has been updated)
 	fn handle_events(&mut self) -> bool;
 }
 pub trait FrameSensitive {

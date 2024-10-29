@@ -1,150 +1,201 @@
-use crate::data::SimplePulseReceiver;
-use rustc_hash::FxHashSet;
-use serde::{Deserialize, Serialize};
+use rustc_hash::FxHashMap;
 use stardust_xr_fusion::{
-	core::values::Datamap,
-	data::{PulseReceiver, PulseReceiverAspect, PulseSender},
-	fields::FieldAspect,
+	core::schemas::zbus::{self, Connection},
+	fields::Field,
 	items::panel::{PanelItem, PanelItemAspect, SurfaceId},
-	node::NodeError,
-	spatial::{SpatialRefAspect, Transform},
+	objects::{FieldObject, SpatialObject},
+	spatial::Spatial,
+};
+use std::{any::Any, marker::PhantomData};
+use zbus::{
+	message::Header, names::UniqueName, object_server::Interface, zvariant::OwnedObjectPath,
 };
 
-lazy_static::lazy_static! {
-	pub static ref KEYBOARD_MASK: Datamap = Datamap::from_typed(KeyboardEvent::default()).unwrap();
-}
+#[allow(dead_code)]
+pub struct DbusObjectHandles(Box<dyn Any>);
 
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
-pub struct KeyboardEvent {
-	pub keyboard: (),
-	pub xkbv1: (),
-	pub keymap_id: u64,
-	pub keys: FxHashSet<i32>,
-}
-impl KeyboardEvent {
-	pub fn send_event(&self, sender: &PulseSender, receivers: &[&PulseReceiver]) {
-		let data = Datamap::from_typed(self).unwrap();
-		for receiver in receivers.iter() {
-			let _ = receiver.send_data(sender, &data);
-		}
-	}
-
-	// pub fn update_xkb_state(&self, receiver_key_state: &mut State) {
-	// 	if let Some(state) = self.keymap_id.as_ref().and_then(|k| {
-	// 		let ctx = Context::new(CONTEXT_NO_FLAGS);
-	// 		let keymap = Keymap::new_from_string(
-	// 			&ctx,
-	// 			k.clone(),
-	// 			KEYMAP_FORMAT_TEXT_V1,
-	// 			KEYMAP_COMPILE_NO_FLAGS,
-	// 		)?;
-	// 		Some(State::new(&keymap))
-	// 	}) {
-	// 		*receiver_key_state = state;
-	// 	};
-	// 	if let Some(keys_up) = &self.keys {
-	// 		for key_up in keys_up {
-	// 			receiver_key_state.update_key((*key_up).into(), KeyDirection::Up);
-	// 		}
-	// 	}
-	// 	if let Some(keys_down) = &self.keys_down {
-	// 		for key_down in keys_down {
-	// 			receiver_key_state.update_key((*key_down).into(), KeyDirection::Down);
-	// 		}
-	// 	}
-	// }
-
-	pub fn send_to_panel(self, panel: &PanelItem, surface: SurfaceId) -> Result<(), NodeError> {
-		let keys = self.keys.iter().cloned().collect::<Vec<_>>();
-		panel.keyboard_keys(surface, self.keymap_id, &keys)
+pub struct DbusObjectHandle<I: Interface>(Connection, OwnedObjectPath, PhantomData<I>);
+impl<I: Interface> Drop for DbusObjectHandle<I> {
+	fn drop(&mut self) {
+		let connection = self.0.clone();
+		let object_path = self.1.clone();
+		tokio::task::spawn(async move {
+			connection
+				.object_server()
+				.remove::<I, _>(object_path)
+				.await
+				.unwrap();
+		});
 	}
 }
 
-pub type KeyboardPanelHandler = SimplePulseReceiver<KeyboardEvent>;
-pub fn create_keyboard_panel_handler(
-	parent: &impl SpatialRefAspect,
-	transform: Transform,
-	field: &impl FieldAspect,
-	panel: PanelItem,
-	focus: SurfaceId,
-) -> Result<KeyboardPanelHandler, NodeError> {
-	SimplePulseReceiver::create(
-		parent,
-		transform,
+pub struct KeyboardHandler<F: Fn(u64, u32, bool) + Send + Sync + 'static> {
+	keymap_ids: FxHashMap<UniqueName<'static>, u64>,
+	on_key: F,
+}
+impl<F: Fn(u64, u32, bool) + Send + Sync + 'static> KeyboardHandler<F> {
+	pub fn init(
+		connection: Connection,
+		connection_point: Option<&Spatial>,
+		field: &Field,
+		on_key: F,
+	) -> DbusObjectHandles {
+		let path = OwnedObjectPath::try_from(format!(
+			"/{}",
+			nanoid::nanoid!(
+				10,
+				&[
+					'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
+					'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'
+				]
+			)
+		))
+		.unwrap();
+		let path_clone = path.clone();
+
+		let connection_clone = connection.clone();
+		let connection_point = connection_point.cloned();
+		let field = field.clone();
+		tokio::spawn(async move {
+			let task_1 = async {
+				let field_object = FieldObject::new(field.clone()).await.unwrap();
+				connection_clone
+					.object_server()
+					.at(path_clone.clone(), field_object)
+					.await
+					.unwrap();
+			};
+			let task_2 = async {
+				if let Some(spatial) = connection_point {
+					let spatial_object = SpatialObject::new(spatial.clone()).await.unwrap();
+					connection_clone
+						.object_server()
+						.at(path_clone.clone(), spatial_object)
+						.await
+						.unwrap();
+				}
+			};
+			let task_3 = async {
+				connection_clone
+					.object_server()
+					.at(
+						path_clone.clone(),
+						KeyboardHandler {
+							keymap_ids: FxHashMap::default(),
+							on_key,
+						},
+					)
+					.await
+					.unwrap();
+			};
+
+			tokio::join!(task_1, task_2, task_3);
+		});
+
+		DbusObjectHandles(Box::new((
+			DbusObjectHandle::<KeyboardHandler<F>>(connection.clone(), path.clone(), PhantomData),
+			DbusObjectHandle::<SpatialObject>(connection.clone(), path.clone(), PhantomData),
+			DbusObjectHandle::<FieldObject>(connection, path, PhantomData),
+		)))
+	}
+}
+#[zbus::interface(name = "org.stardustxr.XKBv1", proxy())]
+impl<F: Fn(u64, u32, bool) + Send + Sync + 'static> KeyboardHandler<F> {
+	#[zbus(proxy(no_reply))]
+	fn keymap(
+		&mut self,
+		#[zbus(header)] header: Header<'_>,
+		keymap_id: u64,
+	) -> zbus::fdo::Result<()> {
+		let Some(sender) = header.sender() else {
+			return Ok(());
+		};
+		self.keymap_ids.insert(sender.to_owned(), keymap_id);
+		Ok(())
+	}
+	#[zbus(proxy(no_reply))]
+	fn key_state(&mut self, #[zbus(header)] header: Header<'_>, key: u32, pressed: bool) {
+		let Some(sender) = header.sender() else {
+			return;
+		};
+		let Some(keymap_id) = self.keymap_ids.get(sender) else {
+			return;
+		};
+
+		(self.on_key)(*keymap_id, key, pressed)
+	}
+}
+
+pub fn make_keyboard_handler(
+	connection: &Connection,
+	connection_point: Option<&Spatial>,
+	field: &Field,
+	panel_item: PanelItem,
+	surface_id: SurfaceId,
+) -> DbusObjectHandles {
+	KeyboardHandler::init(
+		connection.clone(),
+		connection_point,
 		field,
-		move |_uid, data: KeyboardEvent| {
-			let _ = data.send_to_panel(&panel, focus.clone());
+		move |keymap_id, key, pressed| {
+			let _ = panel_item.keyboard_keys(
+				surface_id.clone(),
+				keymap_id,
+				&[if pressed { key as i32 } else { -(key as i32) }],
+			);
 		},
 	)
 }
 
 #[tokio::test]
-async fn keyboard_events() {
-	use crate::UIElement;
-	use stardust_xr_fusion::data::PulseSenderAspect;
-	use stardust_xr_fusion::data::PulseSenderEvent;
-	use stardust_xr_fusion::node::NodeType;
-	let mut client = stardust_xr_fusion::Client::connect().await.unwrap();
+async fn keyboard() {
+	use stardust_xr_fusion::objects::*;
+	use stardust_xr_fusion::spatial::*;
+	use zbus::names::OwnedInterfaceName;
 
-	let field = stardust_xr_fusion::fields::Field::create(
+	let mut client = stardust_xr_fusion::client::Client::connect().await.unwrap();
+
+	let field = Field::create(
 		client.get_root(),
 		Transform::identity(),
-		stardust_xr_fusion::fields::Shape::Sphere(0.1),
+		stardust_xr_fusion::fields::Shape::Sphere(1.0),
 	)
 	.unwrap();
 
-	let keyboard_event = KeyboardEvent {
-		keyboard: (),
-		xkbv1: (),
-		keymap_id: 0,
-		keys: [1, -1].into_iter().collect(),
-	};
-	let pulse_sender =
-		PulseSender::create(client.get_root(), Transform::none(), &KEYBOARD_MASK).unwrap();
+	let connection = connect_client().await.unwrap();
 
-	let mut pulse_receiver = None;
-	let data = Datamap::from_typed(keyboard_event.clone()).unwrap();
+	let _keyboard_objects = KeyboardHandler::init(
+		connection.clone(),
+		None,
+		&field,
+		move |keymap_id, key, pressed| {
+			println!("key pressed");
+			assert_eq!(keymap_id, 20);
+			assert_eq!(key, 10);
+			assert!(pressed);
+			std::process::exit(0);
+		},
+	);
 
-	let event_loop = client.event_loop(move |client, _flow| {
-		let pulse_receiver = pulse_receiver.get_or_insert_with({
-			let client = client.clone();
-			let field = field.clone();
-			move || {
-				SimplePulseReceiver::create(
-					client.get_root(),
-					Transform::none(),
-					&field,
-					move |sender, keyboard_event: KeyboardEvent| {
-						println!(
-							"Pulse sender {} sent {:#?}",
-							sender.node().id(),
-							keyboard_event
-						);
-					},
-				)
-				.unwrap()
-			}
-		});
-		pulse_receiver.handle_events();
-
-		match pulse_sender.recv_pulse_sender_event() {
-			Some(PulseSenderEvent::NewReceiver { receiver, field }) => {
-				println!(
-					"New pulse receiver {:?} with field {:?}",
-					receiver.node().id(),
-					field.node().id(),
-				);
-				receiver.send_data(&pulse_sender, &data).unwrap();
-			}
-			Some(PulseSenderEvent::DropReceiver { id }) => {
-				println!("Pulse receiver {} dropped", id);
-			}
-			_ => (),
-		}
-	});
-
-	tokio::time::timeout(core::time::Duration::from_secs(60), event_loop)
+	let object_registry = object_registry::ObjectRegistry::new(&connection)
 		.await
-		.unwrap()
-		.unwrap()
+		.unwrap();
+
+	// dbg!(&*object_registry.get_watch().borrow());
+
+	for object in
+		object_registry.get_objects(&OwnedInterfaceName::try_from("org.stardustxr.XKBv1").unwrap())
+	{
+		dbg!(&object);
+		let connection = connection.clone();
+		tokio::task::spawn(async move {
+			let keyboard_handler = object
+				.to_typed_proxy::<KeyboardHandlerProxy>(&connection)
+				.await
+				.unwrap();
+			keyboard_handler.keymap(20).await.unwrap();
+			keyboard_handler.key_state(10, true).await.unwrap();
+		});
+	}
+	let _ = client.sync_event_loop(|_, _| {}).await;
 }

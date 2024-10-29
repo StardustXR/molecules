@@ -1,4 +1,5 @@
 mod single_action;
+use glam::Vec3;
 pub use single_action::*;
 mod simple_action;
 pub use simple_action::*;
@@ -8,10 +9,11 @@ pub use multi_action::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use stardust_xr_fusion::{
 	input::{
-		InputData, InputHandler, InputHandlerAspect, InputHandlerEvent, InputMethodRef,
-		InputMethodRefAspect,
+		InputData, InputDataType, InputHandler, InputHandlerAspect, InputHandlerEvent,
+		InputMethodRef, InputMethodRefAspect, Pointer,
 	},
 	node::NodeResult,
+	values::Vector3,
 };
 use std::{
 	fmt::{Debug, Formatter, Result},
@@ -106,5 +108,31 @@ impl<T: Clone + Hash + Eq> DeltaSet<T> {
 	}
 	pub fn removed(&self) -> &FxHashSet<T> {
 		&self.removed
+	}
+}
+
+pub fn grab_pinch_interact(data: &InputData) -> bool {
+	data.datamap.with_data(|datamap| match &data.input {
+		InputDataType::Hand(_) => datamap.idx("pinch_strength").as_f32() > 0.90,
+		_ => datamap.idx("grab").as_f32() > 0.90,
+	})
+}
+pub fn select_pinch_interact(data: &InputData) -> bool {
+	data.datamap.with_data(|datamap| match &data.input {
+		InputDataType::Hand(_) => datamap.idx("pinch_strength").as_f32() > 0.90,
+		_ => datamap.idx("select").as_f32() > 0.90,
+	})
+}
+
+pub trait PointerExt {
+	fn intersect_plane(&self, normal: Vector3<f32>) -> Vector3<f32>;
+}
+impl PointerExt for Pointer {
+	fn intersect_plane(&self, normal: Vector3<f32>) -> Vector3<f32> {
+		let normal: Vec3 = normal.into();
+		let denom = normal.dot(self.direction().into());
+		let t = -Vec3::from(self.origin).dot(normal) / denom;
+		let p = Vec3::from(self.origin) + Vec3::from(self.direction()) * t;
+		p.into()
 	}
 }

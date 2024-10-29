@@ -34,7 +34,7 @@ async fn main() {
 	.unwrap();
 
 	let bounds = client
-		.with_event_loop(model.get_relative_bounding_box(client_handle.get_root()))
+		.await_method(model.get_relative_bounding_box(client_handle.get_root()))
 		.await
 		.unwrap()
 		.unwrap();
@@ -68,7 +68,7 @@ async fn main() {
 		.unwrap();
 
 	let client_state = client
-		.with_event_loop(client.handle().get_root().get_state())
+		.await_method(client.handle().get_root().get_state())
 		.await
 		.unwrap()
 		.unwrap();
@@ -84,7 +84,7 @@ async fn main() {
 	}
 
 	client
-		.event_loop(|client, _flow| {
+		.sync_event_loop(|client, _flow| {
 			grabbable.handle_events();
 			match client.get_root().recv_root_event() {
 				Some(RootEvent::Frame { info }) => grabbable.frame(&info),

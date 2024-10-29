@@ -63,7 +63,7 @@ async fn main() {
 	)
 	.unwrap();
 	client
-		.event_loop(|client, _flow| {
+		.sync_event_loop(|client, _flow| {
 			if let Some(RootEvent::SaveState { response }) = client.get_root().recv_root_event() {
 				response
 					.wrap(|| ClientState::from_data_root(None::<()>, button.touch_plane().root()))

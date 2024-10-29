@@ -32,7 +32,7 @@ async fn main() {
 	let touch_visualizer = Lines::create(touch_plane.root(), Transform::identity(), &[]).unwrap();
 
 	client
-		.event_loop(|_client, _flow| {
+		.sync_event_loop(|_client, _flow| {
 			if touch_plane.handle_events() {
 				let mut lines = Vec::new();
 				for input in touch_plane.action().interact().current() {

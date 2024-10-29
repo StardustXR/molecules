@@ -48,7 +48,7 @@ async fn main() {
 	.unwrap();
 
 	client
-		.event_loop(|client, _flow| {
+		.sync_event_loop(|client, _flow| {
 			hover_plane.update();
 			if hover_plane.interact_status().actor_started() {
 				text.set_text("Pressed").unwrap();
