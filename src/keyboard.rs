@@ -3,7 +3,7 @@ use stardust_xr_fusion::{
 	core::schemas::zbus::{self, Connection},
 	fields::Field,
 	items::panel::{PanelItem, PanelItemAspect, SurfaceId},
-	objects::{FieldObject, SpatialObject},
+	objects::{random_object_name, FieldObject, SpatialObject},
 	spatial::Spatial,
 };
 use std::{any::Any, marker::PhantomData};
@@ -40,17 +40,7 @@ impl<F: Fn(u64, u32, bool) + Send + Sync + 'static> KeyboardHandler<F> {
 		field: &Field,
 		on_key: F,
 	) -> DbusObjectHandles {
-		let path = OwnedObjectPath::try_from(format!(
-			"/{}",
-			nanoid::nanoid!(
-				10,
-				&[
-					'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
-					'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'
-				]
-			)
-		))
-		.unwrap();
+		let path = random_object_name();
 		let path_clone = path.clone();
 
 		let connection_clone = connection.clone();
