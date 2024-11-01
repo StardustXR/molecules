@@ -1,3 +1,4 @@
+use crate::dbus::{DbusObjectHandle, DbusObjectHandles};
 use rustc_hash::FxHashMap;
 use stardust_xr_fusion::{
 	core::schemas::zbus::{self, Connection},
@@ -6,35 +7,15 @@ use stardust_xr_fusion::{
 	objects::{random_object_name, FieldObject, SpatialObject},
 	spatial::Spatial,
 };
-use std::{any::Any, marker::PhantomData};
-use zbus::{
-	message::Header, names::UniqueName, object_server::Interface, zvariant::OwnedObjectPath,
-};
+use std::marker::PhantomData;
+use zbus::{message::Header, names::UniqueName};
 
-#[allow(dead_code)]
-pub struct DbusObjectHandles(Box<dyn Any>);
-
-pub struct DbusObjectHandle<I: Interface>(Connection, OwnedObjectPath, PhantomData<I>);
-impl<I: Interface> Drop for DbusObjectHandle<I> {
-	fn drop(&mut self) {
-		let connection = self.0.clone();
-		let object_path = self.1.clone();
-		tokio::task::spawn(async move {
-			connection
-				.object_server()
-				.remove::<I, _>(object_path)
-				.await
-				.unwrap();
-		});
-	}
-}
-
-pub struct KeyboardHandler<F: Fn(u64, u32, bool) + Send + Sync + 'static> {
+pub struct KeyboardHandler {
 	keymap_ids: FxHashMap<UniqueName<'static>, u64>,
-	on_key: F,
+	on_key: Box<dyn Fn(u64, u32, bool) + Send + Sync + 'static>,
 }
-impl<F: Fn(u64, u32, bool) + Send + Sync + 'static> KeyboardHandler<F> {
-	pub fn init(
+impl KeyboardHandler {
+	pub fn init<F: Fn(u64, u32, bool) + Send + Sync + 'static>(
 		connection: Connection,
 		connection_point: Option<&Spatial>,
 		field: &Field,
@@ -72,7 +53,7 @@ impl<F: Fn(u64, u32, bool) + Send + Sync + 'static> KeyboardHandler<F> {
 						path_clone.clone(),
 						KeyboardHandler {
 							keymap_ids: FxHashMap::default(),
-							on_key,
+							on_key: Box::new(on_key),
 						},
 					)
 					.await
@@ -83,14 +64,14 @@ impl<F: Fn(u64, u32, bool) + Send + Sync + 'static> KeyboardHandler<F> {
 		});
 
 		DbusObjectHandles(Box::new((
-			DbusObjectHandle::<KeyboardHandler<F>>(connection.clone(), path.clone(), PhantomData),
+			DbusObjectHandle::<KeyboardHandler>(connection.clone(), path.clone(), PhantomData),
 			DbusObjectHandle::<SpatialObject>(connection.clone(), path.clone(), PhantomData),
 			DbusObjectHandle::<FieldObject>(connection, path, PhantomData),
 		)))
 	}
 }
 #[zbus::interface(name = "org.stardustxr.XKBv1", proxy())]
-impl<F: Fn(u64, u32, bool) + Send + Sync + 'static> KeyboardHandler<F> {
+impl KeyboardHandler {
 	#[zbus(proxy(no_reply))]
 	fn keymap(
 		&mut self,
@@ -170,8 +151,6 @@ async fn keyboard() {
 	let object_registry = object_registry::ObjectRegistry::new(&connection)
 		.await
 		.unwrap();
-
-	// dbg!(&*object_registry.get_watch().borrow());
 
 	for object in
 		object_registry.get_objects(&OwnedInterfaceName::try_from("org.stardustxr.XKBv1").unwrap())
