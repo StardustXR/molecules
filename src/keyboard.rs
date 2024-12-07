@@ -4,36 +4,41 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use stardust_xr_fusion::{
 	core::schemas::zbus::{self, Connection},
 	fields::Field,
-	items::panel::{PanelItem, PanelItemAspect, SurfaceId},
 	objects::{random_object_name, FieldObject, SpatialObject},
 	spatial::Spatial,
 };
 use std::marker::PhantomData;
+use tokio::sync::mpsc;
 use zbus::{
 	fdo,
 	message::Header,
 	names::{BusName, UniqueName},
 };
 
-pub struct KeyboardHandler {
-	keymap_ids: FxHashMap<UniqueName<'static>, u64>,
-	pressed_keys: FxHashMap<UniqueName<'static>, FxHashSet<u32>>,
-	on_key: Box<dyn Fn(u64, u32, bool) + Send + Sync + 'static>,
+pub struct KeypressInfo {
+	pub key: u32,
+	pub pressed: bool,
+	pub keymap_id: u64,
 }
 
+pub struct KeyboardHandler {
+	pub key_rx: mpsc::UnboundedReceiver<KeypressInfo>,
+	_object_handles: DbusObjectHandles,
+}
 impl KeyboardHandler {
-	pub fn init<F: Fn(u64, u32, bool) + Send + Sync + 'static>(
+	pub fn create(
 		connection: Connection,
 		connection_point: Option<&Spatial>,
 		field: &Field,
-		on_key: F,
-	) -> DbusObjectHandles {
+	) -> Self {
 		let path = random_object_name();
 
-		let handler = KeyboardHandler {
+		let (key_tx, key_rx) = mpsc::unbounded_channel::<KeypressInfo>();
+
+		let handler = KeyboardHandlerInner {
 			keymap_ids: FxHashMap::default(),
 			pressed_keys: FxHashMap::default(),
-			on_key: Box::new(on_key),
+			key_tx,
 		};
 
 		let abort_handle = tokio::spawn({
@@ -86,7 +91,7 @@ impl KeyboardHandler {
 						};
 						let Ok(keyboard_handler) = connection
 							.object_server()
-							.interface::<_, KeyboardHandler>(&path)
+							.interface::<_, KeyboardHandlerInner>(&path)
 							.await
 						else {
 							continue;
@@ -98,14 +103,27 @@ impl KeyboardHandler {
 		})
 		.abort_handle();
 
-		DbusObjectHandles(Box::new((
+		let _object_handles = DbusObjectHandles(Box::new((
 			AbortOnDrop(abort_handle),
-			DbusObjectHandle::<KeyboardHandler>(connection.clone(), path.clone(), PhantomData),
+			DbusObjectHandle::<KeyboardHandlerInner>(connection.clone(), path.clone(), PhantomData),
 			DbusObjectHandle::<SpatialObject>(connection.clone(), path.clone(), PhantomData),
 			DbusObjectHandle::<FieldObject>(connection, path, PhantomData),
-		)))
-	}
+		)));
 
+		KeyboardHandler {
+			key_rx,
+			_object_handles,
+		}
+	}
+}
+
+pub struct KeyboardHandlerInner {
+	keymap_ids: FxHashMap<UniqueName<'static>, u64>,
+	pressed_keys: FxHashMap<UniqueName<'static>, FxHashSet<u32>>,
+	key_tx: mpsc::UnboundedSender<KeypressInfo>,
+}
+
+impl KeyboardHandlerInner {
 	fn reset_keys(&mut self, sender: UniqueName<'static>) {
 		let Some(keymap_id) = self.keymap_ids.remove(&sender) else {
 			return;
@@ -114,13 +132,20 @@ impl KeyboardHandler {
 			return;
 		};
 		for key in keys {
-			(self.on_key)(keymap_id, key, false);
+			let _ = self.key_tx.send(KeypressInfo {
+				key,
+				pressed: false,
+				keymap_id,
+			});
 		}
 	}
 }
 
-#[zbus::interface(name = "org.stardustxr.XKBv1", proxy())]
-impl KeyboardHandler {
+#[zbus::interface(
+	name = "org.stardustxr.XKBv1",
+	proxy(async_name = "KeyboardHandlerProxy")
+)]
+impl KeyboardHandlerInner {
 	#[zbus(proxy(no_reply))]
 	fn keymap(
 		&mut self,
@@ -141,7 +166,7 @@ impl KeyboardHandler {
 			return;
 		};
 		let sender = sender.to_owned();
-		let Some(keymap_id) = self.keymap_ids.get(&sender) else {
+		let Some(keymap_id) = self.keymap_ids.get(&sender).cloned() else {
 			return;
 		};
 
@@ -152,7 +177,11 @@ impl KeyboardHandler {
 			sender_entry.remove(&key);
 		}
 
-		(self.on_key)(*keymap_id, key, pressed)
+		let _ = self.key_tx.send(KeypressInfo {
+			key,
+			pressed,
+			keymap_id,
+		});
 	}
 
 	#[zbus(proxy(no_reply))]
@@ -165,61 +194,25 @@ impl KeyboardHandler {
 	}
 }
 
-pub fn make_keyboard_handler(
-	connection: &Connection,
-	connection_point: Option<&Spatial>,
-	field: &Field,
-	panel_item: PanelItem,
-	surface_id: SurfaceId,
-) -> DbusObjectHandles {
-	KeyboardHandler::init(
-		connection.clone(),
-		connection_point,
-		field,
-		move |keymap_id, key, pressed| {
-			let _ = panel_item.keyboard_keys(
-				surface_id.clone(),
-				keymap_id,
-				&[if pressed { key as i32 } else { -(key as i32) }],
-			);
-		},
-	)
-}
-
 #[tokio::test]
 async fn keyboard() {
 	use stardust_xr_fusion::objects::*;
 	use stardust_xr_fusion::spatial::*;
 	use zbus::names::OwnedInterfaceName;
 
-	let mut client = stardust_xr_fusion::client::Client::connect().await.unwrap();
+	let client = stardust_xr_fusion::client::Client::connect().await.unwrap();
+	let root = client.get_root().clone();
+	let async_loop = client.async_event_loop();
 
 	let field = Field::create(
-		client.get_root(),
+		&root,
 		Transform::identity(),
 		stardust_xr_fusion::fields::Shape::Sphere(1.0),
 	)
 	.unwrap();
 
-	let pressed_notifier = std::sync::Arc::new(tokio::sync::Notify::new());
-	let _object_keyboard_handler =
-		KeyboardHandler::init(connect_client().await.unwrap(), None, &field, {
-			let pressed_notifier = pressed_notifier.clone();
-			move |keymap_id, key, pressed| {
-				if pressed {
-					println!("key {key} pressed")
-				} else {
-					println!("key {key} unpressed")
-				};
-				assert_eq!(keymap_id, 20);
-				assert_eq!(key, 10);
-				if pressed {
-					pressed_notifier.notify_waiters();
-				} else {
-					std::process::exit(0);
-				}
-			}
-		});
+	let mut object_keyboard_handler =
+		KeyboardHandler::create(connect_client().await.unwrap(), None, &field);
 
 	let connection = connect_client().await.unwrap();
 	let object_registry = object_registry::ObjectRegistry::new(&connection)
@@ -240,9 +233,31 @@ async fn keyboard() {
 			keyboard_handler.key_state(10, true).await.unwrap();
 		});
 	}
-	pressed_notifier.notified().await;
+
+	while let Ok(key_info) = object_keyboard_handler.key_rx.try_recv() {
+		if key_info.pressed {
+			println!("key {} pressed", key_info.key)
+		} else {
+			println!("key {} unpressed", key_info.key)
+		}
+		assert!(key_info.pressed);
+		assert_eq!(key_info.keymap_id, 20);
+		assert_eq!(key_info.key, 10);
+	}
+
 	drop(object_registry);
 	drop(connection);
 	println!("dropped object keyboard handler");
-	let _ = client.sync_event_loop(|_, _| {}).await;
+
+	while let Ok(key_info) = object_keyboard_handler.key_rx.try_recv() {
+		if key_info.pressed {
+			println!("key {} pressed", key_info.key)
+		} else {
+			println!("key {} unpressed", key_info.key)
+		}
+		assert_eq!(key_info.keymap_id, 20);
+		assert_eq!(key_info.key, 10);
+		assert!(!key_info.pressed);
+	}
+	async_loop.stop().await.unwrap();
 }
