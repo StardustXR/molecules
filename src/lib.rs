@@ -1,5 +1,4 @@
 pub mod button;
-pub mod data;
 pub mod dbus;
 mod exposure;
 mod grabbable;

@@ -8,7 +8,6 @@ use stardust_xr_fusion::{
 };
 use stardust_xr_molecules::{
 	button::{Button, ButtonSettings},
-	data::SimplePulseReceiver,
 	DebugSettings, UIElement, VisualDebug,
 };
 use std::f32::consts::PI;
@@ -38,18 +37,6 @@ async fn main() {
 	.unwrap();
 	button.set_debug(Some(DebugSettings::default()));
 
-	let mut receiver = SimplePulseReceiver::create(
-		button.touch_plane().root(),
-		Transform::none(),
-		button.touch_plane().field(),
-		|_uid, data: ButtonAction| {
-			if data.press {
-				dbg!(data);
-			}
-		},
-	)
-	.unwrap();
-
 	let text = Text::create(
 		button.touch_plane().root(),
 		Transform::from_translation_rotation([0.0, -0.06, 0.0], Quat::from_rotation_y(PI)),
@@ -69,7 +56,6 @@ async fn main() {
 					.wrap(|| ClientState::from_data_root(None::<()>, button.touch_plane().root()))
 			}
 
-			receiver.handle_events();
 			button.handle_events();
 			if button.pressed() {
 				text.set_text("Pressed").unwrap();
