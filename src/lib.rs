@@ -10,6 +10,7 @@ pub mod mouse;
 pub mod multi;
 pub mod state_machine;
 pub mod touch_plane;
+pub mod tracked;
 
 pub use exposure::*;
 pub use grabbable::*;
