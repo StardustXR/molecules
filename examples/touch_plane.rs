@@ -2,6 +2,7 @@ use glam::{Quat, Vec3};
 use stardust_xr_fusion::{
 	client::Client,
 	drawable::{Lines, LinesAspect},
+	root::{RootAspect, RootEvent},
 	spatial::{Spatial, Transform},
 };
 use stardust_xr_molecules::{
@@ -32,7 +33,14 @@ async fn main() {
 	let touch_visualizer = Lines::create(touch_plane.root(), Transform::identity(), &[]).unwrap();
 
 	client
-		.sync_event_loop(|_client, _flow| {
+		.sync_event_loop(|client, _flow| {
+			while let Some(root_event) = client.get_root().recv_root_event() {
+				match root_event {
+					RootEvent::Ping { response } => response.send(Ok(())),
+					_ => (),
+				}
+			}
+
 			if touch_plane.handle_events() {
 				let mut lines = Vec::new();
 				for input in touch_plane.action().interact().current() {

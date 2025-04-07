@@ -56,8 +56,14 @@ async fn main() {
 			if hover_plane.interact_status().actor_stopped() {
 				text.set_text("Unpressed").unwrap();
 			}
-			if let Some(RootEvent::SaveState { response }) = client.get_root().recv_root_event() {
-				response.wrap(|| Ok(ClientState::default()))
+
+			while let Some(root_event) = client.get_root().recv_root_event() {
+				match root_event {
+					RootEvent::Ping { response } => response.send(Ok(())),
+					RootEvent::SaveState { response } => response
+						.wrap(|| ClientState::from_data_root(None::<()>, hover_plane.root())),
+					_ => (),
+				}
 			}
 		})
 		.await

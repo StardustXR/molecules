@@ -29,7 +29,11 @@ impl MultiAction {
 			// but not if it started hovering at the same time (this means it just got "focus")
 			.filter(|i| !self.hover.added.contains(*i))
 		{
-			queue.request_capture(input);
+			queue.start_capture(input);
+		}
+		// release capture/stop trying to caoture when stopped interacting
+		for input in self.interact_condition.stopped_acting() {
+			queue.release_capture(input);
 		}
 		let interacting_inputs = self
 			.interact_condition
@@ -38,10 +42,7 @@ impl MultiAction {
 			.filter(|k| k.captured)
 			.cloned()
 			.collect::<Vec<_>>();
-		// keep capturing when interacting and already captured
-		for input in &interacting_inputs {
-			queue.request_capture(input);
-		}
+
 		// only something that's been captured can count as interactable to ensure a valid interaction
 		self.interact.push_new(interacting_inputs.into_iter());
 

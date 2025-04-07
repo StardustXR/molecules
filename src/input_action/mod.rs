@@ -44,12 +44,19 @@ impl InputQueue {
 	pub fn input(&self) -> FxHashMap<Arc<InputData>, &InputMethodRef> {
 		FxHashMap::from_iter(self.input.iter().map(|(i, m)| (i.clone(), m)))
 	}
-	pub fn request_capture(&self, data: &Arc<InputData>) {
+	pub fn start_capture(&self, data: &Arc<InputData>) {
 		let input = self.input();
 		let Some(method) = input.get(data) else {
 			return;
 		};
-		let _ = method.request_capture(self.handler());
+		let _ = method.try_capture(self.handler());
+	}
+	pub fn release_capture(&self, data: &Arc<InputData>) {
+		let input = self.input();
+		let Some(method) = input.get(data) else {
+			return;
+		};
+		let _ = method.release(self.handler());
 	}
 
 	// check this as often as possible, will return true when input has been updated

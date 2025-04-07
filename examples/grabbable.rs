@@ -86,27 +86,29 @@ async fn main() {
 	client
 		.sync_event_loop(|client, _flow| {
 			grabbable.handle_events();
-			match client.get_root().recv_root_event() {
-				Some(RootEvent::Frame { info }) => grabbable.frame(&info),
-				Some(RootEvent::SaveState { response }) => response.wrap(|| {
-					root.set_relative_transform(
-						grabbable.content_parent(),
-						Transform::from_translation([0.0; 3]),
-					)
-					.unwrap();
-					Ok(ClientState {
-						data: None,
-						root: root.node().id(),
-						spatial_anchors: [(
-							"content_parent".to_string(),
-							grabbable.content_parent().node().id(),
-						)]
-						.into_iter()
-						.collect(),
-					})
-				}),
-				_ => (),
-			};
+			while let Some(root_event) = client.get_root().recv_root_event() {
+				match root_event {
+					RootEvent::Frame { info } => grabbable.frame(&info),
+					RootEvent::SaveState { response } => response.wrap(|| {
+						root.set_relative_transform(
+							grabbable.content_parent(),
+							Transform::from_translation([0.0; 3]),
+						)
+						.unwrap();
+						Ok(ClientState {
+							data: None,
+							root: root.node().id(),
+							spatial_anchors: [(
+								"content_parent".to_string(),
+								grabbable.content_parent().node().id(),
+							)]
+							.into_iter()
+							.collect(),
+						})
+					}),
+					RootEvent::Ping { response } => response.send(Ok(())),
+				}
+			}
 		})
 		.await
 		.unwrap()
