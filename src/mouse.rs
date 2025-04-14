@@ -10,17 +10,17 @@ use std::marker::PhantomData;
 use zbus::{message::Header, names::OwnedUniqueName};
 
 pub struct MouseHandler {
-	on_button: Box<dyn Fn(OwnedUniqueName, u32, bool) + Send + Sync + 'static>,
-	on_motion: Box<dyn Fn(OwnedUniqueName, Vector2<f32>) + Send + Sync + 'static>,
-	on_scroll_discrete: Box<dyn Fn(OwnedUniqueName, Vector2<f32>) + Send + Sync + 'static>,
-	on_scroll_continuous: Box<dyn Fn(OwnedUniqueName, Vector2<f32>) + Send + Sync + 'static>,
+	on_button: Box<dyn FnMut(OwnedUniqueName, u32, bool) + Send + Sync + 'static>,
+	on_motion: Box<dyn FnMut(OwnedUniqueName, Vector2<f32>) + Send + Sync + 'static>,
+	on_scroll_discrete: Box<dyn FnMut(OwnedUniqueName, Vector2<f32>) + Send + Sync + 'static>,
+	on_scroll_continuous: Box<dyn FnMut(OwnedUniqueName, Vector2<f32>) + Send + Sync + 'static>,
 }
 impl MouseHandler {
 	pub fn init<
-		BtnHandler: Fn(OwnedUniqueName, u32, bool) + Send + Sync + 'static,
-		MotionHandler: Fn(OwnedUniqueName, Vector2<f32>) + Send + Sync + 'static,
-		ScrollDiscreteHandler: Fn(OwnedUniqueName, Vector2<f32>) + Send + Sync + 'static,
-		ScrollContinuousHandler: Fn(OwnedUniqueName, Vector2<f32>) + Send + Sync + 'static,
+		BtnHandler: FnMut(OwnedUniqueName, u32, bool) + Send + Sync + 'static,
+		MotionHandler: FnMut(OwnedUniqueName, Vector2<f32>) + Send + Sync + 'static,
+		ScrollDiscreteHandler: FnMut(OwnedUniqueName, Vector2<f32>) + Send + Sync + 'static,
+		ScrollContinuousHandler: FnMut(OwnedUniqueName, Vector2<f32>) + Send + Sync + 'static,
 	>(
 		connection: Connection,
 		connection_point: Option<&Spatial>,
@@ -114,60 +114,92 @@ impl MouseHandler {
 }
 
 #[tokio::test]
-async fn mouse() {
+async fn mouse_receive() {
 	use stardust_xr_fusion::objects::*;
 	use stardust_xr_fusion::spatial::*;
-	use zbus::names::OwnedInterfaceName;
+	use tokio::sync::mpsc;
 
-	let mut client = stardust_xr_fusion::client::Client::connect().await.unwrap();
+	let client = stardust_xr_fusion::client::Client::connect().await.unwrap();
+	let root = client.get_root().clone();
+	let async_event_loop = client.async_event_loop();
 
 	let field = Field::create(
-		client.get_root(),
+		&root,
 		Transform::identity(),
 		stardust_xr_fusion::fields::Shape::Sphere(1.0),
 	)
 	.unwrap();
 
-	let connection = connect_client().await.unwrap();
+	async_event_loop.get_event_handle().wait().await;
+	let (button_tx, mut button_rx) = mpsc::unbounded_channel();
+	let (motion_tx, mut motion_rx) = mpsc::unbounded_channel();
+	let (scroll_discrete_tx, mut scroll_discrete_rx) = mpsc::unbounded_channel();
+	let (scroll_continuous_tx, mut scroll_continuous_rx) = mpsc::unbounded_channel();
 
+	println!("Creating mouse handler...");
 	let _mouse_objects = MouseHandler::init(
-		connection.clone(),
+		connect_client().await.unwrap(),
 		None,
 		&field,
-		move |mouse_id, button, pressed| {
-			println!("button pressed");
-			dbg!(mouse_id);
-			assert_eq!(button, 10);
-			assert!(pressed);
-			std::process::exit(0);
+		move |sender, button, pressed| {
+			button_tx.send((sender, button, pressed)).unwrap();
 		},
-		move |mouse_id, motion| {
-			println!("motion");
-			dbg!(mouse_id);
-			assert_eq!(motion, [1.0, 2.0].into());
+		move |sender, motion| {
+			motion_tx.send((sender, motion)).unwrap();
 		},
-		move |mouse_id, scroll| {
-			println!("discrete scroll");
-			dbg!(mouse_id);
-			assert_eq!(scroll, [0.5, 1.0].into());
+		move |sender, scroll| {
+			scroll_discrete_tx.send((sender, scroll)).unwrap();
 		},
-		move |mouse_id, scroll| {
-			println!("continuous scroll");
-			dbg!(mouse_id);
-			assert_eq!(scroll, [0.1, 0.2].into());
+		move |sender, scroll| {
+			scroll_continuous_tx.send((sender, scroll)).unwrap();
 		},
 	);
 
+	println!("Waiting for event loop...");
+	async_event_loop.get_event_handle().wait().await;
+
+	println!("Receiving motion info...");
+	let (_, motion) = motion_rx.recv().await.unwrap();
+	assert_eq!(motion, [1.0, 2.0].into());
+
+	println!("Receiving scroll discrete info...");
+	let (_, scroll) = scroll_discrete_rx.recv().await.unwrap();
+	assert_eq!(scroll, [0.5, 1.0].into());
+
+	println!("Receiving scroll continuous info...");
+	let (_, scroll) = scroll_continuous_rx.recv().await.unwrap();
+	assert_eq!(scroll, [0.1, 0.2].into());
+
+	println!("Receiving button info...");
+	let (_, button, pressed) =
+		tokio::time::timeout(std::time::Duration::from_secs(3), button_rx.recv())
+			.await
+			.expect("Test timed out waiting for button event - likely hang detected")
+			.expect("Channel was closed unexpectedly");
+	assert_eq!(button, 10);
+	assert!(pressed);
+}
+
+#[tokio::test]
+async fn mouse_send() {
+	use stardust_xr_fusion::objects::*;
+	use zbus::names::OwnedInterfaceName;
+
+	let client = stardust_xr_fusion::client::Client::connect().await.unwrap();
+	let async_loop = client.async_event_loop();
+
+	let connection = connect_client().await.unwrap();
 	let object_registry = object_registry::ObjectRegistry::new(&connection)
 		.await
 		.unwrap();
 
-	for object in object_registry
-		.get_objects(&OwnedInterfaceName::try_from("org.stardustxr.Mousev1").unwrap())
-	{
-		dbg!(&object);
+	let objects = object_registry
+		.get_objects(&OwnedInterfaceName::try_from("org.stardustxr.Mousev1").unwrap());
+	dbg!(&objects);
+	let mut join_set = tokio::task::JoinSet::new();
+	for object in objects {
 		let connection = connection.clone();
-		tokio::task::spawn(async move {
+		join_set.spawn(async move {
 			let mouse_handler = object
 				.to_typed_proxy::<MouseHandlerProxy>(&connection)
 				.await
@@ -178,5 +210,9 @@ async fn mouse() {
 			mouse_handler.button(10, true).await.unwrap();
 		});
 	}
-	let _ = client.sync_event_loop(|_, _| {}).await;
+	while let Some(result) = join_set.join_next().await {
+		result.unwrap();
+	}
+
+	async_loop.stop().await.unwrap();
 }
