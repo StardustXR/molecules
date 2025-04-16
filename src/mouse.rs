@@ -4,15 +4,16 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use stardust_xr_fusion::{
 	core::schemas::zbus::{self, Connection},
 	fields::Field,
-	objects::{random_object_name, FieldObject, SpatialObject},
+	objects::{FieldObject, SpatialObject},
 	spatial::Spatial,
 	values::Vector2,
 };
-use std::marker::PhantomData;
+use std::{marker::PhantomData, path::Path};
 use zbus::{
 	fdo,
 	message::Header,
 	names::{BusName, UniqueName},
+	zvariant::OwnedObjectPath,
 };
 
 pub struct MouseHandler {
@@ -23,13 +24,15 @@ pub struct MouseHandler {
 	on_scroll_continuous: Box<dyn FnMut(Vector2<f32>) + Send + Sync + 'static>,
 }
 impl MouseHandler {
-	pub fn init<
+	#[allow(clippy::too_many_arguments)]
+	pub fn create<
 		BtnHandler: FnMut(u32, bool) + Send + Sync + 'static,
 		MotionHandler: FnMut(Vector2<f32>) + Send + Sync + 'static,
 		ScrollDiscreteHandler: FnMut(Vector2<f32>) + Send + Sync + 'static,
 		ScrollContinuousHandler: FnMut(Vector2<f32>) + Send + Sync + 'static,
 	>(
 		connection: Connection,
+		path: impl AsRef<Path>,
 		connection_point: Option<&Spatial>,
 		field: &Field,
 		on_button: BtnHandler,
@@ -37,9 +40,7 @@ impl MouseHandler {
 		on_scroll_discrete: ScrollDiscreteHandler,
 		on_scroll_continuous: ScrollContinuousHandler,
 	) -> DbusObjectHandles {
-		let path = random_object_name();
-		let path_clone = path.clone();
-
+		let path: OwnedObjectPath = path.as_ref().to_str().unwrap().try_into().unwrap();
 		let handler = MouseHandler {
 			pressed_buttons: FxHashMap::default(),
 			on_button: Box::new(on_button),
@@ -50,7 +51,7 @@ impl MouseHandler {
 
 		let abort_handle = tokio::spawn({
 			let connection = connection.clone();
-			let path = path_clone.clone();
+			let path = path.clone();
 			let connection_point = connection_point.cloned();
 			let field = field.clone();
 
@@ -169,8 +170,9 @@ async fn mouse_receive() {
 	let (scroll_continuous_tx, mut scroll_continuous_rx) = mpsc::unbounded_channel();
 
 	println!("Creating mouse handler...");
-	let _mouse_objects = MouseHandler::init(
+	let _mouse_objects = MouseHandler::create(
 		connect_client().await.unwrap(),
+		"/mouse_test",
 		None,
 		&field,
 		move |button, pressed| {
