@@ -35,9 +35,8 @@ async fn main() {
 	client
 		.sync_event_loop(|client, _flow| {
 			while let Some(root_event) = client.get_root().recv_root_event() {
-				match root_event {
-					RootEvent::Ping { response } => response.send(Ok(())),
-					_ => (),
+				if let RootEvent::Ping { response } = root_event {
+					response.send(Ok(()))
 				}
 			}
 

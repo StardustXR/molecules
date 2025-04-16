@@ -1,4 +1,4 @@
-use crate::dbus::{AbortOnDrop, DbusObjectHandle, DbusObjectHandles};
+use crate::dbus::{create_spatial_dbus, AbortOnDrop, DbusObjectHandle, DbusObjectHandles};
 use futures_util::StreamExt;
 use rustc_hash::{FxHashMap, FxHashSet};
 use stardust_xr_fusion::{
@@ -12,7 +12,6 @@ use zbus::{
 	fdo,
 	message::Header,
 	names::{BusName, UniqueName},
-	object_server::Interface,
 	zvariant::OwnedObjectPath,
 };
 
@@ -104,37 +103,6 @@ impl KeyboardHandler {
 			(self.on_key)(key_info);
 		}
 	}
-}
-
-async fn create_spatial_dbus<I: Interface>(
-	connection: &Connection,
-	path: &OwnedObjectPath,
-	handler: I,
-	connection_point: Option<Spatial>,
-	field: &Field,
-) {
-	let field = field.clone();
-	let task_1 = async {
-		let field_object = FieldObject::new(field).await.unwrap();
-		let _ = connection
-			.object_server()
-			.at(path.clone(), field_object)
-			.await;
-	};
-	let task_2 = async {
-		if let Some(spatial) = connection_point {
-			let spatial_object = SpatialObject::new(spatial.clone()).await.unwrap();
-			let _ = connection
-				.object_server()
-				.at(path.clone(), spatial_object)
-				.await;
-		}
-	};
-	let task_3 = async {
-		let _ = connection.object_server().at(path.clone(), handler).await;
-	};
-
-	tokio::join!(task_1, task_2, task_3);
 }
 
 #[zbus::interface(

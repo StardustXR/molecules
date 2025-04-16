@@ -1,4 +1,6 @@
-use crate::dbus::{DbusObjectHandle, DbusObjectHandles};
+use crate::dbus::{create_spatial_dbus, AbortOnDrop, DbusObjectHandle, DbusObjectHandles};
+use futures_util::StreamExt;
+use rustc_hash::{FxHashMap, FxHashSet};
 use stardust_xr_fusion::{
 	core::schemas::zbus::{self, Connection},
 	fields::Field,
@@ -7,20 +9,25 @@ use stardust_xr_fusion::{
 	values::Vector2,
 };
 use std::marker::PhantomData;
-use zbus::{message::Header, names::OwnedUniqueName};
+use zbus::{
+	fdo,
+	message::Header,
+	names::{BusName, UniqueName},
+};
 
 pub struct MouseHandler {
-	on_button: Box<dyn FnMut(OwnedUniqueName, u32, bool) + Send + Sync + 'static>,
-	on_motion: Box<dyn FnMut(OwnedUniqueName, Vector2<f32>) + Send + Sync + 'static>,
-	on_scroll_discrete: Box<dyn FnMut(OwnedUniqueName, Vector2<f32>) + Send + Sync + 'static>,
-	on_scroll_continuous: Box<dyn FnMut(OwnedUniqueName, Vector2<f32>) + Send + Sync + 'static>,
+	pressed_buttons: FxHashMap<UniqueName<'static>, FxHashSet<u32>>,
+	on_button: Box<dyn FnMut(u32, bool) + Send + Sync + 'static>,
+	on_motion: Box<dyn FnMut(Vector2<f32>) + Send + Sync + 'static>,
+	on_scroll_discrete: Box<dyn FnMut(Vector2<f32>) + Send + Sync + 'static>,
+	on_scroll_continuous: Box<dyn FnMut(Vector2<f32>) + Send + Sync + 'static>,
 }
 impl MouseHandler {
 	pub fn init<
-		BtnHandler: FnMut(OwnedUniqueName, u32, bool) + Send + Sync + 'static,
-		MotionHandler: FnMut(OwnedUniqueName, Vector2<f32>) + Send + Sync + 'static,
-		ScrollDiscreteHandler: FnMut(OwnedUniqueName, Vector2<f32>) + Send + Sync + 'static,
-		ScrollContinuousHandler: FnMut(OwnedUniqueName, Vector2<f32>) + Send + Sync + 'static,
+		BtnHandler: FnMut(u32, bool) + Send + Sync + 'static,
+		MotionHandler: FnMut(Vector2<f32>) + Send + Sync + 'static,
+		ScrollDiscreteHandler: FnMut(Vector2<f32>) + Send + Sync + 'static,
+		ScrollContinuousHandler: FnMut(Vector2<f32>) + Send + Sync + 'static,
 	>(
 		connection: Connection,
 		connection_point: Option<&Spatial>,
@@ -33,54 +40,67 @@ impl MouseHandler {
 		let path = random_object_name();
 		let path_clone = path.clone();
 
-		let connection_clone = connection.clone();
-		let connection_point = connection_point.cloned();
-		let field = field.clone();
-		tokio::spawn(async move {
-			let task_1 = async {
-				let field_object = FieldObject::new(field.clone()).await.unwrap();
-				connection_clone
-					.object_server()
-					.at(path_clone.clone(), field_object)
-					.await
-					.unwrap();
-			};
-			let task_2 = async {
-				if let Some(spatial) = connection_point {
-					let spatial_object = SpatialObject::new(spatial.clone()).await.unwrap();
-					connection_clone
-						.object_server()
-						.at(path_clone.clone(), spatial_object)
-						.await
-						.unwrap();
-				}
-			};
-			let task_3 = async {
-				connection_clone
-					.object_server()
-					.at(
-						path_clone.clone(),
-						MouseHandler {
-							on_button: Box::new(on_button),
-							on_motion: Box::new(on_motion),
-							on_scroll_discrete: Box::new(on_scroll_discrete),
-							on_scroll_continuous: Box::new(on_scroll_continuous),
-						},
-					)
-					.await
-					.unwrap();
-			};
+		let handler = MouseHandler {
+			pressed_buttons: FxHashMap::default(),
+			on_button: Box::new(on_button),
+			on_motion: Box::new(on_motion),
+			on_scroll_discrete: Box::new(on_scroll_discrete),
+			on_scroll_continuous: Box::new(on_scroll_continuous),
+		};
 
-			tokio::join!(task_1, task_2, task_3);
-		});
+		let abort_handle = tokio::spawn({
+			let connection = connection.clone();
+			let path = path_clone.clone();
+			let connection_point = connection_point.cloned();
+			let field = field.clone();
+
+			async move {
+				create_spatial_dbus(&connection, &path, handler, connection_point, &field).await;
+
+				let Ok(dbus_proxy) = fdo::DBusProxy::new(&connection).await else {
+					return;
+				};
+				let Ok(mut name_changes) = dbus_proxy.receive_name_owner_changed().await else {
+					return;
+				};
+				while let Some(signal) = name_changes.next().await {
+					let args = signal.args().unwrap();
+
+					if args.new_owner.is_none() {
+						let BusName::Unique(bus) = args.name else {
+							continue;
+						};
+						let Ok(mouse_handler) = connection
+							.object_server()
+							.interface::<_, MouseHandler>(&path)
+							.await
+						else {
+							continue;
+						};
+						mouse_handler.get_mut().await.reset_buttons(bus.to_owned());
+					}
+				}
+			}
+		})
+		.abort_handle();
 
 		DbusObjectHandles(Box::new((
+			AbortOnDrop(abort_handle),
 			DbusObjectHandle::<SpatialObject>(connection.clone(), path.clone(), PhantomData),
 			DbusObjectHandle::<FieldObject>(connection.clone(), path.clone(), PhantomData),
 			DbusObjectHandle::<MouseHandler>(connection, path, PhantomData),
 		)))
 	}
+
+	fn reset_buttons(&mut self, sender: UniqueName<'static>) {
+		if let Some(buttons) = self.pressed_buttons.remove(&sender) {
+			for button in buttons {
+				(self.on_button)(button, false);
+			}
+		}
+	}
 }
+
 #[zbus::interface(name = "org.stardustxr.Mousev1", proxy())]
 impl MouseHandler {
 	#[zbus(proxy(no_reply))]
@@ -88,28 +108,40 @@ impl MouseHandler {
 		let Some(sender) = header.sender() else {
 			return;
 		};
-		(self.on_button)(sender.to_owned().into(), button, pressed)
+		let sender = sender.to_owned();
+
+		let sender_entry = self.pressed_buttons.entry(sender).or_default();
+		if pressed {
+			sender_entry.insert(button);
+		} else {
+			sender_entry.remove(&button);
+		}
+
+		(self.on_button)(button, pressed)
 	}
+
 	#[zbus(proxy(no_reply))]
-	fn motion(&mut self, #[zbus(header)] header: Header<'_>, delta: (f32, f32)) {
+	fn motion(&mut self, #[zbus(header)] _header: Header<'_>, delta: (f32, f32)) {
+		(self.on_motion)([delta.0, delta.1].into())
+	}
+
+	#[zbus(proxy(no_reply))]
+	fn scroll_discrete(&mut self, #[zbus(header)] _header: Header<'_>, scroll: (f32, f32)) {
+		(self.on_scroll_discrete)([scroll.0, scroll.1].into())
+	}
+
+	#[zbus(proxy(no_reply))]
+	fn scroll_continuous(&mut self, #[zbus(header)] _header: Header<'_>, scroll: (f32, f32)) {
+		(self.on_scroll_continuous)([scroll.0, scroll.1].into())
+	}
+
+	#[zbus(proxy(no_reply))]
+	fn reset(&mut self, #[zbus(header)] header: Header<'_>) {
 		let Some(sender) = header.sender() else {
 			return;
 		};
-		(self.on_motion)(sender.to_owned().into(), [delta.0, delta.1].into())
-	}
-	#[zbus(proxy(no_reply))]
-	fn scroll_discrete(&mut self, #[zbus(header)] header: Header<'_>, scroll: (f32, f32)) {
-		let Some(sender) = header.sender() else {
-			return;
-		};
-		(self.on_scroll_discrete)(sender.to_owned().into(), [scroll.0, scroll.1].into())
-	}
-	#[zbus(proxy(no_reply))]
-	fn scroll_continuous(&mut self, #[zbus(header)] header: Header<'_>, scroll: (f32, f32)) {
-		let Some(sender) = header.sender() else {
-			return;
-		};
-		(self.on_scroll_continuous)(sender.to_owned().into(), [scroll.0, scroll.1].into())
+		let sender = sender.to_owned();
+		self.reset_buttons(sender);
 	}
 }
 
@@ -141,17 +173,17 @@ async fn mouse_receive() {
 		connect_client().await.unwrap(),
 		None,
 		&field,
-		move |sender, button, pressed| {
-			button_tx.send((sender, button, pressed)).unwrap();
+		move |button, pressed| {
+			button_tx.send((button, pressed)).unwrap();
 		},
-		move |sender, motion| {
-			motion_tx.send((sender, motion)).unwrap();
+		move |motion| {
+			motion_tx.send(motion).unwrap();
 		},
-		move |sender, scroll| {
-			scroll_discrete_tx.send((sender, scroll)).unwrap();
+		move |scroll| {
+			scroll_discrete_tx.send(scroll).unwrap();
 		},
-		move |sender, scroll| {
-			scroll_continuous_tx.send((sender, scroll)).unwrap();
+		move |scroll| {
+			scroll_continuous_tx.send(scroll).unwrap();
 		},
 	);
 
@@ -159,19 +191,19 @@ async fn mouse_receive() {
 	async_event_loop.get_event_handle().wait().await;
 
 	println!("Receiving motion info...");
-	let (_, motion) = motion_rx.recv().await.unwrap();
+	let motion = motion_rx.recv().await.unwrap();
 	assert_eq!(motion, [1.0, 2.0].into());
 
 	println!("Receiving scroll discrete info...");
-	let (_, scroll) = scroll_discrete_rx.recv().await.unwrap();
+	let scroll = scroll_discrete_rx.recv().await.unwrap();
 	assert_eq!(scroll, [0.5, 1.0].into());
 
 	println!("Receiving scroll continuous info...");
-	let (_, scroll) = scroll_continuous_rx.recv().await.unwrap();
+	let scroll = scroll_continuous_rx.recv().await.unwrap();
 	assert_eq!(scroll, [0.1, 0.2].into());
 
 	println!("Receiving button info...");
-	let (_, button, pressed) =
+	let (button, pressed) =
 		tokio::time::timeout(std::time::Duration::from_secs(3), button_rx.recv())
 			.await
 			.expect("Test timed out waiting for button event - likely hang detected")
