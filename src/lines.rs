@@ -1,4 +1,4 @@
-use glam::{vec3, Mat4, Vec3, Vec3A};
+use glam::{vec3, Mat4, Quat, Vec3, Vec3A};
 use lerp::Lerp;
 use stardust_xr_fusion::{
 	core::values::{
@@ -6,10 +6,11 @@ use stardust_xr_fusion::{
 		Mat4 as Matrix4, Vector3,
 	},
 	drawable::{Line, LinePoint},
+	fields::{CylinderShape, Shape, TorusShape},
 	spatial::BoundingBox,
 	values::color::rgba_linear,
 };
-use std::f32::consts::{PI, TAU};
+use std::f32::consts::{FRAC_PI_2, FRAC_PI_4, PI, TAU};
 
 pub trait LineExt: Sized {
 	fn thickness(self, thickness: f32) -> Self;
@@ -202,6 +203,51 @@ pub fn rounded_rectangle(width: f32, height: f32, corner_radius: f32, segments: 
 	Line {
 		points,
 		cyclic: true,
+	}
+}
+
+pub fn shape(shape: Shape) -> Vec<Line> {
+	fn y_offset_circle(segments: usize, radius: f32, offset: f32) -> Line {
+		let mut line = circle(segments, 0.0, radius);
+		line.points.iter_mut().for_each(|p| p.point.y += offset);
+		line
+	}
+	match shape {
+		Shape::Box(size) => bounding_box(BoundingBox {
+			center: Vec3::ZERO.into(),
+			size,
+		}),
+		Shape::Cylinder(CylinderShape { length, radius }) => {
+			let top_inner = y_offset_circle(32, radius * 0.5, length * 0.5);
+			let top = y_offset_circle(32, radius, length * 0.5);
+			let middle = circle(32, 0.0, radius);
+			let bottom = y_offset_circle(32, radius, -length * 0.5);
+			let bottom_inner = y_offset_circle(32, radius * 0.5, -length * 0.5);
+
+			vec![top_inner, top, middle, bottom, bottom_inner]
+		}
+		Shape::Sphere(radius) => {
+			// i am sure that there is a better way to calculate this, but idk how
+			let rotated_middle_vec3 = Quat::from_rotation_z(FRAC_PI_4) * Vec3::X;
+			let rotated_end_vec3 = Quat::from_rotation_z(FRAC_PI_2 * 0.9) * Vec3::X;
+			let center = circle(64, 0.0, radius);
+			let middle_top = y_offset_circle(32, rotated_middle_vec3.x, rotated_middle_vec3.y);
+			let middle_bottom = y_offset_circle(32, rotated_middle_vec3.x, -rotated_middle_vec3.y);
+			let end_top = y_offset_circle(32, rotated_end_vec3.x, rotated_end_vec3.y);
+			let end_bottom = y_offset_circle(32, rotated_end_vec3.x, -rotated_end_vec3.y);
+
+			vec![end_top, middle_top, center, middle_bottom, end_bottom]
+		}
+		Shape::Torus(TorusShape { radius_a, radius_b }) => {
+			let circle_a = circle(32, 0.0, radius_a);
+			let circle_b = circle(32, 0.0, radius_b);
+			let inner_radius = (radius_a - radius_b).abs() * 0.5;
+			let middle_radius = radius_a.lerp(radius_b, 0.5);
+			let middle_top = y_offset_circle(32, middle_radius, inner_radius);
+			let middle_bottom = y_offset_circle(32, middle_radius, -inner_radius);
+
+			vec![circle_a, circle_b, middle_top, middle_bottom]
+		}
 	}
 }
 
