@@ -1,4 +1,4 @@
-use glam::{vec3, Mat4, Quat, Vec3, Vec3A};
+use glam::{vec3, Mat4, Vec3, Vec3A};
 use lerp::Lerp;
 use stardust_xr_fusion::{
 	core::values::{
@@ -10,7 +10,7 @@ use stardust_xr_fusion::{
 	spatial::BoundingBox,
 	values::color::rgba_linear,
 };
-use std::f32::consts::{FRAC_PI_2, FRAC_PI_4, PI, TAU};
+use std::f32::consts::{FRAC_PI_2, PI, TAU};
 
 pub trait LineExt: Sized {
 	fn thickness(self, thickness: f32) -> Self;
@@ -218,39 +218,72 @@ pub fn shape(shape: Shape) -> Vec<Line> {
 			size,
 		}),
 		Shape::Cylinder(CylinderShape { length, radius }) => {
-			let top_inner = y_offset_circle(32, radius * 0.5, length * 0.5);
 			let top = y_offset_circle(32, radius, length * 0.5);
-			let middle = circle(32, 0.0, radius);
 			let bottom = y_offset_circle(32, radius, -length * 0.5);
-			let bottom_inner = y_offset_circle(32, radius * 0.5, -length * 0.5);
 
-			vec![top_inner, top, middle, bottom, bottom_inner]
+			let connector_1 =
+				simple_line([radius, length * 0.5, 0.0], [radius, length * -0.5, 0.0]);
+			let connector_2 =
+				simple_line([-radius, length * 0.5, 0.0], [-radius, length * -0.5, 0.0]);
+			let connector_3 =
+				simple_line([0.0, length * 0.5, radius], [0.0, length * -0.5, radius]);
+			let connector_4 =
+				simple_line([0.0, length * 0.5, -radius], [0.0, length * -0.5, -radius]);
+
+			vec![
+				top,
+				bottom,
+				connector_1,
+				connector_2,
+				connector_3,
+				connector_4,
+			]
 		}
 		Shape::Sphere(radius) => {
-			// i am sure that there is a better way to calculate this, but idk how
-			let rotated_middle_vec3 = Quat::from_rotation_z(FRAC_PI_4) * Vec3::X;
-			let rotated_end_vec3 = Quat::from_rotation_z(FRAC_PI_2 * 0.9) * Vec3::X;
-			let center = circle(64, 0.0, radius);
-			let middle_top = y_offset_circle(32, rotated_middle_vec3.x, rotated_middle_vec3.y);
-			let middle_bottom = y_offset_circle(32, rotated_middle_vec3.x, -rotated_middle_vec3.y);
-			let end_top = y_offset_circle(32, rotated_end_vec3.x, rotated_end_vec3.y);
-			let end_bottom = y_offset_circle(32, rotated_end_vec3.x, -rotated_end_vec3.y);
+			let y = circle(32, 0.0, radius);
+			let x = y.clone().transform(Mat4::from_rotation_x(FRAC_PI_2));
+			let z = y.clone().transform(Mat4::from_rotation_z(FRAC_PI_2));
 
-			vec![end_top, middle_top, center, middle_bottom, end_bottom]
+			vec![x, y, z]
 		}
 		Shape::Torus(TorusShape { radius_a, radius_b }) => {
-			let circle_a = circle(32, 0.0, radius_a);
-			let circle_b = circle(32, 0.0, radius_b);
-			let inner_radius = (radius_a - radius_b).abs() * 0.5;
-			let middle_radius = radius_a.lerp(radius_b, 0.5);
-			let middle_top = y_offset_circle(32, middle_radius, inner_radius);
-			let middle_bottom = y_offset_circle(32, middle_radius, -inner_radius);
+			let radius_a_outer = circle(32, 0.0, radius_a - radius_b);
+			let radius_a_inner = circle(32, 0.0, radius_a + radius_b);
+			let radius_a_top = y_offset_circle(32, radius_a, radius_b);
+			let radius_a_bottom = y_offset_circle(32, radius_a, -radius_b);
 
-			vec![circle_a, circle_b, middle_top, middle_bottom]
+			let radius_b_1 = circle(16, 0.0, radius_b).transform(
+				Mat4::from_translation(vec3(radius_a, 0.0, 0.0)) * Mat4::from_rotation_x(FRAC_PI_2),
+			);
+			let radius_b_2 = circle(16, 0.0, radius_b).transform(
+				Mat4::from_translation(vec3(-radius_a, 0.0, 0.0))
+					* Mat4::from_rotation_x(FRAC_PI_2),
+			);
+			let radius_b_3 = circle(16, 0.0, radius_b).transform(
+				Mat4::from_translation(vec3(0.0, 0.0, radius_a))
+					* Mat4::from_rotation_y(FRAC_PI_2)
+					* Mat4::from_rotation_x(FRAC_PI_2),
+			);
+			let radius_b_4 = circle(16, 0.0, radius_b).transform(
+				Mat4::from_translation(vec3(0.0, 0.0, -radius_a))
+					* Mat4::from_rotation_y(FRAC_PI_2)
+					* Mat4::from_rotation_x(FRAC_PI_2),
+			);
+			vec![
+				radius_a_outer,
+				radius_a_inner,
+				radius_a_top,
+				radius_a_bottom,
+				radius_b_1,
+				radius_b_2,
+				radius_b_3,
+				radius_b_4,
+			]
 		}
 	}
 }
 
+/// on the XZ plane
 pub fn circle(segments: usize, start_angle: f32, radius: f32) -> Line {
 	let line = arc(segments, start_angle, start_angle + TAU, radius);
 	Line {
@@ -259,6 +292,7 @@ pub fn circle(segments: usize, start_angle: f32, radius: f32) -> Line {
 	}
 }
 
+/// on the XZ plane
 pub fn arc(segments: usize, start_angle: f32, end_angle: f32, radius: f32) -> Line {
 	let angle = end_angle - start_angle;
 	let points = (0..segments)
@@ -268,8 +302,8 @@ pub fn arc(segments: usize, start_angle: f32, end_angle: f32, radius: f32) -> Li
 			LinePoint {
 				point: Vector3 {
 					x: x * radius,
-					y: y * radius,
-					z: 0.0,
+					y: 0.0,
+					z: y * radius,
 				},
 				..Default::default()
 			}
@@ -311,60 +345,74 @@ pub fn axes(length: f32, thickness: f32) -> Vec<Line> {
 	]
 }
 
+fn simple_line(start: impl Into<Vector3<f32>>, end: impl Into<Vector3<f32>>) -> Line {
+	Line {
+		points: vec![
+			LinePoint {
+				point: start.into(),
+				..Default::default()
+			},
+			LinePoint {
+				point: end.into(),
+				..Default::default()
+			},
+		],
+		cyclic: false,
+	}
+}
+
 pub fn bounding_box(bounding_box: BoundingBox) -> Vec<Line> {
 	let center = Vec3::from(bounding_box.center);
 	let size_half = Vec3::from(bounding_box.size) / 2.0;
 
-	let lines_points = vec![
-		vec![
-			(center + vec3(-size_half.x, size_half.y, size_half.z)).into(),
-			(center + vec3(-size_half.x, size_half.y, -size_half.z)).into(),
-		],
-		vec![
-			(center + vec3(-size_half.x, size_half.y, size_half.z)).into(),
-			(center + vec3(size_half.x, size_half.y, size_half.z)).into(),
-		],
-		vec![
-			(center + vec3(-size_half.x, size_half.y, -size_half.z)).into(),
-			(center + vec3(size_half.x, size_half.y, -size_half.z)).into(),
-		],
-		vec![
-			(center + vec3(-size_half.x, -size_half.y, size_half.z)).into(),
-			(center + vec3(-size_half.x, -size_half.y, -size_half.z)).into(),
-		],
-		vec![
-			(center + vec3(-size_half.x, -size_half.y, size_half.z)).into(),
-			(center + vec3(size_half.x, -size_half.y, size_half.z)).into(),
-		],
-		vec![
-			(center + vec3(-size_half.x, -size_half.y, -size_half.z)).into(),
-			(center + vec3(size_half.x, -size_half.y, -size_half.z)).into(),
-		],
-		vec![
-			(center + vec3(size_half.x, size_half.y, size_half.z)).into(),
-			(center + vec3(size_half.x, size_half.y, -size_half.z)).into(),
-		],
-		vec![
-			(center + vec3(size_half.x, size_half.y, size_half.z)).into(),
-			(center + vec3(size_half.x, -size_half.y, size_half.z)).into(),
-		],
-		vec![
-			(center + vec3(size_half.x, size_half.y, -size_half.z)).into(),
-			(center + vec3(size_half.x, -size_half.y, -size_half.z)).into(),
-		],
-	];
-
-	lines_points
-		.into_iter()
-		.map(|l| Line {
-			points: l
-				.into_iter()
-				.map(|point| LinePoint {
-					point,
-					..Default::default()
-				})
-				.collect(),
-			cyclic: false,
-		})
-		.collect()
+	vec![
+		simple_line(
+			center + vec3(-size_half.x, size_half.y, size_half.z),
+			center + vec3(-size_half.x, size_half.y, -size_half.z),
+		),
+		simple_line(
+			center + vec3(-size_half.x, size_half.y, size_half.z),
+			center + vec3(size_half.x, size_half.y, size_half.z),
+		),
+		simple_line(
+			center + vec3(-size_half.x, size_half.y, -size_half.z),
+			center + vec3(size_half.x, size_half.y, -size_half.z),
+		),
+		simple_line(
+			center + vec3(-size_half.x, -size_half.y, size_half.z),
+			center + vec3(-size_half.x, -size_half.y, -size_half.z),
+		),
+		simple_line(
+			center + vec3(-size_half.x, -size_half.y, size_half.z),
+			center + vec3(size_half.x, -size_half.y, size_half.z),
+		),
+		simple_line(
+			center + vec3(-size_half.x, -size_half.y, -size_half.z),
+			center + vec3(size_half.x, -size_half.y, -size_half.z),
+		),
+		simple_line(
+			center + vec3(size_half.x, size_half.y, size_half.z),
+			center + vec3(size_half.x, size_half.y, -size_half.z),
+		),
+		simple_line(
+			center + vec3(size_half.x, size_half.y, size_half.z),
+			center + vec3(size_half.x, -size_half.y, size_half.z),
+		),
+		simple_line(
+			center + vec3(size_half.x, size_half.y, -size_half.z),
+			center + vec3(size_half.x, -size_half.y, -size_half.z),
+		),
+		simple_line(
+			center + vec3(-size_half.x, size_half.y, size_half.z),
+			center + vec3(-size_half.x, -size_half.y, size_half.z),
+		),
+		simple_line(
+			center + vec3(-size_half.x, size_half.y, -size_half.z),
+			center + vec3(-size_half.x, -size_half.y, -size_half.z),
+		),
+		simple_line(
+			center + vec3(size_half.x, -size_half.y, size_half.z),
+			center + vec3(size_half.x, -size_half.y, -size_half.z),
+		),
+	]
 }
