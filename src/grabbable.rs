@@ -3,12 +3,12 @@ use crate::{
 	lines::{axes, bounding_box, LineExt},
 	FrameSensitive, UIElement, VisualDebug,
 };
-use glam::{vec3, Quat, Vec3};
+use glam::{vec3, Affine3A, Quat, Vec3};
 use stardust_xr_fusion::{
 	core::values::Vector3,
 	drawable::{Lines, LinesAspect},
 	fields::{Field, FieldRefAspect},
-	input::{InputData, InputDataType, InputHandler},
+	input::{InputDataType, InputHandler},
 	node::{NodeError, NodeType},
 	root::FrameInfo,
 	spatial::{Spatial, SpatialAspect, SpatialRefAspect, Transform},
@@ -78,7 +78,6 @@ impl Default for GrabbableSettings {
 }
 
 pub struct Grabbable {
-	root: Spatial,
 	content_parent: Spatial,
 	field: Field,
 	input: InputQueue,
@@ -86,11 +85,11 @@ pub struct Grabbable {
 
 	content_lines: Lines,
 	root_lines: Lines,
-	settings: GrabbableSettings,
+	pub settings: GrabbableSettings,
 
-	pointer_distance: f32,
-	prev_pose: (Vec3, Quat),
-	pose: (Vec3, Quat),
+	prev_pose: Affine3A,
+	relative_transform: Affine3A, // Relative transform matrix during grab
+	pub pose: Affine3A,
 
 	closest_point_tx: mpsc::Sender<Vec3>,
 	closest_point_rx: mpsc::Receiver<Vec3>,
@@ -105,20 +104,15 @@ impl Grabbable {
 		field: &Field,
 		settings: GrabbableSettings,
 	) -> Result<Self, NodeError> {
-		let input =
-			InputHandler::create(content_space.client()?.get_root(), Transform::none(), field)?
-				.queue()?;
-		let root = Spatial::create(input.handler(), Transform::none(), false)?;
+		let input = InputHandler::create(content_space, Transform::none(), field)?.queue()?;
 		let content_parent =
-			Spatial::create(input.handler(), Transform::none(), settings.zoneable)?;
-		content_parent.set_relative_transform(content_space, content_transform)?;
+			Spatial::create(input.handler(), content_transform, settings.zoneable)?;
 
 		let content_lines = Lines::create(&content_parent, Transform::identity(), &[])?;
-		let root_lines = Lines::create(&root, Transform::identity(), &[])?;
+		let root_lines = Lines::create(content_space, Transform::identity(), &[])?;
 
 		let (closest_point_tx, closest_point_rx) = mpsc::channel(1);
 		Ok(Grabbable {
-			root,
 			content_parent,
 			input,
 			grab_action: SingleAction::default(),
@@ -128,9 +122,9 @@ impl Grabbable {
 			root_lines,
 			settings,
 
-			pointer_distance: 0.0,
-			prev_pose: (vec3(0.0, 0.0, 0.0), Quat::IDENTITY),
-			pose: (vec3(0.0, 0.0, 0.0), Quat::IDENTITY),
+			prev_pose: Affine3A::IDENTITY,
+			relative_transform: Affine3A::IDENTITY,
+			pose: Affine3A::IDENTITY,
 
 			closest_point_tx,
 			closest_point_rx,
@@ -138,28 +132,6 @@ impl Grabbable {
 			linear_velocity: None,
 			angular_velocity: None,
 		})
-	}
-	fn input_position_rotation(&mut self, input: &InputData) -> (Vec3, Quat) {
-		match &input.input {
-			InputDataType::Hand(h) => (
-				Vec3::from(h.thumb.tip.position).lerp(Vec3::from(h.index.tip.position), 0.5),
-				h.palm.rotation.into(),
-			),
-			InputDataType::Pointer(p) => {
-				let scroll = input
-					.datamap
-					.with_data(|d| d.idx("scroll_continuous").as_vector().idx(1).as_f32());
-				self.pointer_distance += scroll * 0.01;
-				let grab_point =
-					Vec3::from(p.origin) + (Vec3::from(p.direction()) * self.pointer_distance);
-				match self.settings.pointer_mode {
-					PointerMode::Parent => (p.origin.into(), p.orientation.into()),
-					PointerMode::Align => (grab_point, swing_direction(p.direction().into())),
-					PointerMode::Move => (grab_point, Quat::IDENTITY),
-				}
-			}
-			InputDataType::Tip(t) => (t.origin.into(), t.orientation.into()),
-		}
 	}
 	const LINEAR_VELOCITY_STOP_THRESHOLD: f32 = 0.001;
 	fn apply_linear_momentum(&mut self, info: &FrameInfo, settings: MomentumSettings) {
@@ -176,7 +148,7 @@ impl Grabbable {
 				.unwrap();
 		} else {
 			*velocity *= (1.0 - settings.drag * delta).clamp(0.0, 1.0);
-			self.pose.0 += *velocity * delta;
+			self.pose *= Affine3A::from_translation(*velocity * delta);
 			trace!(?velocity, "linear momentum");
 		}
 	}
@@ -190,7 +162,10 @@ impl Grabbable {
 			self.angular_velocity.take();
 		} else {
 			*angle *= (1.0 - settings.drag * delta).clamp(0.0, 1.0);
-			self.pose.1 *= Quat::from_axis_angle(*axis, *angle * delta);
+			self.pose *= Affine3A::from_rotation_translation(
+				Quat::from_axis_angle(*axis, *angle * delta),
+				Vec3::ZERO,
+			);
 			trace!(?axis, angle, "angular momentum");
 		}
 	}
@@ -253,41 +228,83 @@ impl UIElement for Grabbable {
 		);
 
 		if self.grab_action.actor_started() {
-			// Make sure we can directly apply the grab data to the content parent
+			// Calculate and store the relative transform matrix
 			let actor = self.grab_action.actor().unwrap();
-			if let InputDataType::Pointer(pointer) = &actor.input {
-				// store the pointer distance so we can keep it at the correct point
-				self.pointer_distance =
-					Vec3::from(pointer.origin).distance(pointer.deepest_point.into());
-			}
+			let grab_position = match &actor.input {
+				InputDataType::Pointer(p) => p.origin.into(),
+				InputDataType::Hand(h) => h.palm.position.into(),
+				InputDataType::Tip(t) => t.origin.into(),
+			};
+			let grab_rotation = match &actor.input {
+				InputDataType::Pointer(p) => p.orientation.into(),
+				InputDataType::Hand(h) => h.palm.rotation.into(),
+				InputDataType::Tip(t) => t.orientation.into(),
+			};
+			let grab_pose_matrix =
+				Affine3A::from_rotation_translation(grab_rotation, grab_position);
 
-			// gotta reparent to the handler to set the root offset without moving it
-			self.content_parent
-				.set_spatial_parent_in_place(self.input.handler())
-				.unwrap();
+			self.relative_transform = grab_pose_matrix.inverse() * self.pose;
+			self.prev_pose = self.pose;
 		}
 
 		if let Some(actor) = self.grab_action.actor().cloned() {
-			let (mut position, rotation) = self.input_position_rotation(&actor);
-			debug!(?position, ?rotation, id = actor.id, "Currently grabbing");
-
-			if self.settings.magnet {
-				if let Ok(closest_point) = self.closest_point_rx.try_recv() {
-					position -= rotation * closest_point;
-					let _ = self.closest_point_tx.try_send(closest_point);
-				}
+			if matches!(&actor.input, InputDataType::Pointer(_)) {
+				let scroll_sensitivity = 0.01;
+				let scroll_amount = actor.datamap.with_data(|datamap| {
+					datamap.idx("scroll_continuous").as_vector().idx(1).as_f32() // Use the Y-axis for forward/backward scrolling
+				});
+				let offset =
+					Affine3A::from_translation(vec3(0.0, 0.0, scroll_amount * -scroll_sensitivity));
+				self.relative_transform = offset * self.relative_transform;
 			}
-			let transform_spatial = match (self.settings.pointer_mode, &actor.input) {
-				(PointerMode::Align, InputDataType::Pointer(_)) => self.content_parent(),
-				_ => &self.root,
+
+			let grab_position = match &actor.input {
+				InputDataType::Pointer(p) => p.origin.into(),
+				InputDataType::Hand(h) => h.palm.position.into(),
+				InputDataType::Tip(t) => t.origin.into(),
 			};
-			transform_spatial
+			let grab_rotation = match &actor.input {
+				InputDataType::Pointer(p) => p.orientation.into(),
+				InputDataType::Hand(h) => h.palm.rotation.into(),
+				InputDataType::Tip(t) => t.orientation.into(),
+			};
+			let current_grab_pose =
+				Affine3A::from_rotation_translation(grab_rotation, grab_position);
+
+			self.pose = match (&actor.input, self.settings.pointer_mode) {
+				(InputDataType::Pointer(p), PointerMode::Align) => {
+					// Calculate the parent pose
+					let parent_pose = current_grab_pose * self.relative_transform;
+
+					// Extract the position from the parent pose
+					let (_, _, parent_translation) = parent_pose.to_scale_rotation_translation();
+
+					// Calculate the swing rotation using swing_direction
+					let swing_rotation = swing_direction(p.direction().into());
+
+					// Combine the swing rotation with the parent translation
+					Affine3A::from_rotation_translation(swing_rotation, parent_translation)
+				}
+				(InputDataType::Pointer(_), PointerMode::Move) => {
+					// Calculate the parent pose
+					let parent_pose = current_grab_pose * self.relative_transform;
+
+					// Compute and apply the inverted offset rotation
+					let offset_rotation = parent_pose.to_scale_rotation_translation().1
+						* self.pose.to_scale_rotation_translation().1.inverse();
+
+					parent_pose * Affine3A::from_quat(offset_rotation.inverse())
+				}
+				(_, _) => current_grab_pose * self.relative_transform,
+			};
+
+			let (_, new_rotation, new_position) = self.pose.to_scale_rotation_translation();
+			self.content_parent
 				.set_relative_transform(
 					self.input.handler(),
-					Transform::from_translation_rotation(position, rotation),
+					Transform::from_translation_rotation(new_position, new_rotation),
 				)
 				.unwrap();
-			self.pose = (position, rotation);
 		}
 
 		if self.grab_action.actor_started() {
@@ -296,9 +313,6 @@ impl UIElement for Grabbable {
 				"Started grabbing"
 			);
 			self.content_parent.set_zoneable(false).unwrap();
-			self.content_parent
-				.set_spatial_parent_in_place(&self.root)
-				.unwrap();
 
 			'magnet: {
 				if self.settings.magnet {
@@ -309,10 +323,10 @@ impl UIElement for Grabbable {
 						break 'magnet;
 					}
 					let field = self.field.clone();
-					let root = self.root.clone();
+					let input = self.input.handler().clone();
 					let closest_point_tx = self.closest_point_tx.clone();
 					tokio::task::spawn(async move {
-						let result = field.closest_point(&root, [0.0; 3]).await.unwrap();
+						let result = field.closest_point(&input, [0.0; 3]).await.unwrap();
 						// if let Ok(result) = result {
 						let _ = closest_point_tx.send(result.into()).await;
 						// }
@@ -324,7 +338,6 @@ impl UIElement for Grabbable {
 		if self.grab_action.actor_stopped() {
 			debug!("Stopped grabbing");
 
-			// drain the closest point queue
 			let _ = self.closest_point_rx.try_recv();
 		}
 		true
@@ -334,14 +347,15 @@ impl FrameSensitive for Grabbable {
 	fn frame(&mut self, info: &FrameInfo) {
 		if self.grab_action.actor_acting() {
 			let delta = info.delta;
+			let velocity = self.pose * self.prev_pose.inverse();
+			let (_, angular_velocity, linear_velocity) = velocity.to_scale_rotation_translation();
 			if let Some(momentum_settings) = &self.settings.linear_momentum {
-				let linear_velocity = self.pose.0 - self.prev_pose.0;
 				let above_threshold =
 					linear_velocity.length_squared() > momentum_settings.threshold.powf(2.0);
 				self.linear_velocity = above_threshold.then(|| linear_velocity / delta);
 			}
 			if let Some(momentum_settings) = &self.settings.angular_momentum {
-				let (axis, angle) = (self.pose.1 * self.prev_pose.1.inverse()).to_axis_angle();
+				let (axis, angle) = angular_velocity.to_axis_angle();
 				let above_threshold = angle > momentum_settings.threshold;
 				self.angular_velocity = above_threshold.then(|| (axis, angle / delta));
 			}
@@ -356,11 +370,13 @@ impl FrameSensitive for Grabbable {
 			}
 
 			if self.linear_velocity.is_some() || self.angular_velocity.is_some() {
-				self.root
-					.set_relative_transform(
-						self.input.handler(),
-						Transform::from_translation_rotation(self.pose.0, self.pose.1),
-					)
+				self.prev_pose = self.pose;
+				let (_, rotation, translation) = self.pose.to_scale_rotation_translation();
+				self.content_parent
+					.set_local_transform(Transform::from_translation_rotation(
+						translation,
+						rotation,
+					))
 					.unwrap();
 			}
 		}
