@@ -196,6 +196,10 @@ impl Grabbable {
 			&& self.angular_velocity.unwrap().1 < Self::ANGULAR_VELOCITY_STOP_THRESHOLD
 	}
 
+	pub fn field(&self) -> &Field {
+		&self.field
+	}
+
 	pub fn grab_action(&self) -> &SingleAction {
 		&self.grab_action
 	}
