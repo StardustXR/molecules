@@ -310,7 +310,6 @@ impl UIElement for Grabbable {
 			};
 
 			let (_, new_rotation, new_position) = self.pose.to_scale_rotation_translation();
-			dbg!((new_position, new_rotation));
 			self.content_parent
 				.set_relative_transform(
 					self.input.handler(),
