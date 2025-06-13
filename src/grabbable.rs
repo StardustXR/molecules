@@ -277,26 +277,15 @@ impl UIElement for Grabbable {
 
 			self.pose = match (&actor.input, self.settings.pointer_mode) {
 				(InputDataType::Pointer(p), PointerMode::Align) => {
-					// Calculate the parent pose
 					let parent_pose = current_grab_pose * self.relative_transform;
-
-					// Extract the position from the parent pose
 					let (_, _, parent_translation) = parent_pose.to_scale_rotation_translation();
-
-					// Calculate the swing rotation using swing_direction
 					let swing_rotation = swing_direction(p.direction().into());
-
-					// Combine the swing rotation with the parent translation
 					Affine3A::from_rotation_translation(swing_rotation, parent_translation)
 				}
 				(InputDataType::Pointer(_), PointerMode::Move) => {
-					// Calculate the parent pose
 					let parent_pose = current_grab_pose * self.relative_transform;
-
-					// Compute and apply the inverted offset rotation
 					let offset_rotation = parent_pose.to_scale_rotation_translation().1
 						* self.pose.to_scale_rotation_translation().1.inverse();
-
 					parent_pose * Affine3A::from_quat(offset_rotation.inverse())
 				}
 				(_, _) => current_grab_pose * self.relative_transform,
@@ -304,10 +293,10 @@ impl UIElement for Grabbable {
 
 			let (_, new_rotation, new_position) = self.pose.to_scale_rotation_translation();
 			self.content_parent
-				.set_relative_transform(
-					self.input.handler(),
-					Transform::from_translation_rotation(new_position, new_rotation),
-				)
+				.set_local_transform(Transform::from_translation_rotation(
+					new_position,
+					new_rotation,
+				))
 				.unwrap();
 		}
 
