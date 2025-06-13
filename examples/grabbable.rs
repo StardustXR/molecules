@@ -1,3 +1,4 @@
+use glam::Quat;
 use stardust_xr_fusion::{
 	client::Client,
 	core::values::ResourceID,
@@ -47,51 +48,45 @@ async fn main() {
 		.unwrap(),
 	);
 
-	let root = Spatial::create(client.get_root(), Transform::identity(), false).unwrap();
+	let root = Spatial::create(
+		client.get_root(),
+		Transform::from_translation([0.1, 0.0, 0.0]),
+		false,
+	)
+	.unwrap();
 	let mut grabbable = Grabbable::create(
 		&root,
-		Transform::none(),
+		Transform::identity(),
 		&field,
 		GrabbableSettings {
-			pointer_mode: PointerMode::Align,
+			pointer_mode: PointerMode::Move,
 			magnet: true,
+			zoneable: false,
 			..Default::default()
 		},
 	)
 	.unwrap();
+
 	grabbable.set_debug(Some(DebugSettings::default()));
 	model
-		.set_spatial_parent(grabbable.content_parent())
+		.set_spatial_parent(&grabbable.content_parent())
 		.unwrap();
 	field
-		.set_spatial_parent(grabbable.content_parent())
+		.set_spatial_parent(&grabbable.content_parent())
 		.unwrap();
-
-	let client_state = client
-		.await_method(client.handle().get_root().get_state())
-		.await
-		.unwrap()
-		.unwrap();
-
-	if let Some(content_parent_reference) = client_state
-		.spatial_anchors(&client.handle())
-		.get("content_parent")
-	{
-		grabbable
-			.content_parent()
-			.set_relative_transform(content_parent_reference, Transform::identity())
-			.unwrap();
-	}
 
 	client
 		.sync_event_loop(|client, _flow| {
 			grabbable.handle_events();
+			if grabbable.grab_action().actor_stopped() {
+				grabbable.set_pose([0.0; 3], Quat::IDENTITY);
+			}
 			while let Some(root_event) = client.get_root().recv_root_event() {
 				match root_event {
 					RootEvent::Frame { info } => grabbable.frame(&info),
 					RootEvent::SaveState { response } => response.wrap(|| {
 						root.set_relative_transform(
-							grabbable.content_parent(),
+							&grabbable.content_parent(),
 							Transform::from_translation([0.0; 3]),
 						)
 						.unwrap();

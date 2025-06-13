@@ -11,7 +11,8 @@ use stardust_xr_fusion::{
 	input::{InputDataType, InputHandler},
 	node::{NodeError, NodeType},
 	root::FrameInfo,
-	spatial::{Spatial, SpatialAspect, SpatialRefAspect, Transform},
+	spatial::{Spatial, SpatialAspect, SpatialRef, SpatialRefAspect, Transform},
+	values::Quaternion,
 };
 use std::f32::consts::PI;
 use tokio::sync::mpsc;
@@ -89,7 +90,7 @@ pub struct Grabbable {
 
 	prev_pose: Affine3A,
 	relative_transform: Affine3A, // Relative transform matrix during grab
-	pub pose: Affine3A,
+	pose: Affine3A,
 
 	closest_point_tx: mpsc::Sender<Vec3>,
 	closest_point_rx: mpsc::Receiver<Vec3>,
@@ -104,7 +105,7 @@ impl Grabbable {
 		field: &Field,
 		settings: GrabbableSettings,
 	) -> Result<Self, NodeError> {
-		let input = InputHandler::create(content_space, Transform::none(), field)?.queue()?;
+		let input = InputHandler::create(content_space, Transform::identity(), field)?.queue()?;
 		let content_parent =
 			Spatial::create(input.handler(), content_transform, settings.zoneable)?;
 
@@ -203,8 +204,25 @@ impl Grabbable {
 	pub fn grab_action(&self) -> &SingleAction {
 		&self.grab_action
 	}
-	pub fn content_parent(&self) -> &Spatial {
-		&self.content_parent
+	pub fn content_parent(&self) -> SpatialRef {
+		self.content_parent.clone().as_spatial_ref()
+	}
+
+	pub fn pose(&self) -> (Vector3<f32>, Quaternion) {
+		let (_, rot, pos) = self.pose.to_scale_rotation_translation();
+		(pos.into(), rot.into())
+	}
+
+	pub fn set_pose(&mut self, pos: impl Into<Vector3<f32>>, rot: impl Into<Quaternion>) {
+		let pos = pos.into();
+		let rot = rot.into();
+		self.pose = Affine3A::from_rotation_translation(rot.into(), pos.into());
+		self.content_parent
+			.set_relative_transform(
+				self.input.handler(),
+				Transform::from_translation_rotation(pos, rot),
+			)
+			.unwrap();
 	}
 
 	pub fn set_enabled(&self, enabled: bool) -> Result<(), NodeError> {
@@ -292,11 +310,12 @@ impl UIElement for Grabbable {
 			};
 
 			let (_, new_rotation, new_position) = self.pose.to_scale_rotation_translation();
+			dbg!((new_position, new_rotation));
 			self.content_parent
-				.set_local_transform(Transform::from_translation_rotation(
-					new_position,
-					new_rotation,
-				))
+				.set_relative_transform(
+					self.input.handler(),
+					Transform::from_translation_rotation(new_position, new_rotation),
+				)
 				.unwrap();
 		}
 
@@ -330,6 +349,8 @@ impl UIElement for Grabbable {
 
 		if self.grab_action.actor_stopped() {
 			debug!("Stopped grabbing");
+
+			self.relative_transform = Affine3A::IDENTITY;
 
 			let _ = self.closest_point_rx.try_recv();
 		}
@@ -366,10 +387,10 @@ impl FrameSensitive for Grabbable {
 				self.prev_pose = self.pose;
 				let (_, rotation, translation) = self.pose.to_scale_rotation_translation();
 				self.content_parent
-					.set_local_transform(Transform::from_translation_rotation(
-						translation,
-						rotation,
-					))
+					.set_relative_transform(
+						self.input.handler(),
+						Transform::from_translation_rotation(translation, rotation),
+					)
 					.unwrap();
 			}
 		}
