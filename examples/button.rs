@@ -1,4 +1,3 @@
-use glam::Quat;
 use serde::{Deserialize, Serialize};
 use stardust_xr_fusion::{
 	client::Client,
@@ -10,7 +9,6 @@ use stardust_xr_molecules::{
 	button::{Button, ButtonSettings},
 	DebugSettings, UIElement, VisualDebug,
 };
-use std::f32::consts::PI;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -39,7 +37,7 @@ async fn main() {
 
 	let text = Text::create(
 		button.touch_plane().root(),
-		Transform::from_translation_rotation([0.0, -0.06, 0.0], Quat::from_rotation_y(PI)),
+		Transform::from_translation([0.0, -0.06, 0.0]),
 		"Unpressed",
 		TextStyle {
 			character_height: 0.01,
@@ -53,7 +51,7 @@ async fn main() {
 		.sync_event_loop(|client, _flow| {
 			while let Some(root_event) = client.get_root().recv_root_event() {
 				match root_event {
-					RootEvent::Ping { response } => response.send(Ok(())),
+					RootEvent::Ping { response } => response.send_ok(()),
 					RootEvent::SaveState { response } => response.wrap(|| {
 						ClientState::from_data_root(None::<()>, button.touch_plane().root())
 					}),

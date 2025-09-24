@@ -8,7 +8,7 @@ use stardust_xr_fusion::{
 use stardust_xr_molecules::{
 	lines::LineExt, touch_plane::TouchPlane, DebugSettings, UIElement, VisualDebug,
 };
-use std::f32::consts::PI;
+use std::f32::consts::{FRAC_PI_2, PI};
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main(flavor = "current_thread")]
@@ -36,7 +36,7 @@ async fn main() {
 		.sync_event_loop(|client, _flow| {
 			while let Some(root_event) = client.get_root().recv_root_event() {
 				if let RootEvent::Ping { response } = root_event {
-					response.send(Ok(()))
+					response.send_ok(())
 				}
 			}
 
@@ -47,9 +47,10 @@ async fn main() {
 					let radius = 0.01 + depth.abs() * 0.1; // Increased multiplier for more pronounced radius change
 					let circle = stardust_xr_molecules::lines::circle(16, 0.0, radius)
 						.thickness(0.002)
-						.transform(glam::Mat4::from_translation(Vec3::new(
-							point.x, point.y, 0.0,
-						)));
+						.transform(
+							glam::Mat4::from_translation(Vec3::new(point.x, point.y, 0.0))
+								* glam::Mat4::from_rotation_x(FRAC_PI_2),
+						);
 					lines.push(circle);
 				}
 				touch_visualizer.set_lines(&lines).unwrap();

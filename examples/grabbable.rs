@@ -13,7 +13,6 @@ use stardust_xr_molecules::{
 	DebugSettings, FrameSensitive, Grabbable, GrabbableSettings, PointerMode, UIElement,
 	VisualDebug,
 };
-use std::sync::Arc;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main(flavor = "current_thread")]
@@ -39,14 +38,13 @@ async fn main() {
 		.await
 		.unwrap()
 		.unwrap();
-	let field = Arc::new(
-		Field::create(
-			&model,
-			Transform::from_translation(bounds.center),
-			Shape::Box(bounds.size),
-		)
-		.unwrap(),
-	);
+	dbg!(&bounds);
+	let field = Field::create(
+		&model,
+		Transform::from_translation(bounds.center),
+		Shape::Box(bounds.size),
+	)
+	.unwrap();
 
 	let root = Spatial::create(
 		client.get_root(),
@@ -84,13 +82,13 @@ async fn main() {
 			while let Some(root_event) = client.get_root().recv_root_event() {
 				match root_event {
 					RootEvent::Frame { info } => grabbable.frame(&info),
-					RootEvent::SaveState { response } => response.wrap(|| {
+					RootEvent::SaveState { response } => response.send_ok({
 						root.set_relative_transform(
 							&grabbable.content_parent(),
 							Transform::from_translation([0.0; 3]),
 						)
 						.unwrap();
-						Ok(ClientState {
+						ClientState {
 							data: None,
 							root: root.node().id(),
 							spatial_anchors: [(
@@ -99,9 +97,9 @@ async fn main() {
 							)]
 							.into_iter()
 							.collect(),
-						})
+						}
 					}),
-					RootEvent::Ping { response } => response.send(Ok(())),
+					RootEvent::Ping { response } => response.send_ok(()),
 				}
 			}
 		})

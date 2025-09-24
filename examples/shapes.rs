@@ -55,7 +55,7 @@ async fn main() {
 		.sync_event_loop(|client, _flow| {
 			while let Some(root_event) = client.get_root().recv_root_event() {
 				if let stardust_xr_fusion::root::RootEvent::Ping { response } = root_event {
-					response.send(Ok(()));
+					response.send_ok(());
 				}
 			}
 		})
