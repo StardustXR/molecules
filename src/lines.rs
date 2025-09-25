@@ -1,9 +1,9 @@
-use glam::{vec3, Mat4, Vec3, Vec3A};
+use glam::{Mat4, Vec3, Vec3A, vec3};
 use lerp::Lerp;
 use stardust_xr_fusion::{
 	core::values::{
-		color::{color_space::LinearRgb, Rgba},
 		Mat4 as Matrix4, Vector3,
+		color::{Rgba, color_space::LinearRgb},
 	},
 	drawable::{Line, LinePoint},
 	fields::{CylinderShape, Shape, TorusShape},

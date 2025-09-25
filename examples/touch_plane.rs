@@ -6,7 +6,7 @@ use stardust_xr_fusion::{
 	spatial::{Spatial, Transform},
 };
 use stardust_xr_molecules::{
-	lines::LineExt, touch_plane::TouchPlane, DebugSettings, UIElement, VisualDebug,
+	DebugSettings, UIElement, VisualDebug, lines::LineExt, touch_plane::TouchPlane,
 };
 use std::f32::consts::{FRAC_PI_2, PI};
 use tracing_subscriber::EnvFilter;

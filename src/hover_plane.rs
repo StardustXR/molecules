@@ -1,14 +1,14 @@
 use crate::{
+	DebugSettings, VisualDebug,
 	input_action::{DeltaSet, InputQueue, InputQueueable, SingleAction},
 	lines::{self, LineExt},
-	DebugSettings, VisualDebug,
 };
-use glam::{vec3, Mat4, Vec3};
+use glam::{Mat4, Vec3, vec3};
 use map_range::MapRange;
 use stardust_xr_fusion::{
 	core::values::{
-		color::{color_space::LinearRgb, rgba_linear, Rgba},
 		Vector2, Vector3,
+		color::{Rgba, color_space::LinearRgb, rgba_linear},
 	},
 	drawable::{Line, LinePoint, Lines, LinesAspect},
 	fields::{Field, FieldAspect, Shape},
@@ -207,10 +207,10 @@ impl HoverPlane {
 			.iter()
 			.filter_map(|i| self.line_from_input(i, false))
 			.collect::<Vec<_>>();
-		if let Some(input) = self.interact.actor().cloned() {
-			if let Some(line) = self.line_from_input(&input, true) {
-				hovered_lines.push(line);
-			}
+		if let Some(input) = self.interact.actor()
+			&& let Some(line) = self.line_from_input(input, true)
+		{
+			hovered_lines.push(line);
 		}
 		self.lines.set_lines(&hovered_lines).unwrap();
 	}

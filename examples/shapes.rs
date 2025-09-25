@@ -1,4 +1,4 @@
-use glam::{vec3, Mat4, Vec3};
+use glam::{Mat4, Vec3, vec3};
 use stardust_xr_fusion::{
 	client::Client,
 	drawable::Lines,
@@ -6,7 +6,7 @@ use stardust_xr_fusion::{
 	root::RootAspect,
 	spatial::{Spatial, Transform},
 };
-use stardust_xr_molecules::lines::{shape, LineExt};
+use stardust_xr_molecules::lines::{LineExt, shape};
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main(flavor = "current_thread")]

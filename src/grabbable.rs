@@ -1,9 +1,9 @@
 use crate::{
-	input_action::{grab_pinch_interact, InputQueue, InputQueueable, SingleAction},
-	lines::{axes, bounding_box, LineExt},
 	FrameSensitive, UIElement, VisualDebug,
+	input_action::{InputQueue, InputQueueable, SingleAction, grab_pinch_interact},
+	lines::{LineExt, axes, bounding_box},
 };
-use glam::{vec3, Affine3A, Quat, Vec3};
+use glam::{Affine3A, Quat, Vec3, vec3};
 use stardust_xr_fusion::{
 	core::values::Vector3,
 	drawable::{Lines, LinesAspect},

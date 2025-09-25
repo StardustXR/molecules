@@ -6,8 +6,8 @@ use stardust_xr_fusion::{
 	spatial::{Spatial, Transform},
 };
 use stardust_xr_molecules::{
-	button::{Button, ButtonSettings},
 	DebugSettings, UIElement, VisualDebug,
+	button::{Button, ButtonSettings},
 };
 use tracing_subscriber::EnvFilter;
 

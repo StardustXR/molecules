@@ -6,8 +6,8 @@ use stardust_xr_fusion::{
 	spatial::{Spatial, Transform},
 };
 use stardust_xr_molecules::{
-	hover_plane::{HoverPlane, HoverPlaneSettings},
 	DebugSettings, VisualDebug,
+	hover_plane::{HoverPlane, HoverPlaneSettings},
 };
 use tracing_subscriber::EnvFilter;
 

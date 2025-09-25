@@ -1,14 +1,14 @@
 use crate::{
-	lines::{circle, rounded_rectangle, LineExt},
-	touch_plane::TouchPlane,
 	UIElement, VisualDebug,
+	lines::{LineExt, circle, rounded_rectangle},
+	touch_plane::TouchPlane,
 };
-use glam::{vec3, Mat4};
+use glam::{Mat4, vec3};
 use map_range::MapRange;
 use stardust_xr_fusion::{
 	core::values::{
-		color::{color_space::LinearRgb, rgba_linear, Rgba},
 		Vector2,
+		color::{Rgba, color_space::LinearRgb, rgba_linear},
 	},
 	drawable::{Lines, LinesAspect},
 	node::NodeError,

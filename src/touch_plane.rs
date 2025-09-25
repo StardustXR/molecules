@@ -1,12 +1,12 @@
 use crate::{
+	DebugSettings, UIElement, VisualDebug,
 	input_action::{InputQueue, InputQueueable, MultiAction},
 	lines::{self, LineExt},
-	DebugSettings, UIElement, VisualDebug,
 };
-use glam::{vec3, Mat4, Vec3};
+use glam::{Mat4, Vec3, vec3};
 use map_range::MapRange;
 use stardust_xr_fusion::{
-	core::values::{color::rgba_linear, Vector2, Vector3},
+	core::values::{Vector2, Vector3, color::rgba_linear},
 	drawable::Lines,
 	fields::{Field, FieldAspect, Shape},
 	input::{InputData, InputDataType, InputHandler},

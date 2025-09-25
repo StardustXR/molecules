@@ -18,7 +18,7 @@ pub use exposure::*;
 pub use grabbable::*;
 
 use stardust_xr_fusion::{
-	core::values::color::{color_space::LinearRgb, rgba_linear, Rgba},
+	core::values::color::{Rgba, color_space::LinearRgb, rgba_linear},
 	root::FrameInfo,
 };
 

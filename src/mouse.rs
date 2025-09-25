@@ -1,4 +1,4 @@
-use crate::dbus::{create_spatial_dbus, AbortOnDrop, DbusObjectHandle, DbusObjectHandles};
+use crate::dbus::{AbortOnDrop, DbusObjectHandle, DbusObjectHandles, create_spatial_dbus};
 use futures_util::StreamExt;
 use rustc_hash::{FxHashMap, FxHashSet};
 use stardust_xr_fusion::{

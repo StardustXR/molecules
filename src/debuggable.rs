@@ -2,9 +2,9 @@ use std::marker::PhantomData;
 
 use stardust_xr_fusion::{fields::Field, spatial::Spatial};
 use tokio::sync::watch;
-use zbus::{zvariant::OwnedObjectPath, Connection};
+use zbus::{Connection, zvariant::OwnedObjectPath};
 
-use crate::dbus::{create_spatial_dbus, DbusObjectHandle};
+use crate::dbus::{DbusObjectHandle, create_spatial_dbus};
 
 pub struct Debuggable {
 	pub reader: watch::Receiver<bool>,
