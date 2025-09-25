@@ -1,5 +1,6 @@
 pub mod button;
 pub mod dbus;
+pub mod debuggable;
 mod exposure;
 mod grabbable;
 pub mod hover_plane;
@@ -11,7 +12,7 @@ pub mod multi;
 pub mod state_machine;
 pub mod touch_plane;
 pub mod tracked;
-pub mod debuggable;
+pub mod zoneable;
 
 pub use exposure::*;
 pub use grabbable::*;
