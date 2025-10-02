@@ -24,16 +24,17 @@ impl Reparentable {
 	pub fn create(
 		connection: Connection,
 		path: impl AsRef<Path>,
-		parent: SpatialRef,
+		initial_parent: SpatialRef,
+		spatial: Spatial,
 		field: Option<Field>,
 	) -> NodeResult<Self> {
 		let path: OwnedObjectPath = path.as_ref().to_str().unwrap().try_into().unwrap();
 
-		let spatial = Spatial::create(&parent, Transform::identity(), false)?;
+		spatial.set_spatial_parent_in_place(&initial_parent)?;
 
 		let (captured_by_sender, captured_by) = watch::channel(None);
 		let reparentable = ReparentableInner {
-			initial_parent: parent.clone(),
+			initial_parent,
 			spatial: spatial.clone(),
 			captured_by,
 		};
