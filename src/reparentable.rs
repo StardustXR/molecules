@@ -16,12 +16,12 @@ use zbus::{
 	zvariant::OwnedObjectPath,
 };
 
-pub struct Zoneable {
+pub struct Reparentable {
 	initial_parent: SpatialRef,
 	spatial: Spatial,
 	captured_by: watch::Receiver<Option<UniqueName<'static>>>,
 }
-impl Zoneable {
+impl Reparentable {
 	pub fn create(
 		connection: Connection,
 		path: impl AsRef<Path>,
@@ -33,12 +33,12 @@ impl Zoneable {
 		let spatial = Spatial::create(&parent, Transform::identity(), false)?;
 
 		let (captured_by_sender, captured_by) = watch::channel(None);
-		let zoneable = Zoneable {
+		let zoneable = Reparentable {
 			initial_parent: parent.clone(),
 			spatial: spatial.clone(),
 			captured_by,
 		};
-		let capture_zoneable = CaptureZoneable(captured_by_sender);
+		let capture_zoneable = ReparentLock(captured_by_sender);
 
 		let abort_handle = tokio::spawn({
 			let connection = connection.clone();
@@ -79,7 +79,7 @@ impl Zoneable {
 						};
 						let Ok(interface) = connection
 							.object_server()
-							.interface::<_, CaptureZoneable>(&path)
+							.interface::<_, ReparentLock>(&path)
 							.await
 						else {
 							continue;
@@ -95,16 +95,16 @@ impl Zoneable {
 			AbortOnDrop(abort_handle),
 			DbusObjectHandle::<SpatialObject>(connection.clone(), path.clone(), PhantomData),
 			DbusObjectHandle::<FieldObject>(connection.clone(), path.clone(), PhantomData),
-			DbusObjectHandle::<Zoneable>(connection.clone(), path.clone(), PhantomData),
-			DbusObjectHandle::<CaptureZoneable>(connection.clone(), path.clone(), PhantomData),
+			DbusObjectHandle::<Reparentable>(connection.clone(), path.clone(), PhantomData),
+			DbusObjectHandle::<ReparentLock>(connection.clone(), path.clone(), PhantomData),
 		))))
 	}
 }
 #[zbus::interface(
-	name = "org.stardustxr.Zoneable",
-	proxy(async_name = "ZoneableProxy", gen_blocking = false)
+	name = "org.stardustxr.Reparentable",
+	proxy(async_name = "ReparentableProxy", gen_blocking = false)
 )]
-impl Zoneable {
+impl Reparentable {
 	async fn parent(&mut self, #[zbus(header)] header: Header<'_>, spatial: u64) {
 		if let Some(captured) = self.captured_by.borrow_and_update().deref()
 			&& let Some(sender) = header.sender()
@@ -152,8 +152,8 @@ impl Zoneable {
 	}
 }
 
-struct CaptureZoneable(watch::Sender<Option<UniqueName<'static>>>);
-impl CaptureZoneable {
+struct ReparentLock(watch::Sender<Option<UniqueName<'static>>>);
+impl ReparentLock {
 	async fn release_body(&mut self, sender: UniqueName<'static>) {
 		self.0.send_modify(move |capture| {
 			if let Some(current_capture) = capture
@@ -165,18 +165,18 @@ impl CaptureZoneable {
 	}
 }
 #[zbus::interface(
-	name = "org.stardustxr.CaptureZoneable",
-	proxy(async_name = "CaptureZoneableProxy", gen_blocking = false)
+	name = "org.stardustxr.ReparentLock",
+	proxy(async_name = "ReparentLockProxy", gen_blocking = false)
 )]
-impl CaptureZoneable {
-	async fn capture(&mut self, #[zbus(header)] header: Header<'_>) {
+impl ReparentLock {
+	async fn lock(&mut self, #[zbus(header)] header: Header<'_>) {
 		let Some(sender) = header.sender() else {
 			return;
 		};
 
 		let _ = self.0.send(Some(sender.to_owned()));
 	}
-	async fn release(&mut self, #[zbus(header)] header: Header<'_>) {
+	async fn unlock(&mut self, #[zbus(header)] header: Header<'_>) {
 		let Some(sender) = header.sender() else {
 			return;
 		};
