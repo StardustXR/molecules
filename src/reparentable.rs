@@ -17,9 +17,8 @@ use zbus::{
 };
 
 pub struct Reparentable {
-	initial_parent: SpatialRef,
-	spatial: Spatial,
-	captured_by: watch::Receiver<Option<UniqueName<'static>>>,
+	pub spatial: SpatialRef,
+	_object_handles: DbusObjectHandles,
 }
 impl Reparentable {
 	pub fn create(
@@ -27,23 +26,24 @@ impl Reparentable {
 		path: impl AsRef<Path>,
 		parent: SpatialRef,
 		field: Option<Field>,
-	) -> NodeResult<DbusObjectHandles> {
+	) -> NodeResult<Self> {
 		let path: OwnedObjectPath = path.as_ref().to_str().unwrap().try_into().unwrap();
 
 		let spatial = Spatial::create(&parent, Transform::identity(), false)?;
 
 		let (captured_by_sender, captured_by) = watch::channel(None);
-		let zoneable = Reparentable {
+		let reparentable = ReparentableInner {
 			initial_parent: parent.clone(),
 			spatial: spatial.clone(),
 			captured_by,
 		};
-		let capture_zoneable = ReparentLock(captured_by_sender);
+		let reparent_lock = ReparentLock(captured_by_sender);
 
 		let abort_handle = tokio::spawn({
 			let connection = connection.clone();
 			let path = path.clone();
 			let field = field.clone();
+			let spatial = spatial.clone();
 
 			async move {
 				if let Some(field) = field {
@@ -58,10 +58,13 @@ impl Reparentable {
 					.object_server()
 					.at(path.clone(), spatial_object)
 					.await;
-				let _ = connection.object_server().at(path.clone(), zoneable).await;
 				let _ = connection
 					.object_server()
-					.at(path.clone(), capture_zoneable)
+					.at(path.clone(), reparentable)
+					.await;
+				let _ = connection
+					.object_server()
+					.at(path.clone(), reparent_lock)
 					.await;
 
 				let Ok(dbus_proxy) = fdo::DBusProxy::new(&connection).await else {
@@ -91,20 +94,33 @@ impl Reparentable {
 		})
 		.abort_handle();
 
-		Ok(DbusObjectHandles(Box::new((
-			AbortOnDrop(abort_handle),
-			DbusObjectHandle::<SpatialObject>(connection.clone(), path.clone(), PhantomData),
-			DbusObjectHandle::<FieldObject>(connection.clone(), path.clone(), PhantomData),
-			DbusObjectHandle::<Reparentable>(connection.clone(), path.clone(), PhantomData),
-			DbusObjectHandle::<ReparentLock>(connection.clone(), path.clone(), PhantomData),
-		))))
+		Ok(Reparentable {
+			spatial: spatial.as_spatial_ref(),
+			_object_handles: DbusObjectHandles(Box::new((
+				AbortOnDrop(abort_handle),
+				DbusObjectHandle::<SpatialObject>(connection.clone(), path.clone(), PhantomData),
+				DbusObjectHandle::<FieldObject>(connection.clone(), path.clone(), PhantomData),
+				DbusObjectHandle::<ReparentableInner>(
+					connection.clone(),
+					path.clone(),
+					PhantomData,
+				),
+				DbusObjectHandle::<ReparentLock>(connection.clone(), path.clone(), PhantomData),
+			))),
+		})
 	}
+}
+
+struct ReparentableInner {
+	initial_parent: SpatialRef,
+	spatial: Spatial,
+	captured_by: watch::Receiver<Option<UniqueName<'static>>>,
 }
 #[zbus::interface(
 	name = "org.stardustxr.Reparentable",
 	proxy(async_name = "ReparentableProxy", gen_blocking = false)
 )]
-impl Reparentable {
+impl ReparentableInner {
 	async fn parent(&mut self, #[zbus(header)] header: Header<'_>, spatial: u64) {
 		if let Some(captured) = self.captured_by.borrow_and_update().deref()
 			&& let Some(sender) = header.sender()
