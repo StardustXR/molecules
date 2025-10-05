@@ -14,6 +14,7 @@ pub mod state_machine;
 pub mod touch_plane;
 pub mod tracked;
 pub mod zone;
+pub mod beam;
 
 pub use exposure::*;
 pub use grabbable::*;
