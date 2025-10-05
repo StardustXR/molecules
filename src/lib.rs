@@ -13,6 +13,7 @@ pub mod reparentable;
 pub mod state_machine;
 pub mod touch_plane;
 pub mod tracked;
+pub mod zone;
 
 pub use exposure::*;
 pub use grabbable::*;
