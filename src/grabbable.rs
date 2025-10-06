@@ -10,7 +10,7 @@ use stardust_xr_fusion::{
 	drawable::{Lines, LinesAspect},
 	fields::{Field, FieldRefAspect},
 	input::{InputDataType, InputHandler},
-	node::{NodeError, NodeResult, NodeType},
+	node::{NodeError, NodeType},
 	root::FrameInfo,
 	spatial::{Spatial, SpatialAspect, SpatialRef, SpatialRefAspect, Transform},
 	values::Quaternion,
@@ -145,21 +145,24 @@ impl Grabbable {
 			linear_velocity: None,
 			angular_velocity: None,
 		};
-		grabbable.reparentable = grabbable
-			.settings
-			.reparentable
-			.then(|| grabbable.create_reparentable().ok())
-			.flatten();
+		grabbable.make_reparentable();
 		Ok(grabbable)
 	}
-	fn create_reparentable(&self) -> NodeResult<Reparentable> {
-		Reparentable::create(
-			self.connection.clone(),
-			&self.path,
-			self.input.handler().clone().as_spatial_ref(),
-			self.content_parent.clone(),
-			Some(self.field.clone()),
-		)
+	fn make_reparentable(&mut self) {
+		self.reparentable = self
+			.settings
+			.reparentable
+			.then(|| {
+				Reparentable::create(
+					self.connection.clone(),
+					&self.path,
+					self.input.handler().clone().as_spatial_ref(),
+					self.content_parent.clone(),
+					Some(self.field.clone()),
+				)
+				.ok()
+			})
+			.flatten();
 	}
 	const LINEAR_VELOCITY_STOP_THRESHOLD: f32 = 0.001;
 	fn apply_linear_momentum(&mut self, info: &FrameInfo, settings: MomentumSettings) {
@@ -171,11 +174,7 @@ impl Grabbable {
 			self.linear_velocity.take();
 
 			// lets us slide the grabbable into a zone seamlessly
-			self.reparentable = self
-				.settings
-				.reparentable
-				.then(|| self.create_reparentable().ok())
-				.flatten();
+			self.make_reparentable();
 		} else {
 			*velocity *= (1.0 - settings.drag * delta).clamp(0.0, 1.0);
 			self.pose *= Affine3A::from_translation(*velocity * delta);
@@ -376,6 +375,10 @@ impl UIElement for Grabbable {
 
 		if self.grab_action.actor_stopped() {
 			debug!("Stopped grabbing");
+
+			if self.settings.linear_momentum.is_none() {
+				self.make_reparentable();
+			}
 
 			self.relative_transform = Affine3A::IDENTITY;
 

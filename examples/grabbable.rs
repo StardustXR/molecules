@@ -14,6 +14,7 @@ use stardust_xr_molecules::{
 	VisualDebug,
 };
 use tracing_subscriber::EnvFilter;
+use zbus::Connection;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
@@ -52,7 +53,10 @@ async fn main() {
 		false,
 	)
 	.unwrap();
+	let connection = Connection::session().await.unwrap();
 	let mut grabbable = Grabbable::create(
+		connection,
+		"/Grabbable",
 		&root,
 		Transform::identity(),
 		&field,
