@@ -2,6 +2,7 @@ use crate::{
 	FrameSensitive, UIElement, VisualDebug,
 	input_action::{InputQueue, InputQueueable, SingleAction, grab_pinch_interact},
 	lines::{LineExt, axes, bounding_box},
+	reparentable::Reparentable,
 };
 use glam::{Affine3A, Quat, Vec3, vec3};
 use stardust_xr_fusion::{
@@ -9,14 +10,18 @@ use stardust_xr_fusion::{
 	drawable::{Lines, LinesAspect},
 	fields::{Field, FieldRefAspect},
 	input::{InputDataType, InputHandler},
-	node::{NodeError, NodeType},
+	node::{NodeError, NodeResult, NodeType},
 	root::FrameInfo,
 	spatial::{Spatial, SpatialAspect, SpatialRef, SpatialRefAspect, Transform},
 	values::Quaternion,
 };
-use std::f32::consts::PI;
+use std::{
+	f32::consts::PI,
+	path::{Path, PathBuf},
+};
 use tokio::sync::mpsc;
 use tracing::{debug, trace};
+use zbus::Connection;
 
 fn swing_direction(direction: Vec3) -> Quat {
 	let pitch = direction.y.asin();
@@ -57,7 +62,7 @@ pub struct GrabbableSettings {
 	/// How should pointers be handled?
 	pub pointer_mode: PointerMode,
 	/// Should the object be movable by zones?
-	pub zoneable: bool,
+	pub reparentable: bool,
 }
 impl Default for GrabbableSettings {
 	fn default() -> Self {
@@ -73,12 +78,15 @@ impl Default for GrabbableSettings {
 			}),
 			magnet: true,
 			pointer_mode: PointerMode::Parent,
-			zoneable: true,
+			reparentable: true,
 		}
 	}
 }
 
 pub struct Grabbable {
+	reparentable: Option<Reparentable>,
+	path: PathBuf,
+	connection: Connection,
 	content_parent: Spatial,
 	field: Field,
 	input: InputQueue,
@@ -100,6 +108,8 @@ pub struct Grabbable {
 }
 impl Grabbable {
 	pub fn create(
+		connection: Connection,
+		path: impl AsRef<Path>,
 		content_space: &impl SpatialRefAspect,
 		content_transform: Transform,
 		field: &Field,
@@ -107,13 +117,15 @@ impl Grabbable {
 	) -> Result<Self, NodeError> {
 		let input = InputHandler::create(content_space, Transform::identity(), field)?.queue()?;
 		let content_parent =
-			Spatial::create(input.handler(), content_transform, settings.zoneable)?;
+			Spatial::create(input.handler(), content_transform, settings.reparentable)?;
 
 		let content_lines = Lines::create(&content_parent, Transform::identity(), &[])?;
 		let root_lines = Lines::create(content_space, Transform::identity(), &[])?;
-
 		let (closest_point_tx, closest_point_rx) = mpsc::channel(1);
-		Ok(Grabbable {
+		let mut grabbable = Grabbable {
+			reparentable: None,
+			connection,
+			path: path.as_ref().to_path_buf(),
 			content_parent,
 			input,
 			grab_action: SingleAction::default(),
@@ -132,7 +144,22 @@ impl Grabbable {
 
 			linear_velocity: None,
 			angular_velocity: None,
-		})
+		};
+		grabbable.reparentable = grabbable
+			.settings
+			.reparentable
+			.then(|| grabbable.create_reparentable().ok())
+			.flatten();
+		Ok(grabbable)
+	}
+	fn create_reparentable(&self) -> NodeResult<Reparentable> {
+		Reparentable::create(
+			self.connection.clone(),
+			&self.path,
+			self.input.handler().clone().as_spatial_ref(),
+			self.content_parent.clone(),
+			Some(self.field.clone()),
+		)
 	}
 	const LINEAR_VELOCITY_STOP_THRESHOLD: f32 = 0.001;
 	fn apply_linear_momentum(&mut self, info: &FrameInfo, settings: MomentumSettings) {
@@ -144,9 +171,11 @@ impl Grabbable {
 			self.linear_velocity.take();
 
 			// lets us slide the grabbable into a zone seamlessly
-			self.content_parent
-				.set_zoneable(self.settings.zoneable)
-				.unwrap();
+			self.reparentable = self
+				.settings
+				.reparentable
+				.then(|| self.create_reparentable().ok())
+				.flatten();
 		} else {
 			*velocity *= (1.0 - settings.drag * delta).clamp(0.0, 1.0);
 			self.pose *= Affine3A::from_translation(*velocity * delta);
@@ -323,8 +352,7 @@ impl UIElement for Grabbable {
 				id = self.grab_action.actor().as_ref().unwrap().id,
 				"Started grabbing"
 			);
-			self.content_parent.set_zoneable(false).unwrap();
-
+			self.reparentable.take();
 			'magnet: {
 				if self.settings.magnet {
 					// if we have magnet strength, store the closest point so we can lerp that to the grab point
