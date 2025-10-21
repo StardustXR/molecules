@@ -63,7 +63,6 @@ async fn main() {
 		GrabbableSettings {
 			pointer_mode: PointerMode::Move,
 			magnet: true,
-			reparentable: false,
 			..Default::default()
 		},
 	)

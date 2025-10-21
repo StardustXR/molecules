@@ -11,6 +11,7 @@ use stardust_xr_fusion::{
 	spatial::SpatialRef,
 };
 use tracing::error;
+use zbus::names::InterfaceName;
 
 pub struct Beam {
 	beam_origin: SpatialRef,
@@ -40,7 +41,7 @@ impl<Ctx: BeamQueryContext> Queryable<Ctx> for Beamable {
 		connection: &zbus::Connection,
 		ctx: &Arc<Ctx>,
 		object: &ObjectInfo,
-		contains_interface: &(impl Fn(&str) -> bool + Send + Sync),
+		contains_interface: &(impl Fn(&InterfaceName) -> bool + Send + Sync),
 	) -> Option<Self> {
 		let field_ref = FieldRef::try_new(connection, ctx, object, contains_interface).await?;
 		let beam = ctx.get_beam();

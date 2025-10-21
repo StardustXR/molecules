@@ -223,9 +223,7 @@ async fn mouse_send() {
 	let async_loop = client.async_event_loop();
 
 	let connection = connect_client().await.unwrap();
-	let object_registry = object_registry::ObjectRegistry::new(&connection)
-		.await
-		.unwrap();
+	let object_registry = object_registry::ObjectRegistry::new(&connection).await;
 
 	let objects = object_registry
 		.get_objects(&OwnedInterfaceName::try_from("org.stardustxr.Mousev1").unwrap());

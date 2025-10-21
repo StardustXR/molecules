@@ -10,6 +10,7 @@ use stardust_xr_fusion::{
 	spatial::SpatialRef,
 };
 use tracing::error;
+use zbus::names::InterfaceName;
 
 pub struct Zone {
 	field: Field,
@@ -19,7 +20,7 @@ impl Zone {
 	pub fn new(field: Field) -> Self {
 		Zone { field, margin: 0.0 }
 	}
-	pub fn new_with_margin(field: Field,margin:f32) -> Self {
+	pub fn new_with_margin(field: Field, margin: f32) -> Self {
 		Zone { field, margin }
 	}
 }
@@ -33,7 +34,7 @@ impl<Ctx: ZoneQueryContext> Queryable<Ctx> for Zoneable {
 		connection: &zbus::Connection,
 		ctx: &Arc<Ctx>,
 		object: &ObjectInfo,
-		contains_interface: &(impl Fn(&str) -> bool + Send + Sync),
+		contains_interface: &(impl Fn(&InterfaceName) -> bool + Send + Sync),
 	) -> Option<Self> {
 		let spatial_ref = SpatialRef::try_new(connection, ctx, object, contains_interface).await?;
 		let zone = ctx.get_zone();
