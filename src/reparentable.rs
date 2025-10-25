@@ -117,10 +117,7 @@ struct ReparentableInner {
 	spatial: Spatial,
 	captured_by: watch::Receiver<Option<UniqueName<'static>>>,
 }
-#[zbus::interface(
-	name = "org.stardustxr.Reparentable",
-	proxy(async_name = "ReparentableProxy", gen_blocking = false)
-)]
+#[zbus::interface(name = "org.stardustxr.Reparentable")]
 impl ReparentableInner {
 	async fn parent(&mut self, #[zbus(header)] header: Header<'_>, spatial: u64) {
 		if let Some(captured) = self.captured_by.borrow_and_update().deref()
@@ -181,10 +178,7 @@ impl ReparentLock {
 		});
 	}
 }
-#[zbus::interface(
-	name = "org.stardustxr.ReparentLock",
-	proxy(async_name = "ReparentLockProxy", gen_blocking = false)
-)]
+#[zbus::interface(name = "org.stardustxr.ReparentLock")]
 impl ReparentLock {
 	async fn lock(&mut self, #[zbus(header)] header: Header<'_>) {
 		let Some(sender) = header.sender() else {
