@@ -5,7 +5,7 @@ use stardust_xr_fusion::{
 	fields::Field,
 	node::{NodeResult, NodeType},
 	objects::{FieldObject, SpatialObject},
-	spatial::{Spatial, SpatialAspect, SpatialRef, Transform},
+	spatial::{Spatial, SpatialAspect, SpatialRef, SpatialRefAspect, Transform},
 };
 use std::{marker::PhantomData, ops::Deref, path::Path};
 use tokio::sync::watch;
@@ -34,11 +34,17 @@ impl Reparentable {
 
 		let (captured_by_sender, captured_by) = watch::channel(None);
 		let reparentable = ReparentableInner {
-			initial_parent,
+			initial_parent: initial_parent.clone(),
 			spatial: spatial.clone(),
 			captured_by,
+			parented_to: None,
 		};
-		let reparent_lock = ReparentLock(captured_by_sender);
+		let reparent_lock = ReparentLock {
+			watch: captured_by_sender,
+			initial_parent,
+			spatial: spatial.clone().as_spatial_ref(),
+			lock_transform: None,
+		};
 
 		let abort_handle = tokio::spawn({
 			let connection = connection.clone();
@@ -81,14 +87,27 @@ impl Reparentable {
 						let BusName::Unique(bus) = args.name else {
 							continue;
 						};
-						let Ok(interface) = connection
+						let Ok(lock_interface) = connection
 							.object_server()
 							.interface::<_, ReparentLock>(&path)
 							.await
 						else {
 							continue;
 						};
-						interface.get_mut().await.release_body(bus.to_owned()).await;
+						let unlock_transform =
+							lock_interface.get_mut().await.release_body(bus.to_owned());
+
+						let Ok(interface) = connection
+							.object_server()
+							.interface::<_, ReparentableInner>(&path)
+							.await
+						else {
+							continue;
+						};
+						interface
+							.get_mut()
+							.await
+							.client_lost(bus.to_owned(), unlock_transform);
 					}
 				}
 			}
@@ -116,6 +135,21 @@ struct ReparentableInner {
 	initial_parent: SpatialRef,
 	spatial: Spatial,
 	captured_by: watch::Receiver<Option<UniqueName<'static>>>,
+	parented_to: Option<UniqueName<'static>>,
+}
+impl ReparentableInner {
+	fn client_lost(&mut self, name: UniqueName<'static>, lock_transform: Option<Transform>) {
+		if self.parented_to.as_ref() == Some(&name) {
+			self.parented_to = None;
+			if let Some(transform) = lock_transform {
+				self.spatial.set_spatial_parent(&self.initial_parent);
+				self.spatial.set_local_transform(transform);
+			} else {
+				self.spatial
+					.set_spatial_parent_in_place(&self.initial_parent);
+			}
+		}
+	}
 }
 #[zbus::interface(name = "org.stardustxr.Reparentable")]
 impl ReparentableInner {
@@ -130,6 +164,9 @@ impl ReparentableInner {
 		else {
 			return;
 		};
+		if let Some(sender) = header.sender() {
+			self.parented_to = Some(sender.to_owned());
+		}
 		let _ = self.spatial.set_spatial_parent_in_place(&spatial_ref);
 	}
 	async fn unparent(&mut self, #[zbus(header)] header: Header<'_>) {
@@ -142,6 +179,7 @@ impl ReparentableInner {
 		let _ = self
 			.spatial
 			.set_spatial_parent_in_place(&self.initial_parent);
+		self.parented_to.take();
 	}
 	/// Use this to reset the local transform of the zoneable object relative to an object.
 	async fn reset_local_transform(
@@ -166,16 +204,29 @@ impl ReparentableInner {
 	}
 }
 
-struct ReparentLock(watch::Sender<Option<UniqueName<'static>>>);
+struct ReparentLock {
+	watch: watch::Sender<Option<UniqueName<'static>>>,
+	initial_parent: SpatialRef,
+	spatial: SpatialRef,
+	lock_transform: Option<Transform>,
+}
 impl ReparentLock {
-	async fn release_body(&mut self, sender: UniqueName<'static>) {
-		self.0.send_modify(move |capture| {
+	fn release_body(&mut self, sender: UniqueName<'static>) -> Option<Transform> {
+		let uncaptured = self.watch.send_if_modified(move |capture| {
 			if let Some(current_capture) = capture
 				&& current_capture == &sender
 			{
 				*capture = None;
+				true
+			} else {
+				false
 			}
 		});
+		if uncaptured {
+			self.lock_transform.take()
+		} else {
+			None
+		}
 	}
 }
 #[zbus::interface(name = "org.stardustxr.ReparentLock")]
@@ -185,12 +236,13 @@ impl ReparentLock {
 			return;
 		};
 
-		let _ = self.0.send(Some(sender.to_owned()));
+		self.lock_transform = self.spatial.get_transform(&self.initial_parent).await.ok();
+		let _ = self.watch.send(Some(sender.to_owned()));
 	}
 	async fn unlock(&mut self, #[zbus(header)] header: Header<'_>) {
 		let Some(sender) = header.sender() else {
 			return;
 		};
-		self.release_body(sender.to_owned()).await;
+		self.release_body(sender.to_owned());
 	}
 }
