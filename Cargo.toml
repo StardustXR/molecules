@@ -22,6 +22,10 @@ lerp = "0.5.0"
 zbus = { version = "5.11.0", features = ["tokio"] }
 futures-util = "0.3.31"
 
+[dependencies.ashpd]
+git = "https://github.com/technobaboo/ashpd.git"
+branch = "feature/custom-session-connection"
+
 [dependencies.stardust-xr-fusion]
 git = "https://github.com/StardustXR/core.git"
 branch = "dev"

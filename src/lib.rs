@@ -1,3 +1,5 @@
+pub mod accent_color;
+pub mod beam;
 pub mod button;
 pub mod dbus;
 pub mod debuggable;
@@ -14,7 +16,6 @@ pub mod state_machine;
 pub mod touch_plane;
 pub mod tracked;
 pub mod zone;
-pub mod beam;
 
 pub use exposure::*;
 pub use grabbable::*;
