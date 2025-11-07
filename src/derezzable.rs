@@ -9,11 +9,11 @@ use std::{marker::PhantomData, path::Path};
 use tokio::sync::mpsc;
 use zbus::{Connection, zvariant::OwnedObjectPath};
 
-pub struct Derez {
+pub struct Derezzable {
 	pub receiver: mpsc::Receiver<()>,
 	_object_handles: DbusObjectHandles,
 }
-impl Derez {
+impl Derezzable {
 	pub fn create(
 		connection: Connection,
 		path: impl AsRef<Path>,
@@ -30,49 +30,28 @@ impl Derez {
 			let path = path.clone();
 
 			async move {
-				println!("[derez] Starting object registration");
 				if let Some(field) = field {
-					println!("[derez] Creating field object");
-					let field_object = match FieldObject::new(field).await {
-						Ok(obj) => obj,
-						Err(e) => {
-							eprintln!("[derez] Failed to create field object: {:?}", e);
-							return;
-						}
+					let Ok(field_object) = FieldObject::new(field).await else {
+						return;
 					};
-					if let Err(e) = connection
+					let _ = connection
 						.object_server()
 						.at(path.clone(), field_object)
-						.await
-					{
-						eprintln!("[derez] Failed to register field object: {:?}", e);
-					}
+						.await;
 				}
-				println!("[derez] Creating spatial object");
-				let spatial_object = match SpatialObject::new(spatial).await {
-					Ok(obj) => obj,
-					Err(e) => {
-						eprintln!("[derez] Failed to create spatial object: {:?}", e);
-						return;
-					}
+				let Ok(spatial_object) = SpatialObject::new(spatial).await else {
+					return;
 				};
-				if let Err(e) = connection
+				let _ = connection
 					.object_server()
 					.at(path.clone(), spatial_object)
-					.await
-				{
-					eprintln!("[derez] Failed to register spatial object: {:?}", e);
-				}
-				println!("[derez] Registering derez interface");
-				if let Err(e) = connection.object_server().at(path.clone(), derez).await {
-					eprintln!("[derez] Failed to register derez interface: {:?}", e);
-				}
-				println!("[derez] All registrations complete");
+					.await;
+				let _ = connection.object_server().at(path.clone(), derez).await;
 			}
 		})
 		.abort_handle();
 
-		Ok(Derez {
+		Ok(Derezzable {
 			receiver: derez_rx,
 			_object_handles: DbusObjectHandles(Box::new((
 				AbortOnDrop(abort_handle),
@@ -85,7 +64,10 @@ impl Derez {
 }
 
 struct DerezInner(mpsc::Sender<()>);
-#[zbus::interface(name = "org.stardustxr.Derez")]
+#[zbus::interface(
+	name = "org.stardustxr.Derezzable",
+	proxy(async_name = "DerezzableHandlerProxy")
+)]
 impl DerezInner {
 	async fn derez(&self) {
 		let _ = self.0.send(()).await;
@@ -93,7 +75,7 @@ impl DerezInner {
 }
 
 #[tokio::test]
-async fn derez_dbus() {
+async fn derezzable_dbus() {
 	tokio::spawn(async {
 		tokio::time::sleep(std::time::Duration::from_secs(30)).await;
 		panic!("Timed out")
@@ -111,7 +93,7 @@ async fn derez_dbus() {
 		.await
 		.unwrap();
 
-	let mut derez = Derez::create(connection.clone(), "/", spatial, None).unwrap();
+	let mut derez = Derezzable::create(connection.clone(), "/", spatial, None).unwrap();
 	derez.receiver.recv().await.unwrap();
 	println!("Received derez");
 }
