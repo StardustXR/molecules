@@ -3,6 +3,7 @@ pub mod beam;
 pub mod button;
 pub mod dbus;
 pub mod debuggable;
+pub mod destroy;
 mod exposure;
 mod grabbable;
 pub mod hover_plane;
