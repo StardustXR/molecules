@@ -142,10 +142,11 @@ impl ReparentableInner {
 		if self.parented_to.as_ref() == Some(&name) {
 			self.parented_to = None;
 			if let Some(transform) = lock_transform {
-				self.spatial.set_spatial_parent(&self.initial_parent);
-				self.spatial.set_local_transform(transform);
+				let _ = self.spatial.set_spatial_parent(&self.initial_parent);
+				let _ = self.spatial.set_local_transform(transform);
 			} else {
-				self.spatial
+				let _ = self
+					.spatial
 					.set_spatial_parent_in_place(&self.initial_parent);
 			}
 		}
