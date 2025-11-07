@@ -22,21 +22,21 @@ impl Derez {
 	) -> NodeResult<Self> {
 		let path: OwnedObjectPath = path.as_ref().to_str().unwrap().try_into().unwrap();
 
-		let (destroy_tx, destroy_rx) = mpsc::channel(6);
-		let destroy = DerezInner(destroy_tx);
+		let (derez_tx, derez_rx) = mpsc::channel(6);
+		let derez = DerezInner(derez_tx);
 
 		let abort_handle = tokio::spawn({
 			let connection = connection.clone();
 			let path = path.clone();
 
 			async move {
-				println!("[destroy] Starting object registration");
+				println!("[derez] Starting object registration");
 				if let Some(field) = field {
-					println!("[destroy] Creating field object");
+					println!("[derez] Creating field object");
 					let field_object = match FieldObject::new(field).await {
 						Ok(obj) => obj,
 						Err(e) => {
-							eprintln!("[destroy] Failed to create field object: {:?}", e);
+							eprintln!("[derez] Failed to create field object: {:?}", e);
 							return;
 						}
 					};
@@ -45,14 +45,14 @@ impl Derez {
 						.at(path.clone(), field_object)
 						.await
 					{
-						eprintln!("[destroy] Failed to register field object: {:?}", e);
+						eprintln!("[derez] Failed to register field object: {:?}", e);
 					}
 				}
-				println!("[destroy] Creating spatial object");
+				println!("[derez] Creating spatial object");
 				let spatial_object = match SpatialObject::new(spatial).await {
 					Ok(obj) => obj,
 					Err(e) => {
-						eprintln!("[destroy] Failed to create spatial object: {:?}", e);
+						eprintln!("[derez] Failed to create spatial object: {:?}", e);
 						return;
 					}
 				};
@@ -61,19 +61,19 @@ impl Derez {
 					.at(path.clone(), spatial_object)
 					.await
 				{
-					eprintln!("[destroy] Failed to register spatial object: {:?}", e);
+					eprintln!("[derez] Failed to register spatial object: {:?}", e);
 				}
-				println!("[destroy] Registering destroy interface");
-				if let Err(e) = connection.object_server().at(path.clone(), destroy).await {
-					eprintln!("[destroy] Failed to register destroy interface: {:?}", e);
+				println!("[derez] Registering derez interface");
+				if let Err(e) = connection.object_server().at(path.clone(), derez).await {
+					eprintln!("[derez] Failed to register derez interface: {:?}", e);
 				}
-				println!("[destroy] All registrations complete");
+				println!("[derez] All registrations complete");
 			}
 		})
 		.abort_handle();
 
 		Ok(Derez {
-			receiver: destroy_rx,
+			receiver: derez_rx,
 			_object_handles: DbusObjectHandles(Box::new((
 				AbortOnDrop(abort_handle),
 				DbusObjectHandle::<SpatialObject>(connection.clone(), path.clone(), PhantomData),
@@ -85,7 +85,7 @@ impl Derez {
 }
 
 struct DerezInner(mpsc::Sender<()>);
-#[zbus::interface(name = "org.stardustxr.Destroy")]
+#[zbus::interface(name = "org.stardustxr.Derez")]
 impl DerezInner {
 	async fn derez(&self) {
 		let _ = self.0.send(()).await;
@@ -111,7 +111,7 @@ async fn derez_dbus() {
 		.await
 		.unwrap();
 
-	let mut destroy = Derez::create(connection.clone(), "/", spatial, None).unwrap();
-	destroy.receiver.recv().await.unwrap();
-	println!("Received destroy");
+	let mut derez = Derez::create(connection.clone(), "/", spatial, None).unwrap();
+	derez.receiver.recv().await.unwrap();
+	println!("Received derez");
 }
