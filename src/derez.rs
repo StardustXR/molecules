@@ -9,11 +9,11 @@ use std::{marker::PhantomData, path::Path};
 use tokio::sync::mpsc;
 use zbus::{Connection, zvariant::OwnedObjectPath};
 
-pub struct Destroy {
+pub struct Derez {
 	pub receiver: mpsc::Receiver<()>,
 	_object_handles: DbusObjectHandles,
 }
-impl Destroy {
+impl Derez {
 	pub fn create(
 		connection: Connection,
 		path: impl AsRef<Path>,
@@ -23,7 +23,7 @@ impl Destroy {
 		let path: OwnedObjectPath = path.as_ref().to_str().unwrap().try_into().unwrap();
 
 		let (destroy_tx, destroy_rx) = mpsc::channel(6);
-		let destroy = DestroyInner(destroy_tx);
+		let destroy = DerezInner(destroy_tx);
 
 		let abort_handle = tokio::spawn({
 			let connection = connection.clone();
@@ -72,29 +72,28 @@ impl Destroy {
 		})
 		.abort_handle();
 
-		Ok(Destroy {
+		Ok(Derez {
 			receiver: destroy_rx,
 			_object_handles: DbusObjectHandles(Box::new((
 				AbortOnDrop(abort_handle),
 				DbusObjectHandle::<SpatialObject>(connection.clone(), path.clone(), PhantomData),
 				DbusObjectHandle::<FieldObject>(connection.clone(), path.clone(), PhantomData),
-				DbusObjectHandle::<DestroyInner>(connection.clone(), path.clone(), PhantomData),
+				DbusObjectHandle::<DerezInner>(connection.clone(), path.clone(), PhantomData),
 			))),
 		})
 	}
 }
 
-struct DestroyInner(mpsc::Sender<()>);
+struct DerezInner(mpsc::Sender<()>);
 #[zbus::interface(name = "org.stardustxr.Destroy")]
-impl DestroyInner {
-	async fn destroy(&self) {
-		println!("Destroy called");
+impl DerezInner {
+	async fn derez(&self) {
 		let _ = self.0.send(()).await;
 	}
 }
 
 #[tokio::test]
-async fn destroy_dbus() {
+async fn derez_dbus() {
 	tokio::spawn(async {
 		tokio::time::sleep(std::time::Duration::from_secs(30)).await;
 		panic!("Timed out")
@@ -112,7 +111,7 @@ async fn destroy_dbus() {
 		.await
 		.unwrap();
 
-	let mut destroy = Destroy::create(connection.clone(), "/", spatial, None).unwrap();
+	let mut destroy = Derez::create(connection.clone(), "/", spatial, None).unwrap();
 	destroy.receiver.recv().await.unwrap();
 	println!("Received destroy");
 }

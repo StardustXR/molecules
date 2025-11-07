@@ -3,7 +3,7 @@ pub mod beam;
 pub mod button;
 pub mod dbus;
 pub mod debuggable;
-pub mod destroy;
+mod derez;
 mod exposure;
 mod grabbable;
 pub mod hover_plane;
@@ -18,6 +18,7 @@ pub mod touch_plane;
 pub mod tracked;
 pub mod zone;
 
+pub use derez::Derez;
 pub use exposure::*;
 pub use grabbable::*;
 
