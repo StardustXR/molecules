@@ -121,7 +121,14 @@ impl ButtonVisuals {
 		size: Vector2<f32>,
 		settings: ButtonVisualSettings,
 	) -> Result<Self, NodeError> {
-		let segment_count = (size.x.min(size.y) * 1280.0) as usize / 4 * 4;
+		let min_size = size.x.min(size.y);
+		let segment_count = if min_size < 0.1 {
+			32
+		} else if min_size < 1.0 {
+			64
+		} else {
+			128
+		};
 		let outline = Lines::create(parent, Transform::from_scale([1.0, 1.0, 0.0]), &[])?;
 
 		Ok(ButtonVisuals {
