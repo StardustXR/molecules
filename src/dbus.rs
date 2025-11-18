@@ -1,3 +1,4 @@
+pub use crate::drop_handlers::AbortOnDrop;
 use stardust_xr_fusion::{
 	core::schemas::zbus::Connection,
 	fields::Field,
@@ -5,7 +6,6 @@ use stardust_xr_fusion::{
 	spatial::Spatial,
 };
 use std::{any::Any, marker::PhantomData};
-use tokio::task::AbortHandle;
 use zbus::{object_server::Interface, zvariant::OwnedObjectPath};
 
 #[allow(dead_code)]
@@ -23,13 +23,6 @@ impl<I: Interface> Drop for DbusObjectHandle<I> {
 		tokio::task::spawn(async move {
 			let _ = connection.object_server().remove::<I, _>(object_path).await;
 		});
-	}
-}
-
-pub struct AbortOnDrop(pub AbortHandle);
-impl Drop for AbortOnDrop {
-	fn drop(&mut self) {
-		self.0.abort();
 	}
 }
 

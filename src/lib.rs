@@ -17,6 +17,7 @@ pub mod state_machine;
 pub mod touch_plane;
 pub mod tracked;
 pub mod zone;
+pub mod drop_handlers;
 
 pub use derezzable::*;
 pub use exposure::*;
