@@ -2,7 +2,7 @@ use crate::{
 	FrameSensitive, UIElement, VisualDebug,
 	input_action::{InputQueue, InputQueueable, SingleAction, grab_pinch_interact},
 	lines::{LineExt, axes, bounding_box},
-	reparentable::Reparentable,
+	reparentable::{ReparentTransformReceiver, Reparentable},
 };
 use glam::{Affine3A, Quat, Vec3, vec3};
 use stardust_xr_fusion::{
@@ -61,7 +61,7 @@ pub struct GrabbableSettings {
 	pub magnet: bool,
 	/// How should pointers be handled?
 	pub pointer_mode: PointerMode,
-	/// Should the object be movable by zones?
+	/// Should the object be reparentable?
 	pub reparentable: bool,
 }
 impl Default for GrabbableSettings {
@@ -105,6 +105,9 @@ pub struct Grabbable {
 
 	linear_velocity: Option<Vec3>,
 	angular_velocity: Option<(Vec3, f32)>,
+
+	waiting_for_transform: bool,
+	transform_changed: Option<ReparentTransformReceiver>,
 }
 impl Grabbable {
 	pub fn create(
@@ -144,6 +147,9 @@ impl Grabbable {
 
 			linear_velocity: None,
 			angular_velocity: None,
+
+			waiting_for_transform: false,
+			transform_changed: None,
 		};
 		grabbable.make_reparentable();
 		Ok(grabbable)
@@ -163,6 +169,7 @@ impl Grabbable {
 				.ok()
 			})
 			.flatten();
+		self.transform_changed = self.reparentable.as_ref().map(|v| v.transform_recv());
 	}
 	const LINEAR_VELOCITY_STOP_THRESHOLD: f32 = 0.001;
 	fn apply_linear_momentum(&mut self, info: &FrameInfo, settings: MomentumSettings) {
@@ -177,7 +184,7 @@ impl Grabbable {
 			self.make_reparentable();
 		} else {
 			*velocity *= (1.0 - settings.drag * delta).clamp(0.0, 1.0);
-			self.pose *= Affine3A::from_translation(*velocity * delta);
+			self.pose = Affine3A::from_translation(*velocity * delta) * self.pose;
 			trace!(?velocity, "linear momentum");
 		}
 	}
@@ -191,10 +198,10 @@ impl Grabbable {
 			self.angular_velocity.take();
 		} else {
 			*angle *= (1.0 - settings.drag * delta).clamp(0.0, 1.0);
-			self.pose *= Affine3A::from_rotation_translation(
+			self.pose = Affine3A::from_rotation_translation(
 				Quat::from_axis_angle(*axis, *angle * delta),
 				Vec3::ZERO,
-			);
+			) * self.pose;
 			trace!(?axis, angle, "angular momentum");
 		}
 	}
@@ -276,8 +283,30 @@ impl UIElement for Grabbable {
 			},
 			grab_pinch_interact,
 		);
-
+		let was_waiting_for_transform = self.waiting_for_transform;
+		if let Some(recv) = self.transform_changed.as_ref() {
+			if let Some(pose) = recv.try_changed() {
+				self.pose = Affine3A::from_rotation_translation(
+					pose.rotation.map_or(Quat::IDENTITY, Quat::from),
+					pose.translation.map_or(Vec3::ZERO, Vec3::from),
+				);
+				self.relative_transform = Affine3A::IDENTITY;
+				self.waiting_for_transform = false;
+				self.transform_changed
+					.take_if(|_| self.reparentable.is_none());
+			}
+		}
 		if self.grab_action.actor_started() {
+			self.reparentable.take();
+			self.waiting_for_transform = true;
+		}
+
+		if self.waiting_for_transform {
+			// should this be true or false?
+			return true;
+		}
+
+		if was_waiting_for_transform || self.grab_action.actor_changed() {
 			// Calculate and store the relative transform matrix
 			let actor = self.grab_action.actor().unwrap();
 			let grab_position = match &actor.input {
@@ -346,12 +375,11 @@ impl UIElement for Grabbable {
 				.unwrap();
 		}
 
-		if self.grab_action.actor_started() {
+		if was_waiting_for_transform {
 			debug!(
 				id = self.grab_action.actor().as_ref().unwrap().id,
 				"Started grabbing"
 			);
-			self.reparentable.take();
 			'magnet: {
 				if self.settings.magnet {
 					// if we have magnet strength, store the closest point so we can lerp that to the grab point
@@ -376,7 +404,7 @@ impl UIElement for Grabbable {
 		if self.grab_action.actor_stopped() {
 			debug!("Stopped grabbing");
 
-			if self.settings.linear_momentum.is_none() {
+			if self.linear_velocity().is_none() {
 				self.make_reparentable();
 			}
 
@@ -405,7 +433,9 @@ impl FrameSensitive for Grabbable {
 			}
 			self.prev_pose = self.pose;
 		}
-		if !self.grab_action.actor_acting() {
+		if (!self.grab_action.actor_acting())
+			&& !self.reparentable.as_ref().map_or(false, |v| v.reparented())
+		{
 			if let Some(settings) = self.settings.linear_momentum {
 				self.apply_linear_momentum(info, settings);
 			}

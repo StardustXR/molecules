@@ -1,4 +1,3 @@
-use glam::Quat;
 use stardust_xr_fusion::{
 	client::Client,
 	core::values::ResourceID,
@@ -14,7 +13,7 @@ use stardust_xr_molecules::{
 	VisualDebug,
 };
 use tracing_subscriber::EnvFilter;
-use zbus::Connection;
+use zbus::{conn::Builder, fdo::ObjectManager};
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
@@ -53,7 +52,13 @@ async fn main() {
 		false,
 	)
 	.unwrap();
-	let connection = Connection::session().await.unwrap();
+	let connection = Builder::session()
+		.unwrap()
+		.serve_at("/", ObjectManager)
+		.unwrap()
+		.build()
+		.await
+		.unwrap();
 	let mut grabbable = Grabbable::create(
 		connection,
 		"/Grabbable",
@@ -80,7 +85,7 @@ async fn main() {
 		.sync_event_loop(|client, _flow| {
 			grabbable.handle_events();
 			if grabbable.grab_action().actor_stopped() {
-				grabbable.set_pose([0.0; 3], Quat::IDENTITY);
+				grabbable.set_pose([0.0; 3], glam::Quat::IDENTITY);
 			}
 			while let Some(root_event) = client.get_root().recv_root_event() {
 				match root_event {
@@ -88,7 +93,7 @@ async fn main() {
 					RootEvent::SaveState { response } => response.send_ok({
 						root.set_relative_transform(
 							&grabbable.content_parent(),
-							Transform::from_translation([0.0; 3]),
+							Transform::identity(),
 						)
 						.unwrap();
 						ClientState {

@@ -7,7 +7,15 @@ use stardust_xr_fusion::{
 	objects::{FieldObject, SpatialObject},
 	spatial::{Spatial, SpatialAspect, SpatialRef, SpatialRefAspect, Transform},
 };
-use std::{marker::PhantomData, ops::Deref, path::Path};
+use std::{
+	marker::PhantomData,
+	ops::Deref,
+	path::Path,
+	sync::{
+		Arc, Mutex,
+		atomic::{AtomicBool, Ordering},
+	},
+};
 use tokio::sync::watch;
 use zbus::{
 	fdo,
@@ -19,8 +27,16 @@ use zbus::{
 pub struct Reparentable {
 	pub spatial: SpatialRef,
 	_object_handles: DbusObjectHandles,
+	transform_changed: Arc<Mutex<Option<Transform>>>,
+	reparented: Arc<AtomicBool>,
 }
 impl Reparentable {
+	pub fn reparented(&self) -> bool {
+		self.reparented.load(Ordering::Relaxed)
+	}
+	pub fn transform_recv(&self) -> ReparentTransformReceiver {
+		ReparentTransformReceiver(self.transform_changed.clone())
+	}
 	pub fn create(
 		connection: Connection,
 		path: impl AsRef<Path>,
@@ -33,11 +49,15 @@ impl Reparentable {
 		spatial.set_spatial_parent_in_place(&initial_parent)?;
 
 		let (captured_by_sender, captured_by) = watch::channel(None);
+		let transform_changed = Arc::new(Mutex::new(None));
+		let reparented = Arc::new(AtomicBool::new(false));
 		let reparentable = ReparentableInner {
 			initial_parent: initial_parent.clone(),
 			spatial: spatial.clone(),
 			captured_by,
 			parented_to: None,
+			transform_changed: transform_changed.clone(),
+			reparented: reparented.clone(),
 		};
 		let reparent_lock = ReparentLock {
 			watch: captured_by_sender,
@@ -116,6 +136,7 @@ impl Reparentable {
 
 		Ok(Reparentable {
 			spatial: spatial.as_spatial_ref(),
+			transform_changed,
 			_object_handles: DbusObjectHandles(Box::new((
 				AbortOnDrop(abort_handle),
 				DbusObjectHandle::<SpatialObject>(connection.clone(), path.clone(), PhantomData),
@@ -127,6 +148,7 @@ impl Reparentable {
 				),
 				DbusObjectHandle::<ReparentLock>(connection.clone(), path.clone(), PhantomData),
 			))),
+			reparented,
 		})
 	}
 }
@@ -136,20 +158,43 @@ struct ReparentableInner {
 	spatial: Spatial,
 	captured_by: watch::Receiver<Option<UniqueName<'static>>>,
 	parented_to: Option<UniqueName<'static>>,
+	transform_changed: Arc<Mutex<Option<Transform>>>,
+	reparented: Arc<AtomicBool>,
 }
 impl ReparentableInner {
 	fn client_lost(&mut self, name: UniqueName<'static>, lock_transform: Option<Transform>) {
 		if self.parented_to.as_ref() == Some(&name) {
 			self.parented_to = None;
+			self.reparented.store(false, Ordering::Relaxed);
 			if let Some(transform) = lock_transform {
 				let _ = self.spatial.set_spatial_parent(&self.initial_parent);
 				let _ = self.spatial.set_local_transform(transform);
+				self.transform_changed.lock().unwrap().replace(transform);
 			} else {
 				let _ = self
 					.spatial
 					.set_spatial_parent_in_place(&self.initial_parent);
+				self.request_relative_transform();
 			}
 		}
+	}
+	fn request_relative_transform(&self) {
+		let tx = self.transform_changed.clone();
+		let initial_parent = self.initial_parent.clone();
+		let spatial = self.spatial.clone();
+		tokio::spawn(async move {
+			let transform = spatial.get_transform(&initial_parent).await.unwrap();
+			tx.lock().unwrap().replace(transform);
+		});
+	}
+}
+impl Drop for ReparentableInner {
+	fn drop(&mut self) {
+		_ = self
+			.spatial
+			.set_spatial_parent_in_place(&self.initial_parent);
+		self.reparented.store(false, Ordering::Relaxed);
+		self.request_relative_transform();
 	}
 }
 #[zbus::interface(name = "org.stardustxr.Reparentable")]
@@ -169,6 +214,7 @@ impl ReparentableInner {
 			self.parented_to = Some(sender.to_owned());
 		}
 		let _ = self.spatial.set_spatial_parent_in_place(&spatial_ref);
+		self.reparented.store(true, Ordering::Relaxed);
 	}
 	async fn unparent(&mut self, #[zbus(header)] header: Header<'_>) {
 		if let Some(captured) = self.captured_by.borrow_and_update().deref()
@@ -180,7 +226,9 @@ impl ReparentableInner {
 		let _ = self
 			.spatial
 			.set_spatial_parent_in_place(&self.initial_parent);
+		self.request_relative_transform();
 		self.parented_to.take();
+		self.reparented.store(false, Ordering::Relaxed);
 	}
 	/// Use this to reset the local transform of the zoneable object relative to an object.
 	async fn reset_local_transform(
@@ -245,5 +293,11 @@ impl ReparentLock {
 			return;
 		};
 		self.release_body(sender.to_owned());
+	}
+}
+pub struct ReparentTransformReceiver(Arc<Mutex<Option<Transform>>>);
+impl ReparentTransformReceiver {
+	pub fn try_changed(&self) -> Option<Transform> {
+		self.0.lock().unwrap().take()
 	}
 }
