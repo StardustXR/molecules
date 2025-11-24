@@ -283,7 +283,8 @@ impl UIElement for Grabbable {
 			},
 			grab_pinch_interact,
 		);
-		let was_waiting_for_transform = self.waiting_for_transform;
+		let start_grabbing = self.waiting_for_transform
+			|| (self.transform_changed.is_none() && self.grab_action().actor_started());
 		if let Some(recv) = self.transform_changed.as_ref() {
 			if let Some(pose) = recv.try_changed() {
 				self.pose = Affine3A::from_rotation_translation(
@@ -296,7 +297,7 @@ impl UIElement for Grabbable {
 					.take_if(|_| self.reparentable.is_none());
 			}
 		}
-		if self.grab_action.actor_started() {
+		if self.grab_action.actor_started() && self.transform_changed.is_some() {
 			self.reparentable.take();
 			self.waiting_for_transform = true;
 		}
@@ -306,7 +307,7 @@ impl UIElement for Grabbable {
 			return true;
 		}
 
-		if was_waiting_for_transform || self.grab_action.actor_changed() {
+		if start_grabbing || self.grab_action.actor_changed() {
 			// Calculate and store the relative transform matrix
 			let actor = self.grab_action.actor().unwrap();
 			let grab_position = match &actor.input {
@@ -375,7 +376,7 @@ impl UIElement for Grabbable {
 				.unwrap();
 		}
 
-		if was_waiting_for_transform {
+		if start_grabbing {
 			debug!(
 				id = self.grab_action.actor().as_ref().unwrap().id,
 				"Started grabbing"
