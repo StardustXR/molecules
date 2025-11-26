@@ -18,10 +18,10 @@ fn accent_color_to_color(accent_color: ashpd::desktop::Color) -> Color {
 }
 
 async fn accent_color_loop(
-	dbus_connection: Connection,
+	_dbus_connection: Connection,
 	accent_color_sender: watch::Sender<Color>,
 ) -> Result<(), ashpd::Error> {
-	let _ = ashpd::set_session_connection(dbus_connection);
+	// let _ = ashpd::set_session_connection(dbus_connection);
 	let settings = Settings::new().await?;
 	let initial_color = accent_color_to_color(settings.accent_color().await?);
 	let _ = accent_color_sender.send(initial_color);
