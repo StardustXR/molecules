@@ -49,7 +49,6 @@ async fn main() {
 	let root = Spatial::create(
 		client.get_root(),
 		Transform::from_translation([0.1, 0.0, 0.0]),
-		false,
 	)
 	.unwrap();
 	let connection = Builder::session()

@@ -18,7 +18,7 @@ async fn main() {
 		.init();
 	let mut client = Client::connect().await.unwrap();
 
-	let root = Spatial::create(client.get_root(), Transform::identity(), true).unwrap();
+	let root = Spatial::create(client.get_root(), Transform::identity()).unwrap();
 	let mut touch_plane = TouchPlane::create(
 		&root,
 		Transform::from_rotation(Quat::from_rotation_x(-PI / 4.0)),

@@ -25,7 +25,7 @@ async fn main() {
 		.init();
 	let mut client = Client::connect().await.unwrap();
 
-	let root = Spatial::create(client.get_root(), Transform::identity(), true).unwrap();
+	let root = Spatial::create(client.get_root(), Transform::identity()).unwrap();
 	let mut button = Button::create(
 		&root,
 		Transform::none(),

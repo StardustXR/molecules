@@ -16,7 +16,7 @@ async fn main() {
 		.init();
 	let mut client = Client::connect().await.unwrap();
 
-	let root = Spatial::create(client.get_root(), Transform::identity(), true).unwrap();
+	let root = Spatial::create(client.get_root(), Transform::identity()).unwrap();
 
 	let mut x_offset = -0.375;
 

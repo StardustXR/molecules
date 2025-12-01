@@ -38,7 +38,7 @@ impl TouchPlane {
 		y_range: Range<f32>,
 	) -> Result<Self, NodeError> {
 		let size = size.into();
-		let root = Spatial::create(parent, transform, false)?;
+		let root = Spatial::create(parent, transform)?;
 		let field = Field::create(
 			&root,
 			Transform::from_translation([0.0, 0.0, thickness * -0.5]),

@@ -17,7 +17,7 @@ async fn main() {
 		.with_env_filter(EnvFilter::from_default_env())
 		.init();
 	let mut client = Client::connect().await.unwrap();
-	let root = Spatial::create(client.get_root(), Transform::identity(), true).unwrap();
+	let root = Spatial::create(client.get_root(), Transform::identity()).unwrap();
 	let mut hover_plane = HoverPlane::create(
 		&root,
 		Transform::identity(),

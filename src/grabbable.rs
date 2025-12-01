@@ -119,8 +119,7 @@ impl Grabbable {
 		settings: GrabbableSettings,
 	) -> Result<Self, NodeError> {
 		let input = InputHandler::create(content_space, Transform::identity(), field)?.queue()?;
-		let content_parent =
-			Spatial::create(input.handler(), content_transform, settings.reparentable)?;
+		let content_parent = Spatial::create(input.handler(), content_transform)?;
 
 		let content_lines = Lines::create(&content_parent, Transform::identity(), &[])?;
 		let root_lines = Lines::create(content_space, Transform::identity(), &[])?;
@@ -285,17 +284,17 @@ impl UIElement for Grabbable {
 		);
 		let start_grabbing = self.waiting_for_transform
 			|| (self.transform_changed.is_none() && self.grab_action().actor_started());
-		if let Some(recv) = self.transform_changed.as_ref() {
-			if let Some(pose) = recv.try_changed() {
-				self.pose = Affine3A::from_rotation_translation(
-					pose.rotation.map_or(Quat::IDENTITY, Quat::from),
-					pose.translation.map_or(Vec3::ZERO, Vec3::from),
-				);
-				self.relative_transform = Affine3A::IDENTITY;
-				self.waiting_for_transform = false;
-				self.transform_changed
-					.take_if(|_| self.reparentable.is_none());
-			}
+		if let Some(recv) = self.transform_changed.as_ref()
+			&& let Some(pose) = recv.try_changed()
+		{
+			self.pose = Affine3A::from_rotation_translation(
+				pose.rotation.map_or(Quat::IDENTITY, Quat::from),
+				pose.translation.map_or(Vec3::ZERO, Vec3::from),
+			);
+			self.relative_transform = Affine3A::IDENTITY;
+			self.waiting_for_transform = false;
+			self.transform_changed
+				.take_if(|_| self.reparentable.is_none());
 		}
 		if self.grab_action.actor_started() && self.transform_changed.is_some() {
 			self.reparentable.take();
@@ -435,7 +434,7 @@ impl FrameSensitive for Grabbable {
 			self.prev_pose = self.pose;
 		}
 		if (!self.grab_action.actor_acting())
-			&& !self.reparentable.as_ref().map_or(false, |v| v.reparented())
+			&& !self.reparentable.as_ref().is_some_and(|v| v.reparented())
 		{
 			if let Some(settings) = self.settings.linear_momentum {
 				self.apply_linear_momentum(info, settings);

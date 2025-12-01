@@ -80,12 +80,8 @@ async fn debuggable() {
 		stardust_xr_fusion::fields::Shape::Sphere(0.05),
 	)
 	.unwrap();
-	let spatial = Spatial::create(
-		&field,
-		stardust_xr_fusion::spatial::Transform::identity(),
-		false,
-	)
-	.unwrap();
+	let spatial =
+		Spatial::create(&field, stardust_xr_fusion::spatial::Transform::identity()).unwrap();
 
 	// Create a mock object path
 	let path = OwnedObjectPath::try_from("/org/stardustxr/DebuggableTest").unwrap();

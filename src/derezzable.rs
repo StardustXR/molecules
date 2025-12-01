@@ -86,7 +86,6 @@ async fn derezzable_dbus() {
 	let spatial = Spatial::create(
 		event_loop.client_handle.get_root(),
 		stardust_xr_fusion::spatial::Transform::identity(),
-		false,
 	)
 	.unwrap();
 	let connection = stardust_xr_fusion::core::schemas::dbus::connect_client()
