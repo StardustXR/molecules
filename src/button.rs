@@ -6,13 +6,13 @@ use crate::{
 use glam::{Mat4, vec3};
 use map_range::MapRange;
 use stardust_xr_fusion::{
-	core::values::{
-		Vector2,
-		color::{Rgba, color_space::LinearRgb, rgba_linear},
-	},
 	drawable::{Lines, LinesAspect},
 	node::NodeError,
 	spatial::{SpatialRefAspect, Transform},
+	values::{
+		Vector2,
+		color::{Rgba, color_space::LinearRgb, rgba_linear},
+	},
 };
 use std::f32::consts::PI;
 

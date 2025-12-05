@@ -88,9 +88,7 @@ async fn derezzable_dbus() {
 		stardust_xr_fusion::spatial::Transform::identity(),
 	)
 	.unwrap();
-	let connection = stardust_xr_fusion::core::schemas::dbus::connect_client()
-		.await
-		.unwrap();
+	let connection = stardust_xr_fusion::objects::connect_client().await.unwrap();
 
 	let mut derez = Derezzable::create(connection.clone(), "/", spatial, None).unwrap();
 	derez.receiver.recv().await.unwrap();

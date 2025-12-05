@@ -30,6 +30,7 @@ ashpd = "0.12.0"
 [dependencies.stardust-xr-fusion]
 version = "0.50.0"
 git = "https://github.com/StardustXR/core.git"
+# path = "../core/fusion"
 
 [dev-dependencies]
 tokio = { version = "1.38.0", features = ["full"] }

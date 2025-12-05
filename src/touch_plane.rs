@@ -6,12 +6,12 @@ use crate::{
 use glam::{Mat4, Vec3, vec3};
 use map_range::MapRange;
 use stardust_xr_fusion::{
-	core::values::{Vector2, Vector3, color::rgba_linear},
 	drawable::Lines,
 	fields::{Field, FieldAspect, Shape},
 	input::{InputData, InputDataType, InputHandler},
 	node::{NodeError, NodeType},
 	spatial::{Spatial, SpatialAspect, SpatialRefAspect, Transform},
+	values::{Vector2, Vector3, color::rgba_linear},
 };
 use std::{ops::Range, sync::Arc};
 

@@ -1,8 +1,7 @@
 pub use crate::drop_handlers::AbortOnDrop;
 use stardust_xr_fusion::{
-	core::schemas::zbus::Connection,
 	fields::Field,
-	objects::{FieldObject, SpatialObject},
+	objects::{FieldObject, SpatialObject, zbus::Connection},
 	spatial::Spatial,
 };
 use std::{any::Any, marker::PhantomData};

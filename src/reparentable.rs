@@ -1,9 +1,14 @@
 use crate::dbus::{AbortOnDrop, DbusObjectHandle, DbusObjectHandles};
 use futures_util::StreamExt;
 use stardust_xr_fusion::{
-	core::schemas::zbus::{self, Connection},
 	fields::Field,
 	node::{NodeResult, NodeType},
+	objects::zbus::{
+		self, Connection, fdo,
+		message::Header,
+		names::{BusName, UniqueName},
+		zvariant::OwnedObjectPath,
+	},
 	objects::{FieldObject, SpatialObject},
 	spatial::{Spatial, SpatialAspect, SpatialRef, SpatialRefAspect, Transform},
 };
@@ -17,12 +22,6 @@ use std::{
 	},
 };
 use tokio::sync::watch;
-use zbus::{
-	fdo,
-	message::Header,
-	names::{BusName, UniqueName},
-	zvariant::OwnedObjectPath,
-};
 
 pub struct Reparentable {
 	pub spatial: SpatialRef,

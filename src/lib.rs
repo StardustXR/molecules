@@ -4,6 +4,7 @@ pub mod button;
 pub mod dbus;
 pub mod debuggable;
 mod derezzable;
+pub mod drop_handlers;
 mod exposure;
 mod grabbable;
 pub mod hover_plane;
@@ -17,15 +18,14 @@ pub mod state_machine;
 pub mod touch_plane;
 pub mod tracked;
 pub mod zone;
-pub mod drop_handlers;
 
 pub use derezzable::*;
 pub use exposure::*;
 pub use grabbable::*;
 
 use stardust_xr_fusion::{
-	core::values::color::{Rgba, color_space::LinearRgb, rgba_linear},
 	root::FrameInfo,
+	values::color::{Rgba, color_space::LinearRgb, rgba_linear},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]

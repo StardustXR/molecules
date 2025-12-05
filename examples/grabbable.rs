@@ -1,12 +1,12 @@
 use stardust_xr_fusion::{
 	client::Client,
-	core::values::ResourceID,
 	drawable::Model,
 	fields::{Field, Shape},
 	node::NodeType,
 	project_local_resources,
 	root::{ClientState, RootAspect, RootEvent},
 	spatial::{Spatial, SpatialAspect, SpatialRefAspect, Transform},
+	values::ResourceID,
 };
 use stardust_xr_molecules::{
 	DebugSettings, FrameSensitive, Grabbable, GrabbableSettings, PointerMode, UIElement,

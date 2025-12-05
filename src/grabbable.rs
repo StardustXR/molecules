@@ -6,14 +6,13 @@ use crate::{
 };
 use glam::{Affine3A, Quat, Vec3, vec3};
 use stardust_xr_fusion::{
-	core::values::Vector3,
 	drawable::{Lines, LinesAspect},
 	fields::{Field, FieldRefAspect},
 	input::{InputDataType, InputHandler},
 	node::{NodeError, NodeType},
 	root::FrameInfo,
 	spatial::{Spatial, SpatialAspect, SpatialRef, SpatialRefAspect, Transform},
-	values::Quaternion,
+	values::{Quaternion, Vector3},
 };
 use std::{
 	f32::consts::PI,

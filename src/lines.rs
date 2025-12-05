@@ -1,14 +1,14 @@
 use glam::{Mat4, Vec3, Vec3A, vec3};
 use lerp::Lerp;
 use stardust_xr_fusion::{
-	core::values::{
-		Mat4 as Matrix4, Vector3,
-		color::{Rgba, color_space::LinearRgb},
-	},
 	drawable::{Line, LinePoint},
 	fields::{CylinderShape, Shape, TorusShape},
 	spatial::BoundingBox,
 	values::color::rgba_linear,
+	values::{
+		Mat4 as Matrix4, Vector3,
+		color::{Rgba, color_space::LinearRgb},
+	},
 };
 use std::f32::consts::{FRAC_PI_2, PI, TAU};
 

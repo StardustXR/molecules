@@ -2,19 +2,18 @@ use crate::dbus::{AbortOnDrop, DbusObjectHandle, DbusObjectHandles, create_spati
 use futures_util::StreamExt;
 use rustc_hash::{FxHashMap, FxHashSet};
 use stardust_xr_fusion::{
-	core::schemas::zbus::{self, Connection},
 	fields::Field,
+	objects::zbus::{
+		self, Connection, fdo,
+		message::Header,
+		names::{BusName, UniqueName},
+		zvariant::OwnedObjectPath,
+	},
 	objects::{FieldObject, SpatialObject},
 	spatial::Spatial,
 	values::Vector2,
 };
 use std::{marker::PhantomData, path::Path};
-use zbus::{
-	fdo,
-	message::Header,
-	names::{BusName, UniqueName},
-	zvariant::OwnedObjectPath,
-};
 
 pub struct MouseHandler {
 	pressed_buttons: FxHashMap<UniqueName<'static>, FxHashSet<u32>>,

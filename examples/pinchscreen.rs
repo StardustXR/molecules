@@ -1,9 +1,9 @@
 use stardust_xr_fusion::{
 	client::Client,
-	core::values::color::rgba_linear,
 	drawable::{Text, TextAspect, TextStyle, XAlign, YAlign},
 	root::{ClientState, RootAspect, RootEvent},
 	spatial::{Spatial, Transform},
+	values::color::rgba_linear,
 };
 use stardust_xr_molecules::{
 	DebugSettings, VisualDebug,
