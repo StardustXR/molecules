@@ -12,7 +12,7 @@ use stardust_xr_fusion::{
 		InputData, InputDataType, InputHandler, InputHandlerAspect, InputHandlerEvent,
 		InputMethodRef, InputMethodRefAspect, Pointer,
 	},
-	node::NodeResult,
+	node::{NodeResult, NodeType},
 	values::Vector3,
 };
 use std::{
@@ -62,11 +62,24 @@ impl InputQueue {
 	// check this as often as possible, will return true when input has been updated
 	pub fn handle_events(&mut self) -> bool {
 		let mut updated = false;
-		while let Some(InputHandlerEvent::Input { methods, data }) =
-			self.handler.recv_input_handler_event()
-		{
-			updated = true;
-			self.input = data.into_iter().map(Arc::new).zip(methods).collect();
+		while let Some(event) = self.handler.recv_input_handler_event() {
+			match event {
+				InputHandlerEvent::InputSent { method, data } => {
+					updated = true;
+					self.input.insert(Arc::new(data), method);
+				}
+				InputHandlerEvent::InputUpdated { data } => {
+					let Some(method) = self.input.remove(&data) else {
+						continue;
+					};
+					updated = true;
+					self.input.insert(Arc::new(data), method.clone());
+				}
+				InputHandlerEvent::InputLeft { method } => {
+					updated = true;
+					self.input.retain(|_, i| i.id() != method);
+				}
+			}
 		}
 		updated
 	}
