@@ -62,6 +62,8 @@ impl InputQueue {
 	// check this as often as possible, will return true when input has been updated
 	pub fn handle_events(&mut self) -> bool {
 		let mut updated = false;
+
+		// TODO: truly async input handling but this queueing will do for now
 		while let Some(event) = self.handler.recv_input_handler_event() {
 			match event {
 				InputHandlerEvent::InputSent { method, data } => {
