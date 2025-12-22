@@ -327,12 +327,11 @@ impl UIElement for Grabbable {
 
 		if let Some(actor) = self.grab_action.actor().cloned() {
 			if matches!(&actor.input, InputDataType::Pointer(_)) {
-				let scroll_sensitivity = 0.01;
 				let scroll_amount = actor.datamap.with_data(|datamap| {
-					datamap.idx("scroll_continuous").as_vector().idx(1).as_f32() // Use the Y-axis for forward/backward scrolling
+					(datamap.idx("scroll_continuous").as_vector().idx(1).as_f32() * 0.01) + // Use the Y-axis for forward/backward scrolling
+					(datamap.idx("scroll_discrete").as_vector().idx(1).as_f32() * 0.01) // Use the Y-axis for forward/backward scrolling
 				});
-				let offset =
-					Affine3A::from_translation(vec3(0.0, 0.0, scroll_amount * -scroll_sensitivity));
+				let offset = Affine3A::from_translation(vec3(0.0, 0.0, scroll_amount));
 				self.relative_transform = offset * self.relative_transform;
 			}
 
