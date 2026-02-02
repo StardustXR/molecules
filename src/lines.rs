@@ -1,5 +1,6 @@
 use glam::{Mat4, Vec3, Vec3A, vec3};
 use lerp::Lerp;
+use map_range::MapRange;
 use stardust_xr_fusion::{
 	drawable::{Line, LinePoint},
 	fields::{CylinderShape, Shape, TorusShape},
@@ -15,6 +16,14 @@ use std::f32::consts::{FRAC_PI_2, PI, TAU};
 pub trait LineExt: Sized {
 	fn thickness(self, thickness: f32) -> Self;
 	fn color(self, color: Rgba<f32, LinearRgb>) -> Self;
+	fn shimmer<P: Into<Vector3<f32>> + Copy>(
+		self,
+		points: &[P],
+		max_distance: f32,
+		min_distance: f32,
+		to_color: Rgba<f32, LinearRgb>,
+		thickness_multiplier: f32,
+	) -> Self;
 	// fn trace(self, amount: f32) -> Self;
 	fn lerp(self, other: &Self, amount: f32) -> Option<Self>;
 	fn transform(self, transform: impl Into<Matrix4>) -> Self;
@@ -48,6 +57,33 @@ impl LineExt for Line {
 				.collect(),
 			cyclic: self.cyclic,
 		}
+	}
+
+	fn shimmer<P: Into<Vector3<f32>> + Copy>(
+		mut self,
+		points: &[P],
+		max_distance: f32,
+		min_distance: f32,
+		to_color: Rgba<f32, LinearRgb>,
+		thickness_multiplier: f32,
+	) -> Self {
+		for point in &mut self.points {
+			let Some(shimmer_distance) = points
+				.iter()
+				.map(|p| Vec3::from(Into::<Vector3<f32>>::into(*p)).distance(point.point.into()))
+				.reduce(|a, b| a.min(b))
+			else {
+				return self;
+			};
+
+			let mapped = shimmer_distance
+				.map_range(max_distance..min_distance, 0.0..1.0)
+				.clamp(0.0, 1.0);
+
+			point.color.lerp_bounded_to(to_color, mapped);
+			point.thickness *= mapped.map_range(0.0..1.0, 1.0..thickness_multiplier);
+		}
+		self
 	}
 
 	// fn trace(self, t: f32) -> Self {
