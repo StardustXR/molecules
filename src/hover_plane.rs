@@ -3,8 +3,7 @@ use crate::{
 	input_action::{DeltaSet, InputQueue, InputQueueable, SingleAction},
 	lines::{self, LineExt},
 };
-use glam::{Mat4, Vec3, vec3};
-use map_range::MapRange;
+use glam::{FloatExt, Mat4, Vec3, vec3};
 use stardust_xr_fusion::{
 	drawable::{Line, LinePoint, Lines, LinesAspect},
 	fields::{Field, FieldAspect, Shape},
@@ -117,11 +116,21 @@ impl HoverPlane {
 		let x = interact_point
 			.x
 			.clamp(-self.size.x / 2.0, self.size.x / 2.0)
-			.map_range(-self.size.x / 2.0..self.size.x / 2.0, self.x_range.clone());
+			.remap(
+				-self.size.x / 2.0,
+				self.size.x / 2.0,
+				self.x_range.start,
+				self.x_range.end,
+			);
 		let y = interact_point
 			.y
 			.clamp(-self.size.y / 2.0, self.size.y / 2.0)
-			.map_range(self.size.y / 2.0..-self.size.y / 2.0, self.y_range.clone());
+			.remap(
+				self.size.y / 2.0,
+				-self.size.y / 2.0,
+				self.y_range.start,
+				self.y_range.end,
+			);
 
 		([x, y].into(), interact_point.z)
 	}

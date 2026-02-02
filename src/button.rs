@@ -3,8 +3,7 @@ use crate::{
 	lines::{LineExt, circle, rounded_rectangle},
 	touch_plane::TouchPlane,
 };
-use glam::{Mat4, vec3};
-use map_range::MapRange;
+use glam::{FloatExt, Mat4, vec3};
 use stardust_xr_fusion::{
 	drawable::{Lines, LinesAspect},
 	node::NodeError,
@@ -177,7 +176,7 @@ impl ButtonVisuals {
 			} else {
 				// if hovering
 				let blend = interact_distance
-					.map_range(settings.max_hover_distance..0.0, 0.0..1.0)
+					.remap(settings.max_hover_distance, 0.0, 0.0, 1.0)
 					.clamp(0.0, 1.0);
 				let mut circle = circle(self.segment_count, PI * 0.5, 0.0)
 					.thickness(0.0025)

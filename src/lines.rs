@@ -1,6 +1,5 @@
-use glam::{Mat4, Vec3, Vec3A, vec3};
+use glam::{FloatExt, Mat4, Vec3, Vec3A, vec3};
 use lerp::Lerp;
-use map_range::MapRange;
 use stardust_xr_fusion::{
 	drawable::{Line, LinePoint},
 	fields::{CylinderShape, Shape, TorusShape},
@@ -89,11 +88,11 @@ impl LineExt for Line {
 			};
 
 			let mapped = shimmer_distance
-				.map_range(max_distance..min_distance, 0.0..1.0)
+				.remap(max_distance, min_distance, 0.0, 1.0)
 				.clamp(0.0, 1.0);
 
 			point.color.lerp_bounded_to(to_color, mapped);
-			point.thickness *= mapped.map_range(0.0..1.0, 1.0..thickness_multiplier);
+			point.thickness *= mapped.remap(0.0, 1.0, 1.0, thickness_multiplier);
 		}
 		self
 	}
@@ -158,7 +157,7 @@ impl LineExt for Line {
 
 				let interpolated = LinePoint {
 					point: start_pos.lerp(end_pos, segment_t).into(),
-					thickness: start_point.thickness.lerp(end_point.thickness, segment_t),
+					thickness: Lerp::lerp(start_point.thickness, end_point.thickness, segment_t),
 					color: start_point.color.lerp_bounded(end_point.color, segment_t),
 				};
 				result_points.push(interpolated);
@@ -190,7 +189,7 @@ impl LineExt for Line {
 				let end_pos = Vec3::from(end.point);
 				new_points.push(LinePoint {
 					point: start_pos.lerp(end_pos, t).into(),
-					thickness: start.thickness.lerp(end.thickness, t),
+					thickness: Lerp::lerp(start.thickness, end.thickness, t),
 					color: start.color.lerp_bounded(end.color, t),
 				});
 			}
