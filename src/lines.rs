@@ -13,6 +13,17 @@ use stardust_xr_fusion::{
 };
 use std::f32::consts::{FRAC_PI_2, PI, TAU};
 
+fn gcd(mut a: usize, mut b: usize) -> usize {
+	while b != 0 {
+		(a, b) = (b, a % b);
+	}
+	a
+}
+
+fn lcm(a: usize, b: usize) -> usize {
+	a * b / gcd(a, b)
+}
+
 pub trait LineExt: Sized {
 	fn thickness(self, thickness: f32) -> Self;
 	fn color(self, color: Rgba<f32, LinearRgb>) -> Self;
@@ -25,6 +36,7 @@ pub trait LineExt: Sized {
 		thickness_multiplier: f32,
 	) -> Self;
 	fn trace(self, t: f32) -> Self;
+	fn simple_subdivide(&self, n: usize) -> Self;
 	fn lerp(self, other: &Self, amount: f32) -> Option<Self>;
 	fn transform(self, transform: impl Into<Matrix4>) -> Self;
 }
@@ -101,7 +113,7 @@ impl LineExt for Line {
 		// Build working points list (close loop if cyclic)
 		let mut points = self.points;
 		if self.cyclic {
-			let first = points.first().unwrap().clone();
+			let first = *points.first().unwrap();
 			points.push(first);
 		}
 
@@ -112,7 +124,10 @@ impl LineExt for Line {
 			.sum();
 
 		if total_length == 0.0 {
-			return Line { points, cyclic: false };
+			return Line {
+				points,
+				cyclic: false,
+			};
 		}
 
 		let target_distance = t * total_length;
@@ -124,11 +139,12 @@ impl LineExt for Line {
 		for window in points.windows(2) {
 			let start_point = &window[0];
 			let end_point = &window[1];
-			let segment_length = Vec3::from(start_point.point).distance(Vec3::from(end_point.point));
+			let segment_length =
+				Vec3::from(start_point.point).distance(Vec3::from(end_point.point));
 
 			if accumulated + segment_length >= target_distance {
 				// This segment contains our target
-				result_points.push(start_point.clone());
+				result_points.push(*start_point);
 
 				let segment_t = if segment_length > 0.0 {
 					(target_distance - accumulated) / segment_length
@@ -149,7 +165,7 @@ impl LineExt for Line {
 				break;
 			}
 
-			result_points.push(start_point.clone());
+			result_points.push(*start_point);
 			accumulated += segment_length;
 		}
 
@@ -159,28 +175,74 @@ impl LineExt for Line {
 		}
 	}
 
+	fn simple_subdivide(&self, n: usize) -> Self {
+		if n == 0 || self.points.len() < 2 {
+			return self.clone();
+		}
+		let mut new_points = Vec::new();
+		for window in self.points.windows(2) {
+			let start = &window[0];
+			let end = &window[1];
+			new_points.push(*start);
+			for i in 1..=n {
+				let t = i as f32 / (n + 1) as f32;
+				let start_pos = Vec3::from(start.point);
+				let end_pos = Vec3::from(end.point);
+				new_points.push(LinePoint {
+					point: start_pos.lerp(end_pos, t).into(),
+					thickness: start.thickness.lerp(end.thickness, t),
+					color: start.color.lerp_bounded(end.color, t),
+				});
+			}
+		}
+		new_points.push(*self.points.last().unwrap());
+		Line {
+			points: new_points,
+			cyclic: self.cyclic,
+		}
+	}
+
 	fn lerp(self, to: &Self, amount: f32) -> Option<Self> {
-		if self.points.len() != to.points.len() {
+		let len_a = self.points.len();
+		let len_b = to.points.len();
+
+		// Fast path: same point counts
+		if len_a == len_b {
+			return Some(Line {
+				points: self
+					.points
+					.into_iter()
+					.zip(to.points.iter())
+					.map(|(from, to)| {
+						let from_point = Vec3::from(from.point);
+						let to_point = Vec3::from(to.point);
+
+						LinePoint {
+							point: from_point.lerp_bounded(to_point, amount).into(),
+							thickness: from.thickness.lerp_bounded(to.thickness, amount),
+							color: from.color.lerp_bounded(to.color, amount),
+						}
+					})
+					.collect(),
+				cyclic: if amount > 0.5 { to.cyclic } else { self.cyclic },
+			});
+		}
+
+		// Need at least 2 points in each line to have segments
+		if len_a < 2 || len_b < 2 {
 			return None;
 		}
-		Some(Line {
-			points: self
-				.points
-				.into_iter()
-				.zip(to.points.iter())
-				.map(|(from, to)| {
-					let from_point = Vec3::from(from.point);
-					let to_point = Vec3::from(to.point);
 
-					LinePoint {
-						point: from_point.lerp_bounded(to_point, amount).into(),
-						thickness: from.thickness.lerp_bounded(to.thickness, amount),
-						color: from.color.lerp_bounded(to.color, amount),
-					}
-				})
-				.collect(),
-			cyclic: if amount > 0.5 { to.cyclic } else { self.cyclic },
-		})
+		// Different point counts: use LCM of segment counts
+		let seg_a = len_a - 1;
+		let seg_b = len_b - 1;
+		let target = lcm(seg_a, seg_b);
+
+		let subdivided_a = self.simple_subdivide(target / seg_a - 1);
+		let subdivided_b = to.simple_subdivide(target / seg_b - 1);
+
+		// Now both have target + 1 points, lerp normally
+		subdivided_a.lerp(&subdivided_b, amount)
 	}
 
 	fn transform(self, transform: impl Into<Matrix4>) -> Self {
