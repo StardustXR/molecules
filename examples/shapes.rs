@@ -63,7 +63,7 @@ async fn main() {
 					RootEvent::Frame { info } => {
 						let mut shapes = shapes.clone();
 						for shape in &mut shapes {
-							*shape = shape.clone().shimmer(
+							*shape = shape.clone().trace(info.elapsed).shimmer(
 								&[[(info.elapsed * 0.5).sin(), 0.0, 0.0]],
 								0.25,
 								0.0,

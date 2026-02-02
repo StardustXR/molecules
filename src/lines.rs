@@ -24,7 +24,7 @@ pub trait LineExt: Sized {
 		to_color: Rgba<f32, LinearRgb>,
 		thickness_multiplier: f32,
 	) -> Self;
-	// fn trace(self, amount: f32) -> Self;
+	fn trace(self, t: f32) -> Self;
 	fn lerp(self, other: &Self, amount: f32) -> Option<Self>;
 	fn transform(self, transform: impl Into<Matrix4>) -> Self;
 }
@@ -86,63 +86,78 @@ impl LineExt for Line {
 		self
 	}
 
-	// fn trace(self, t: f32) -> Self {
-	// 	let points =
-	// 	if t <= 0.0 {
-	// 		return self;
-	// 	}
-	// 	if t >= 1.0 || points.len() < 2 {
-	// 		return self;
-	// 	}
-	// 	let first_point = points.first().unwrap().clone();
-	// 	if cyclic {
-	// 		points.push(first_point.clone());
-	// 	}
-	// 	let mut segment_start_t = 0.0;
-	// 	let mut segment_start_point = first_point.clone();
-	// 	let mut segment_end_t = 0.0;
-	// 	let mut segment_end_point = first_point.clone();
+	fn trace(self, t: f32) -> Self {
+		// Edge cases
+		if self.points.len() < 2 || t >= 1.0 {
+			return self;
+		}
+		if t <= 0.0 {
+			return Line {
+				points: vec![],
+				cyclic: false,
+			};
+		}
 
-	// 	let mut new_length: usize = 0;
-	// 	{
-	// 		let mut current_t = 0.0;
-	// 		let mut previous_point = &first_point;
-	// 		for (points_len, point) in points.iter().enumerate() {
-	// 			let previous_position: Vec3 = previous_point.point.into();
-	// 			let previous_t = current_t;
-	// 			current_t += previous_position.distance(point.point.into());
-	// 			if current_t > t {
-	// 				new_length = points_len;
-	// 				segment_start_t = previous_t;
-	// 				segment_end_t = current_t;
-	// 				segment_start_point = previous_point.clone();
-	// 				segment_end_point = point.clone();
-	// 				break;
-	// 			}
-	// 			previous_point = point;
-	// 		}
-	// 	}
+		// Build working points list (close loop if cyclic)
+		let mut points = self.points;
+		if self.cyclic {
+			let first = points.first().unwrap().clone();
+			points.push(first);
+		}
 
-	// 	points.truncate(new_length);
-	// 	let last = points.last_mut().unwrap();
+		// Calculate total length
+		let total_length: f32 = points
+			.windows(2)
+			.map(|w| Vec3::from(w[0].point).distance(Vec3::from(w[1].point)))
+			.sum();
 
-	// 	let segment_t = (t - segment_start_t) / (segment_end_t - segment_start_t);
-	// 	last.color = segment_start_point
-	// 		.color
-	// 		.mix(segment_end_point.color, segment_t);
-	// 	last.thickness = (segment_start_point.thickness * segment_t)
-	// 		+ (segment_end_point.thickness * (1.0 - segment_t));
-	// 	last.point = Vector3::from([
-	// 		(segment_start_point.point.x * segment_t)
-	// 			+ (segment_end_point.point.x * (1.0 - segment_t)),
-	// 		(segment_start_point.point.y * segment_t)
-	// 			+ (segment_end_point.point.y * (1.0 - segment_t)),
-	// 		(segment_start_point.point.z * segment_t)
-	// 			+ (segment_end_point.point.z * (1.0 - segment_t)),
-	// 	]);
+		if total_length == 0.0 {
+			return Line { points, cyclic: false };
+		}
 
-	// 	points
-	// }
+		let target_distance = t * total_length;
+
+		// Find the segment containing target_distance
+		let mut accumulated = 0.0;
+		let mut result_points = Vec::new();
+
+		for window in points.windows(2) {
+			let start_point = &window[0];
+			let end_point = &window[1];
+			let segment_length = Vec3::from(start_point.point).distance(Vec3::from(end_point.point));
+
+			if accumulated + segment_length >= target_distance {
+				// This segment contains our target
+				result_points.push(start_point.clone());
+
+				let segment_t = if segment_length > 0.0 {
+					(target_distance - accumulated) / segment_length
+				} else {
+					0.0
+				};
+
+				// Interpolate the final point
+				let start_pos = Vec3::from(start_point.point);
+				let end_pos = Vec3::from(end_point.point);
+
+				let interpolated = LinePoint {
+					point: start_pos.lerp(end_pos, segment_t).into(),
+					thickness: start_point.thickness.lerp(end_point.thickness, segment_t),
+					color: start_point.color.lerp_bounded(end_point.color, segment_t),
+				};
+				result_points.push(interpolated);
+				break;
+			}
+
+			result_points.push(start_point.clone());
+			accumulated += segment_length;
+		}
+
+		Line {
+			points: result_points,
+			cyclic: false,
+		}
+	}
 
 	fn lerp(self, to: &Self, amount: f32) -> Option<Self> {
 		if self.points.len() != to.points.len() {
