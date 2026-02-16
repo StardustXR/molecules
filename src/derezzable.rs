@@ -1,6 +1,7 @@
 use crate::dbus::{AbortOnDrop, DbusObjectHandle, DbusObjectHandles};
 use stardust_xr_fusion::{
 	fields::Field,
+	impl_queryable_for_proxy,
 	node::NodeResult,
 	objects::{FieldObject, SpatialObject},
 	spatial::Spatial,
@@ -73,6 +74,7 @@ impl DerezInner {
 		let _ = self.0.send(()).await;
 	}
 }
+impl_queryable_for_proxy!(DerezzableHandlerProxy);
 
 #[tokio::test]
 async fn derezzable_dbus() {
