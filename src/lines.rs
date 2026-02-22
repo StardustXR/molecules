@@ -358,6 +358,9 @@ pub fn shape(shape: Shape) -> Vec<Line> {
 
 			vec![x, y, z]
 		}
+		Shape::Spline(spline) => {
+			vec![spline.to_lines(8)]
+		}
 		Shape::Torus(TorusShape { radius_a, radius_b }) => {
 			let radius_a_outer = circle(32, 0.0, radius_a - radius_b);
 			let radius_a_inner = circle(32, 0.0, radius_a + radius_b);
