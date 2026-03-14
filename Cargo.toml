@@ -22,14 +22,9 @@ zbus = { version = "5.11.0", features = ["tokio"] }
 futures-util = "0.3.31"
 ashpd = "0.12.0"
 
-# [dependencies.ashpd]
-# git = "https://github.com/technobaboo/ashpd.git"
-# branch = "feature/custom-session-connection"
-
 [dependencies.stardust-xr-fusion]
-version = "0.50.0"
+version = "0.51.0"
 git = "https://github.com/StardustXR/core.git"
-# path = "../core/fusion"
 
 [dev-dependencies]
 tokio = { version = "1.38.0", features = ["full"] }
