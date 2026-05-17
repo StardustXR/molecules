@@ -1,9 +1,7 @@
 use ashpd::desktop::settings::Settings;
+use color::{rgba, rgba_linear};
 use futures_util::StreamExt;
-use stardust_xr_fusion::values::{
-	Color,
-	color::{rgba, rgba_linear},
-};
+use stardust_xr_fusion::types::Color;
 use tokio::{sync::watch, task::AbortHandle};
 use zbus::Connection;
 

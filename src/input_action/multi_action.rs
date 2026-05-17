@@ -1,67 +1,71 @@
-use super::{DeltaSet, InputQueue, SimpleAction};
-use stardust_xr_fusion::input::InputData;
+use super::{DeltaSet, InputQueue, InputSnapshot, SimpleAction};
 use std::sync::Arc;
 
 #[derive(Default, Debug)]
 pub struct MultiAction {
 	interact_condition: SimpleAction,
-	hover: DeltaSet<Arc<InputData>>,
-	interact: DeltaSet<Arc<InputData>>,
+	hover: DeltaSet<Arc<InputSnapshot>>,
+	interact: DeltaSet<Arc<InputSnapshot>>,
 }
 impl MultiAction {
 	pub fn update(
 		&mut self,
 		queue: &InputQueue,
-		hover_condition: impl Fn(&InputData) -> bool,
-		interact_condition: impl Fn(&InputData) -> bool,
+		hover_condition: impl Fn(&InputSnapshot) -> bool,
+		interact_condition: impl Fn(&InputSnapshot) -> bool,
 	) {
 		let input = queue.input();
-		let hover_action = input.keys().filter(|d| (hover_condition)(d));
+		let hover_snaps: Vec<Arc<InputSnapshot>> = input
+			.values()
+			.filter(|snap| (hover_condition)(snap))
+			.cloned()
+			.collect();
+
 		self.interact_condition.update(queue, &interact_condition);
 
-		// initial capture when just started interacting and valid
-		for input in self
+		// capture when just started interacting and was already hovering (not newly focused)
+		for snap in self
 			.interact_condition
 			.started_acting()
 			.iter()
-			// gotta make sure it only tries to capture it when hovering
-			.filter(|i| self.hover.current.contains(*i))
-			// but not if it started hovering at the same time (this means it just got "focus")
-			.filter(|i| !self.hover.added.contains(*i))
+			.filter(|s| self.hover.current.contains(*s))
+			.filter(|s| !self.hover.added.contains(*s))
 		{
-			queue.start_capture(input);
+			queue.start_capture(snap);
 		}
-		// release capture/stop trying to caoture when stopped interacting
-		for input in self.interact_condition.stopped_acting() {
-			queue.release_capture(input);
+		// release when stopped interacting
+		for snap in self.interact_condition.stopped_acting() {
+			queue.release_capture(snap);
 		}
-		let interacting_inputs = self
+
+		let interacting: Vec<Arc<InputSnapshot>> = self
 			.interact_condition
 			.currently_acting()
 			.iter()
-			.filter(|k| k.captured)
+			.filter(|s| s.semantic.captured)
 			.cloned()
-			.collect::<Vec<_>>();
+			.collect();
+		self.interact.push_new(interacting.into_iter());
 
-		// only something that's been captured can count as interactable to ensure a valid interaction
-		self.interact.push_new(interacting_inputs.into_iter());
-
-		// TOOD: make this code not stupid
-		let current_hover_state = self.hover.current.clone();
+		let current_hover = self.hover.current.clone();
 		self.hover.push_new(
-			hover_action
-				.clone()
+			hover_snaps
+				.iter()
 				// don't hover when interacting
-				.filter(|i| !self.interact_condition.currently_acting().contains(*i))
-				// except if we just started interacting and were hovering before and it's not captured
-				.chain(hover_action.filter(|i| current_hover_state.contains(*i) && !i.captured))
+				.filter(|s| !self.interact_condition.currently_acting().contains(*s))
+				// except if we were hovering before and not yet captured
+				.chain(
+					hover_snaps
+						.iter()
+						.filter(|s| current_hover.contains(*s) && !s.semantic.captured),
+				)
 				.cloned(),
 		);
 	}
-	pub fn hover(&self) -> &DeltaSet<Arc<InputData>> {
+	pub fn hover(&self) -> &DeltaSet<Arc<InputSnapshot>> {
 		&self.hover
 	}
-	pub fn interact(&self) -> &DeltaSet<Arc<InputData>> {
+	pub fn interact(&self) -> &DeltaSet<Arc<InputSnapshot>> {
 		&self.interact
 	}
 }

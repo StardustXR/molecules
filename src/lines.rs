@@ -2,13 +2,9 @@ use glam::{FloatExt, Mat4, Vec3, Vec3A, vec3};
 use lerp::Lerp;
 use stardust_xr_fusion::{
 	drawable::{Line, LinePoint},
-	fields::{CylinderShape, Shape, TorusShape},
+	fields::{CubicBezierControlPoint, Shape},
 	spatial::BoundingBox,
-	values::color::rgba_linear,
-	values::{
-		Mat4 as Matrix4, Vector3,
-		color::{Rgba, color_space::LinearRgb},
-	},
+	types::{Color, Mat4F, Vec3F, rgba_linear},
 };
 use std::f32::consts::{FRAC_PI_2, PI, TAU};
 
@@ -25,19 +21,19 @@ fn lcm(a: usize, b: usize) -> usize {
 
 pub trait LineExt: Sized {
 	fn thickness(self, thickness: f32) -> Self;
-	fn color(self, color: Rgba<f32, LinearRgb>) -> Self;
-	fn shimmer<P: Into<Vector3<f32>> + Copy>(
+	fn color(self, color: Color) -> Self;
+	fn shimmer<P: Into<Vec3F> + Copy>(
 		self,
 		points: &[P],
 		max_distance: f32,
 		min_distance: f32,
-		to_color: Rgba<f32, LinearRgb>,
+		to_color: Color,
 		thickness_multiplier: f32,
 	) -> Self;
 	fn trace(self, t: f32) -> Self;
 	fn simple_subdivide(&self, n: usize) -> Self;
 	fn lerp(self, other: &Self, amount: f32) -> Option<Self>;
-	fn transform(self, transform: impl Into<Matrix4>) -> Self;
+	fn transform(self, transform: impl Into<Mat4F>) -> Self;
 }
 
 impl LineExt for Line {
@@ -55,7 +51,7 @@ impl LineExt for Line {
 			cyclic: self.cyclic,
 		}
 	}
-	fn color(self, color: Rgba<f32, LinearRgb>) -> Self {
+	fn color(self, color: Color) -> Self {
 		Line {
 			points: self
 				.points
@@ -70,18 +66,18 @@ impl LineExt for Line {
 		}
 	}
 
-	fn shimmer<P: Into<Vector3<f32>> + Copy>(
+	fn shimmer<P: Into<Vec3F> + Copy>(
 		mut self,
 		points: &[P],
 		max_distance: f32,
 		min_distance: f32,
-		to_color: Rgba<f32, LinearRgb>,
+		to_color: Color,
 		thickness_multiplier: f32,
 	) -> Self {
 		for point in &mut self.points {
 			let Some(shimmer_distance) = points
 				.iter()
-				.map(|p| Vec3::from(Into::<Vector3<f32>>::into(*p)).distance(point.point.into()))
+				.map(|p| Vec3::from(Into::<Vec3F>::into(*p)).distance(point.point.into()))
 				.reduce(|a, b| a.min(b))
 			else {
 				return self;
@@ -244,7 +240,7 @@ impl LineExt for Line {
 		subdivided_a.lerp(&subdivided_b, amount)
 	}
 
-	fn transform(self, transform: impl Into<Matrix4>) -> Self {
+	fn transform(self, transform: impl Into<Mat4F>) -> Self {
 		let transform: Mat4 = transform.into().into();
 		Line {
 			points: self
@@ -318,18 +314,18 @@ pub fn rounded_rectangle(width: f32, height: f32, corner_radius: f32, segments: 
 	}
 }
 
-pub fn shape(shape: Shape) -> Vec<Line> {
+pub fn shape(s: Shape) -> Vec<Line> {
 	fn y_offset_circle(segments: usize, radius: f32, offset: f32) -> Line {
 		let mut line = circle(segments, 0.0, radius);
 		line.points.iter_mut().for_each(|p| p.point.y += offset);
 		line
 	}
-	match shape {
-		Shape::Box(size) => bounding_box(BoundingBox {
+	match s {
+		Shape::Box { size } => bounding_box(BoundingBox {
 			center: Vec3::ZERO.into(),
-			size,
+			extents: size,
 		}),
-		Shape::Cylinder(CylinderShape { length, radius }) => {
+		Shape::Cylinder { length, radius } => {
 			let top = y_offset_circle(32, radius, length * 0.5);
 			let bottom = y_offset_circle(32, radius, -length * 0.5);
 
@@ -351,36 +347,40 @@ pub fn shape(shape: Shape) -> Vec<Line> {
 				connector_4,
 			]
 		}
-		Shape::Sphere(radius) => {
+		Shape::Sphere { radius } => {
 			let y = circle(32, 0.0, radius);
 			let x = y.clone().transform(Mat4::from_rotation_x(FRAC_PI_2));
 			let z = y.clone().transform(Mat4::from_rotation_z(FRAC_PI_2));
 
 			vec![x, y, z]
 		}
-		Shape::Spline(spline) => {
-			vec![spline.to_lines(8)]
+		Shape::CubicBezierSpline { points, cyclic } => {
+			vec![cubic_bezier_spline_to_line(&points, cyclic)]
 		}
-		Shape::Torus(TorusShape { radius_a, radius_b }) => {
-			let radius_a_outer = circle(32, 0.0, radius_a - radius_b);
-			let radius_a_inner = circle(32, 0.0, radius_a + radius_b);
-			let radius_a_top = y_offset_circle(32, radius_a, radius_b);
-			let radius_a_bottom = y_offset_circle(32, radius_a, -radius_b);
+		Shape::Torus {
+			minor_radius,
+			major_radius,
+		} => {
+			let radius_a_outer = circle(32, 0.0, minor_radius - major_radius);
+			let radius_a_inner = circle(32, 0.0, minor_radius + major_radius);
+			let radius_a_top = y_offset_circle(32, minor_radius, major_radius);
+			let radius_a_bottom = y_offset_circle(32, minor_radius, -major_radius);
 
-			let radius_b_1 = circle(16, 0.0, radius_b).transform(
-				Mat4::from_translation(vec3(radius_a, 0.0, 0.0)) * Mat4::from_rotation_x(FRAC_PI_2),
-			);
-			let radius_b_2 = circle(16, 0.0, radius_b).transform(
-				Mat4::from_translation(vec3(-radius_a, 0.0, 0.0))
+			let radius_b_1 = circle(16, 0.0, major_radius).transform(
+				Mat4::from_translation(vec3(minor_radius, 0.0, 0.0))
 					* Mat4::from_rotation_x(FRAC_PI_2),
 			);
-			let radius_b_3 = circle(16, 0.0, radius_b).transform(
-				Mat4::from_translation(vec3(0.0, 0.0, radius_a))
+			let radius_b_2 = circle(16, 0.0, major_radius).transform(
+				Mat4::from_translation(vec3(-minor_radius, 0.0, 0.0))
+					* Mat4::from_rotation_x(FRAC_PI_2),
+			);
+			let radius_b_3 = circle(16, 0.0, major_radius).transform(
+				Mat4::from_translation(vec3(0.0, 0.0, minor_radius))
 					* Mat4::from_rotation_y(FRAC_PI_2)
 					* Mat4::from_rotation_x(FRAC_PI_2),
 			);
-			let radius_b_4 = circle(16, 0.0, radius_b).transform(
-				Mat4::from_translation(vec3(0.0, 0.0, -radius_a))
+			let radius_b_4 = circle(16, 0.0, major_radius).transform(
+				Mat4::from_translation(vec3(0.0, 0.0, -minor_radius))
 					* Mat4::from_rotation_y(FRAC_PI_2)
 					* Mat4::from_rotation_x(FRAC_PI_2),
 			);
@@ -394,6 +394,48 @@ pub fn shape(shape: Shape) -> Vec<Line> {
 				radius_b_3,
 				radius_b_4,
 			]
+		}
+		Shape::Capsule { length, radius } => {
+			let half = length * 0.5;
+			let top_circle = y_offset_circle(32, radius, half);
+			let bottom_circle = y_offset_circle(32, radius, -half);
+			let c1 = simple_line([radius, half, 0.0], [radius, -half, 0.0]);
+			let c2 = simple_line([-radius, half, 0.0], [-radius, -half, 0.0]);
+			let c3 = simple_line([0.0, half, radius], [0.0, -half, radius]);
+			let c4 = simple_line([0.0, half, -radius], [0.0, -half, -radius]);
+			let top_hem_xy = hemisphere_arc(16, radius, half, true, false);
+			let top_hem_yz = hemisphere_arc(16, radius, half, true, true);
+			let bot_hem_xy = hemisphere_arc(16, radius, -half, false, false);
+			let bot_hem_yz = hemisphere_arc(16, radius, -half, false, true);
+			vec![
+				top_circle,
+				bottom_circle,
+				c1,
+				c2,
+				c3,
+				c4,
+				top_hem_xy,
+				top_hem_yz,
+				bot_hem_xy,
+				bot_hem_yz,
+			]
+		}
+		Shape::Transform {
+			shape: inner,
+			transform,
+		} => shape(*inner)
+			.into_iter()
+			.map(|line| line.transform(transform))
+			.collect(),
+		Shape::Union { shapes } => shapes.into_iter().flat_map(shape).collect(),
+		Shape::SmoothUnion {
+			shapes,
+			smoothing: _,
+		} => shapes.into_iter().flat_map(shape).collect(),
+		Shape::Sweep { surface, sweeper } => {
+			let mut lines = shape(*surface);
+			lines.extend(shape(*sweeper));
+			lines
 		}
 	}
 }
@@ -413,13 +455,9 @@ pub fn arc(segments: usize, start_angle: f32, end_angle: f32, radius: f32) -> Li
 	let points = (0..segments)
 		.map(|s| ((s as f32) / (segments as f32) * angle) + start_angle)
 		.map(|angle| {
-			let (x, y) = angle.sin_cos();
+			let (x, z) = angle.sin_cos();
 			LinePoint {
-				point: Vector3 {
-					x: x * radius,
-					y: 0.0,
-					z: y * radius,
-				},
+				point: [x * radius, 0.0, z * radius].into(),
 				..Default::default()
 			}
 		})
@@ -430,7 +468,7 @@ pub fn arc(segments: usize, start_angle: f32, end_angle: f32, radius: f32) -> Li
 	}
 }
 
-pub fn line_from_points(points: Vec<impl Into<Vector3<f32>>>) -> Line {
+pub fn line_from_points(points: Vec<impl Into<Vec3F>>) -> Line {
 	Line {
 		points: points
 			.into_iter()
@@ -460,7 +498,7 @@ pub fn axes(length: f32, thickness: f32) -> Vec<Line> {
 	]
 }
 
-fn simple_line(start: impl Into<Vector3<f32>>, end: impl Into<Vector3<f32>>) -> Line {
+fn simple_line(start: impl Into<Vec3F>, end: impl Into<Vec3F>) -> Line {
 	Line {
 		points: vec![
 			LinePoint {
@@ -476,9 +514,72 @@ fn simple_line(start: impl Into<Vector3<f32>>, end: impl Into<Vector3<f32>>) -> 
 	}
 }
 
+fn cubic_bezier_spline_to_line(points: &[CubicBezierControlPoint], cyclic: bool) -> Line {
+	let n = points.len();
+	let segments_per_curve = 8;
+	let curve_count = if cyclic { n } else { n.saturating_sub(1) };
+	let mut line_points = Vec::with_capacity(curve_count * segments_per_curve + 1);
+
+	for i in 0..curve_count {
+		let p0 = &points[i];
+		let p1 = &points[(i + 1) % n];
+		let a0 = Vec3::from(p0.anchor);
+		let h0 = Vec3::from(p0.handle_out);
+		let h1 = Vec3::from(p1.handle_in);
+		let a1 = Vec3::from(p1.anchor);
+
+		for j in 0..segments_per_curve {
+			let t = j as f32 / segments_per_curve as f32;
+			let mt = 1.0 - t;
+			let pos =
+				mt * mt * mt * a0 + 3.0 * mt * mt * t * h0 + 3.0 * mt * t * t * h1 + t * t * t * a1;
+			line_points.push(LinePoint {
+				point: pos.into(),
+				thickness: Lerp::lerp(p0.thickness, p1.thickness, t),
+				..Default::default()
+			});
+		}
+	}
+	if !cyclic && let Some(last) = points.last() {
+		line_points.push(LinePoint {
+			point: last.anchor,
+			thickness: last.thickness,
+			..Default::default()
+		});
+	}
+	Line {
+		points: line_points,
+		cyclic,
+	}
+}
+
+/// Semicircle cap for a capsule. `top=true` arcs upward, `top=false` arcs downward.
+/// `yz=true` uses the YZ plane, otherwise uses the XY plane.
+fn hemisphere_arc(segments: usize, radius: f32, y_base: f32, top: bool, yz: bool) -> Line {
+	let sign = if top { 1.0_f32 } else { -1.0_f32 };
+	Line {
+		points: (0..=segments)
+			.map(|i| {
+				let angle = sign * (i as f32 / segments as f32) * PI;
+				let (cos_a, sin_a) = (angle.cos(), angle.sin());
+				let point = if yz {
+					[0.0, sin_a * radius + y_base, cos_a * radius]
+				} else {
+					[cos_a * radius, sin_a * radius + y_base, 0.0]
+				};
+				LinePoint {
+					point: point.into(),
+					..Default::default()
+				}
+			})
+			.collect(),
+		cyclic: false,
+	}
+}
+
 pub fn bounding_box(bounding_box: BoundingBox) -> Vec<Line> {
 	let center = Vec3::from(bounding_box.center);
-	let size_half = Vec3::from(bounding_box.size) / 2.0;
+	let size_half = Vec3::from(bounding_box.extents) / 2.0;
 
 	vec![
 		simple_line(

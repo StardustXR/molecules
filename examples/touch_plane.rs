@@ -1,7 +1,7 @@
 use glam::{Quat, Vec3};
 use stardust_xr_fusion::{
 	client::Client,
-	drawable::{Lines, LinesAspect},
+	drawable::Lines,
 	root::{RootAspect, RootEvent},
 	spatial::{Spatial, Transform},
 };
@@ -16,7 +16,7 @@ async fn main() {
 	tracing_subscriber::fmt()
 		.with_env_filter(EnvFilter::from_default_env())
 		.init();
-	let mut client = Client::connect().await.unwrap();
+	let mut client = Client::auto_connect(&[]).await.unwrap();
 
 	let root = Spatial::create(client.get_root(), Transform::identity()).unwrap();
 	let mut touch_plane = TouchPlane::create(

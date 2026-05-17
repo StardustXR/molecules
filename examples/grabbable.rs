@@ -20,7 +20,7 @@ async fn main() {
 	tracing_subscriber::fmt()
 		.with_env_filter(EnvFilter::from_default_env())
 		.init();
-	let mut client = Client::connect().await.unwrap();
+	let mut client = Client::auto_connect(&[]).await.unwrap();
 	client
 		.setup_resources(&[&project_local_resources!("res")])
 		.unwrap();

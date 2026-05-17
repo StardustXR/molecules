@@ -4,15 +4,7 @@ use crate::{
 	touch_plane::TouchPlane,
 };
 use glam::{FloatExt, Mat4, vec3};
-use stardust_xr_fusion::{
-	drawable::{Lines, LinesAspect},
-	node::NodeError,
-	spatial::{SpatialRefAspect, Transform},
-	values::{
-		Vector2,
-		color::{Rgba, color_space::LinearRgb, rgba_linear},
-	},
-};
+
 use std::f32::consts::PI;
 
 #[derive(Debug, Clone, Copy)]
