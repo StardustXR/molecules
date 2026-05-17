@@ -18,6 +18,4 @@ interface ReparentKeepalive {
 interface ReparentHandle {
 		/// Set transform relative to the given SpatialRef to IDENTITY
 		reset_transform(relative_to: Ref<spatial::SpatialRef>)
-		/// Finish reparenting, invalidates handle
-		unparent()
 }

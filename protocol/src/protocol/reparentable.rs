@@ -276,12 +276,6 @@ impl ReparentHandle {
         self.obj.device().transact_one_way(&self.obj, 8u32, gluon_builder.to_payload())?;
         Ok(())
     }
-    ///Finish reparenting, invalidates handle
-    pub fn unparent(&self) -> Result<(), gluon::SendError> {
-        let mut gluon_builder = gluon::DataBuilder::new();
-        self.obj.device().transact_one_way(&self.obj, 9u32, gluon_builder.to_payload())?;
-        Ok(())
-    }
     pub fn from_handler<H: ReparentHandleHandler>(
         obj: &impl gluon::OwnedObjectRef<H>,
     ) -> ReparentHandle {
@@ -320,8 +314,6 @@ pub trait ReparentHandleHandler: gluon::Handler + Send + Sync + 'static {
         _ctx: gluon::Context,
         relative_to: stardust_xr_protocol::spatial::SpatialRef,
     ) -> impl Future<Output = ()> + Send + Sync;
-    ///Finish reparenting, invalidates handle
-    fn unparent(&self, _ctx: gluon::Context) -> impl Future<Output = ()> + Send + Sync;
     fn dispatch_one_way(
         &self,
         transaction_code: u32,
@@ -334,10 +326,6 @@ pub trait ReparentHandleHandler: gluon::Handler + Send + Sync + 'static {
                     let param_relative_to = gluon::Convertable::read(&mut gluon_data)?;
                     drop(gluon_data);
                     self.reset_transform(ctx, param_relative_to).await;
-                }
-                9u32 => {
-                    drop(gluon_data);
-                    self.unparent(ctx).await;
                 }
                 _ => {}
             }
