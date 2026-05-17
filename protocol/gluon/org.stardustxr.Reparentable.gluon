@@ -2,20 +2,20 @@ import "org.stardustxr.Spatial" as spatial
 
 /// Interface for moving other objects
 interface Reparentable {
-		/// Reparents this object, locking this Reparentable to make sure others can't steal this reparent, can steal from non-locking reparents
-		reparent_locking(new_parent: Ref<spatial::SpatialRef>, keepalive: Ref<ReparentKeepalive>) -> (handle: Option<Ref<ReparentHandle>>)
-		/// Reparents this object, this is non-locking, others can steal this reparent
-		reparent(new_parent: Ref<spatial::SpatialRef>, keepalive: Ref<ReparentKeepalive>) -> (handle: Option<Ref<ReparentHandle>>)
+	/// Reparents this object, locking this Reparentable to make sure others can't steal this reparent, can steal from non-locking reparents
+	reparent_locking(new_parent: Ref<spatial::SpatialRef>, keepalive: Ref<ReparentKeepalive>) -> (handle: Option<Ref<ReparentHandle>>)
+	/// Reparents this object, this is non-locking, others can steal this reparent
+	reparent(new_parent: Ref<spatial::SpatialRef>, keepalive: Ref<ReparentKeepalive>) -> (handle: Option<Ref<ReparentHandle>>)
 }
 
 /// Used to detect if a reparenter dies
 interface ReparentKeepalive {
-		/// The reparent this object was associated with was stolen, the ReparentHandle becomes invalid
-		reparent_stolen()
+	/// The reparent this object was associated with was stolen, the ReparentHandle becomes invalid
+	reparent_stolen()
 }
 
 /// Handle for active reparenting, when dropped unparents
 interface ReparentHandle {
-		/// Set transform relative to the given SpatialRef to IDENTITY
-		reset_transform(relative_to: Ref<spatial::SpatialRef>)
+	/// Set transform relative to the given SpatialRef to IDENTITY
+	reset_transform(relative_to: Ref<spatial::SpatialRef>)
 }

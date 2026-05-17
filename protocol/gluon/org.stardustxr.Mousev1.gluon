@@ -2,17 +2,17 @@ import "org.stardustxr.Types" as types
 
 /// Receives raw mouse input
 interface MouseHandler {
-		motion(delta: types::Vec2f, timestamp: Option<types::Timestamp>)
-		/// button code from `input_event_codes.h`
-		button(button: u32, pressed: bool, timestamp: Option<types::Timestamp>)
-		scroll_smooth(delta: types::Vec2f, source: ScrollSource, timestamp: Option<types::Timestamp>)
-		scroll_discrete(delta: types::Vec2f, source: ScrollSource, timestamp: Option<types::Timestamp>)
+	motion(delta: types::Vec2f, timestamp: Option<types::Timestamp>)
+	/// button code from `input_event_codes.h`
+	button(button: u32, pressed: bool, timestamp: Option<types::Timestamp>)
+	scroll_smooth(delta: types::Vec2f, source: ScrollSource, timestamp: Option<types::Timestamp>)
+	scroll_discrete(delta: types::Vec2f, source: ScrollSource, timestamp: Option<types::Timestamp>)
 }
 
 /// The physical source type of a scroll event
 enum ScrollSource {
-		Wheel,
-		Finger,
-		Continuous,
-		WheelTilt
+	Wheel,
+	Finger,
+	Continuous,
+	WheelTilt
 }

@@ -1,4 +1,4 @@
 /// Derez an object
 interface Derezzable {
-		derez()
+	derez()
 }

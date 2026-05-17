@@ -20,7 +20,8 @@ impl SingleAction {
 		hover_condition: impl Fn(&InputSnapshot) -> bool,
 		interact_condition: impl Fn(&InputSnapshot) -> bool,
 	) {
-		self.multi.update(queue, hover_condition, interact_condition);
+		self.multi
+			.update(queue, hover_condition, interact_condition);
 
 		self.actor_started = false;
 		self.actor_changed = false;
