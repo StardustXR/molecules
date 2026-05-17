@@ -1,13 +1,13 @@
 [package]
-name = "stardust-xr-molecules-protocol"
+name = "stardust-xr-molecules-protocols"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-gluon.git = "https://github.com/technobaboo/gluon"
+gluon = { git = "https://github.com/technobaboo/gluon" }
 
 [build-dependencies]
-gluon-codegen.git = "https://github.com/technobaboo/gluon"
+gluon-codegen = { git = "https://github.com/technobaboo/gluon" }
 
 [build-dependencies.stardust-xr-protocol]
 git = "https://github.com/StardustXR/core.git"
