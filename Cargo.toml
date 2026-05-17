@@ -9,6 +9,9 @@ license = "MIT"
 repository = "https://github.com/StardustXR/molecules/"
 homepage = "https://stardustxr.org"
 
+[workspace]
+members = ["protocol"]
+
 [dependencies]
 glam = { version = "0.29.0", features = ["mint"] }
 lazy_static = "1.4.0"

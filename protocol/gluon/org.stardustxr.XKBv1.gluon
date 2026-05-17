@@ -1,0 +1,36 @@
+import "org.stardustxr.Types" as types
+
+/// Receives raw keyboard input
+interface KeyboardHandler {
+		/// Keycode is a linux event code, to get an xkbcommon keycode add 8
+		key_state(keycode: u32, pressed: bool, timestamp: Option<types::Timestamp>, modifiers: ModifierState, keymap: Ref<Keymap>)
+}
+
+/// A store for keymaps, needed for deduplication
+interface KeymapStore {
+		/// Register a xkbcommon keymap, deduplicates
+		exchange(keymap: String) -> (keymap: Result<Ref<Keymap>, KeymapExchangeError>)
+		get(keymap: Ref<Keymap>) -> (keymap: Option<XkbcommonKeymapFd>)
+}
+
+/// Error returned by KeymapStore::exchange
+enum KeymapExchangeError {
+		InvalidKeymap,
+}
+
+/// A reference to a keymap
+interface Keymap {}
+
+/// A Fd representing an xkbcommon keymap with a null byte
+/// Has the same format as wayland uses
+struct XkbcommonKeymapFd {
+		fd: Fd,
+		size: u32,
+}
+
+/// Modifier state driven by xkbcommon
+struct ModifierState {
+		depressed: u32,
+		latched: u32,
+		locked: u32,
+}
