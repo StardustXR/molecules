@@ -1,11 +1,9 @@
 use glam::{Mat4, Vec3, vec3};
 use stardust_xr_fusion::{
 	client::Client,
-	drawable::{Lines, LinesAspect},
-	fields::{CylinderShape, Shape, TorusShape},
-	root::{RootAspect, RootEvent},
-	spatial::{Spatial, Transform},
-	values::color::rgba_linear,
+	drawable::Lines,
+	fields::Shape,
+	spatial::{Spatial, SpatialExt, Transform},
 };
 use stardust_xr_molecules::lines::{LineExt, shape};
 use tracing_subscriber::EnvFilter;
@@ -17,7 +15,7 @@ async fn main() {
 		.init();
 	let mut client = Client::auto_connect(&[]).await.unwrap();
 
-	let root = Spatial::create(client.get_root(), Transform::identity()).unwrap();
+	let root = Spatial::new(client.get_root(), Transform::identity()).unwrap();
 
 	let mut x_offset = -0.375;
 

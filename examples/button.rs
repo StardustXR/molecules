@@ -1,9 +1,8 @@
 use serde::{Deserialize, Serialize};
 use stardust_xr_fusion::{
 	client::Client,
-	drawable::{Text, TextStyle, XAlign, YAlign},
-	root::{ClientState, RootAspect, RootEvent},
-	spatial::{Spatial, Transform},
+	drawable::{Text, TextExt, TextStyle, XAlign, YAlign},
+	spatial::{Spatial, SpatialExt, Transform},
 };
 use stardust_xr_molecules::{
 	DebugSettings, UIElement, VisualDebug,
@@ -23,21 +22,30 @@ async fn main() {
 	tracing_subscriber::fmt()
 		.with_env_filter(EnvFilter::from_default_env())
 		.init();
-	let mut client = Client::auto_connect(&[]).await.unwrap();
+	let (mut client, root) = Client::auto_connect(&[]).await.unwrap();
 
-	let root = Spatial::create(client.get_root(), Transform::identity()).unwrap();
+	let root = Spatial::new(&client, &root, Transform::IDENTITY)
+		.await
+		.unwrap();
 	let mut button = Button::create(
 		&root,
-		Transform::none(),
+		Transform::IDENTITY,
 		[0.1; 2],
 		ButtonSettings::default(),
 	)
 	.unwrap();
 	button.set_debug(Some(DebugSettings::default()));
 
-	let text = Text::create(
-		button.touch_plane().root(),
+	let text_spatial = Spatial::new(
+		&client,
+		&root.spatial_ref().await.unwrap(),
 		Transform::from_translation([0.0, -0.06, 0.0]),
+	)
+	.await
+	.unwrap();
+	let text = Text::new(
+		&client,
+		&text_spatial,
 		"Unpressed",
 		TextStyle {
 			character_height: 0.01,
@@ -46,27 +54,19 @@ async fn main() {
 			..Default::default()
 		},
 	)
+	.await
 	.unwrap();
-	client
-		.sync_event_loop(|client, _flow| {
-			while let Some(root_event) = client.get_root().recv_root_event() {
-				match root_event {
-					RootEvent::Ping { response } => response.send_ok(()),
-					RootEvent::SaveState { response } => response.wrap(|| {
-						ClientState::from_data_root(None::<()>, button.touch_plane().root())
-					}),
-					_ => (),
-				}
-			}
 
-			button.handle_events();
-			if button.pressed() {
-				text.set_text("Pressed").unwrap();
-			}
-			if button.released() {
-				text.set_text("Unpressed").unwrap();
-			}
-		})
-		.await
-		.unwrap()
+	let mut frame_receiver = client.frame_receiver();
+	loop {
+		let frame_info = frame_receiver.recv().await.unwrap();
+
+		button.handle_events();
+		if button.pressed() {
+			text.set_text("Pressed").unwrap();
+		}
+		if button.released() {
+			text.set_text("Unpressed").unwrap();
+		}
+	}
 }
