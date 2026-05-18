@@ -37,3 +37,6 @@ git = "https://github.com/technobaboo/gluon"
 [dev-dependencies]
 tokio = { version = "1.38.0", features = ["full"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+
+[dev-dependencies.pion-binder]
+git = "https://github.com/technobaboo/pion"
