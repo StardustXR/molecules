@@ -1,12 +1,17 @@
+use glam::Mat4;
 use stardust_xr_fusion::{
 	client::Client,
+	drawable::ModelExt,
 	fields::{Field, FieldExt, Shape},
+	project_local_resources,
 	spatial::{Spatial, SpatialExt, Transform},
+	types::Resource,
 };
 use stardust_xr_molecules::{
 	DebugSettings, FrameSensitive, UIElement, VisualDebug,
-	grabbable::{Grabbable, GrabbableSettings},
+	grabbable::{Grabbable, GrabbableSettings, PointerMode},
 };
+use stardust_xr_protocol::model::Model;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main(flavor = "current_thread")]
@@ -14,20 +19,39 @@ async fn main() {
 	tracing_subscriber::fmt()
 		.with_env_filter(EnvFilter::from_default_env())
 		.init();
-	let (client, root) = Client::auto_connect(&[]).await.unwrap();
+	let (client, root) = Client::auto_connect(&[&project_local_resources!("res")])
+		.await
+		.unwrap();
 	let root_spatial = Spatial::create(&client, &root, Transform::IDENTITY)
 		.await
 		.unwrap();
 	let root_ref = root_spatial.spatial_ref().await.unwrap();
 
-	let field_spatial = Spatial::create(&client, &root_ref, Transform::IDENTITY)
+	let content_spatial = Spatial::create(&client, &root_ref, Transform::IDENTITY)
 		.await
 		.unwrap();
+
+	let model = Model::create(
+		&client,
+		&content_spatial,
+		Resource::Namespaced {
+			namespace: "molecules".to_string(),
+			path: "grabbable".to_string(),
+		},
+	)
+	.await
+	.unwrap();
+
+	let bounds = content_spatial.get_local_bounding_box().await.unwrap();
+
 	let field = Field::create(
 		&client,
-		&field_spatial,
-		Shape::Box {
-			size: [0.1, 0.1, 0.1].into(),
+		&content_spatial,
+		Shape::Transform {
+			shape: Box::new(Shape::Box {
+				size: bounds.extents,
+			}),
+			transform: Mat4::from_translation(bounds.center.into()).into(),
 		},
 	)
 	.await
@@ -38,10 +62,15 @@ async fn main() {
 		root_ref,
 		Transform::IDENTITY,
 		field,
-		GrabbableSettings::default(),
+		GrabbableSettings {
+			pointer_mode: PointerMode::Move,
+			..Default::default()
+		},
 	)
 	.await
 	.unwrap();
+	let content_parent = grabbable.content_parent().spatial_ref().await.unwrap();
+	content_spatial.set_parent(content_parent).unwrap();
 	grabbable.set_debug(Some(DebugSettings::default()));
 
 	let mut frame_receiver = client.frame_receiver();
