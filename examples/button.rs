@@ -1,8 +1,8 @@
-use serde::{Deserialize, Serialize};
 use stardust_xr_fusion::{
 	client::Client,
 	drawable::{Text, TextExt, TextStyle, XAlign, YAlign},
 	spatial::{Spatial, SpatialExt, Transform},
+	types::rgba_linear,
 };
 use stardust_xr_molecules::{
 	DebugSettings, UIElement, VisualDebug,
@@ -10,48 +10,47 @@ use stardust_xr_molecules::{
 };
 use tracing_subscriber::EnvFilter;
 
-#[derive(Debug, Default, Serialize, Deserialize)]
-pub struct ButtonAction {
-	action: (),
-	button: (),
-	press: bool,
-}
-
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
 	tracing_subscriber::fmt()
 		.with_env_filter(EnvFilter::from_default_env())
 		.init();
-	let (mut client, root) = Client::auto_connect(&[]).await.unwrap();
+	let (client, root) = Client::auto_connect(&[]).await.unwrap();
 
-	let root = Spatial::new(&client, &root, Transform::IDENTITY)
+	let root_spatial = Spatial::create(&client, &root, Transform::IDENTITY)
 		.await
 		.unwrap();
-	let mut button = Button::create(
-		&root,
+	let root_ref = root_spatial.spatial_ref().await.unwrap();
+
+	let mut button = Button::new(
+		&client,
+		&root_ref,
 		Transform::IDENTITY,
 		[0.1; 2],
 		ButtonSettings::default(),
 	)
+	.await
 	.unwrap();
 	button.set_debug(Some(DebugSettings::default()));
 
-	let text_spatial = Spatial::new(
+	let text_spatial = Spatial::create(
 		&client,
-		&root.spatial_ref().await.unwrap(),
+		&root_ref,
 		Transform::from_translation([0.0, -0.06, 0.0]),
 	)
 	.await
 	.unwrap();
-	let text = Text::new(
+	let text = Text::create(
 		&client,
 		&text_spatial,
-		"Unpressed",
+		"Unpressed".to_string(),
 		TextStyle {
 			character_height: 0.01,
+			color: rgba_linear!(1.0, 1.0, 1.0, 1.0),
 			text_align_x: XAlign::Center,
 			text_align_y: YAlign::Top,
-			..Default::default()
+			font: None,
+			bounds: None,
 		},
 	)
 	.await
@@ -59,14 +58,14 @@ async fn main() {
 
 	let mut frame_receiver = client.frame_receiver();
 	loop {
-		let frame_info = frame_receiver.recv().await.unwrap();
+		frame_receiver.recv().await.unwrap();
 
 		button.handle_events();
 		if button.pressed() {
-			text.set_text("Pressed").unwrap();
+			let _ = text.set_text("Pressed");
 		}
 		if button.released() {
-			text.set_text("Unpressed").unwrap();
+			let _ = text.set_text("Unpressed");
 		}
 	}
 }

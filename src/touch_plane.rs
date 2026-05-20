@@ -1,108 +1,118 @@
 use crate::{
 	DebugSettings, UIElement, VisualDebug,
-	input_action::{InputQueue, InputQueueable, MultiAction},
+	input_action::{InputQueue, InputSnapshot, MultiAction},
 	lines::{self, LineExt},
 };
 use glam::{FloatExt, Mat4, Vec3, vec3};
+use gluon::Object;
 use stardust_xr_fusion::{
-	drawable::Lines,
-	fields::{Field, FieldAspect, Shape},
-	input::{InputData, InputDataType, InputHandler},
-	node::{NodeError, NodeType},
-	spatial::{Spatial, SpatialAspect, SpatialRefAspect, Transform},
-	values::{Vector2, Vector3, color::rgba_linear},
+	client::{Client, ClientHandler},
+	drawable::{Lines, LinesExt},
+	error::ServerError,
+	fields::{Field, FieldExt, Shape},
+	spatial::{Spatial, SpatialExt, SpatialRef, Transform},
+	suis::InputDataType,
+	types::rgba_linear,
 };
 use std::{ops::Range, sync::Arc};
 
 pub struct TouchPlane {
-	size: Vector2<f32>,
+	size: [f32; 2],
 	pub x_range: Range<f32>,
 	pub y_range: Range<f32>,
 	thickness: f32,
 
 	root: Spatial,
-	input: InputQueue,
+	field_spatial: Spatial,
 	field: Field,
+	input: Object<InputQueue>,
 	action: MultiAction,
 
-	debug_lines: Option<Lines>,
+	debug_lines: Lines,
 }
 impl TouchPlane {
-	pub fn create(
-		parent: &impl SpatialRefAspect,
+	pub async fn new<H: ClientHandler>(
+		client: &Client<H>,
+		parent: &SpatialRef,
 		transform: Transform,
-		size: impl Into<Vector2<f32>>,
+		size: [f32; 2],
 		thickness: f32,
 		x_range: Range<f32>,
 		y_range: Range<f32>,
-	) -> Result<Self, NodeError> {
-		let size = size.into();
-		let root = Spatial::create(parent, transform)?;
-		let field = Field::create(
-			&root,
+	) -> Result<Self, ServerError> {
+		let root = Spatial::create(client, parent, transform).await?;
+		let root_ref = root.spatial_ref().await?;
+		let field_spatial = Spatial::create(
+			client,
+			&root_ref,
 			Transform::from_translation([0.0, 0.0, thickness * -0.5]),
-			Shape::Box([size.x, size.y, thickness].into()),
-		)?;
-		let input = InputHandler::create(&root, Transform::none(), &field)?.queue()?;
+		)
+		.await?;
+		let field = Field::create(
+			client,
+			&field_spatial,
+			Shape::Box {
+				size: [size[0], size[1], thickness].into(),
+			},
+		)
+		.await?;
+		let input = InputQueue::new(client, root.clone(), field.clone(), root_ref.clone()).await?;
+		let debug_lines = Lines::create(client, &root, vec![]).await?;
 
 		Ok(TouchPlane {
 			size,
 			x_range,
 			y_range,
 			thickness,
-
 			root,
-			input,
+			field_spatial,
 			field,
+			input,
 			action: Default::default(),
-			debug_lines: None,
+			debug_lines,
 		})
 	}
 
-	fn hover(size: Vector2<f32>, point: Vector3<f32>, front: bool) -> bool {
+	fn hover(size: [f32; 2], point: Vec3, front: bool) -> bool {
 		point.z.is_sign_positive() == front
-			&& point.x.abs() * 2.0 < size.x
-			&& point.y.abs() * 2.0 < size.y
+			&& point.x.abs() * 2.0 < size[0]
+			&& point.y.abs() * 2.0 < size[1]
 	}
 
-	pub fn interact_point(&self, input: &InputData) -> (Vector2<f32>, f32) {
-		let interact_point = match &input.input {
-			InputDataType::Pointer(p) => {
+	pub fn interact_point(&self, snap: &InputSnapshot) -> ([f32; 2], f32) {
+		let p = match snap.input() {
+			InputDataType::Pointer { data } => {
 				let normal = vec3(0.0, 0.0, 1.0);
-				let denom = normal.dot(p.direction().into());
-				let t = -Vec3::from(p.origin).dot(normal) / denom;
-				(Vec3::from(p.origin) + Vec3::from(p.direction()) * t).into()
+				let origin = Vec3::from(data.pose.position);
+				let dir = Vec3::from(data.direction());
+				let t = -origin.dot(normal) / normal.dot(dir);
+				origin + dir * t
 			}
-			InputDataType::Hand(h) => h.index.tip.position,
-			InputDataType::Tip(t) => t.origin,
+			InputDataType::Hand { data } => Vec3::from(data.index.tip.pose.position),
+			InputDataType::Tip { data } => Vec3::from(data.pose.position),
 		};
 
-		let x = interact_point
-			.x
-			.clamp(-self.size.x / 2.0, self.size.x / 2.0)
-			.remap(
-				-self.size.x / 2.0,
-				self.size.x / 2.0,
-				self.x_range.start,
-				self.x_range.end,
-			);
-		let y = interact_point
-			.y
-			.clamp(-self.size.y / 2.0, self.size.y / 2.0)
-			.remap(
-				self.size.y / 2.0,
-				-self.size.y / 2.0,
-				self.y_range.start,
-				self.y_range.end,
-			);
+		let x = p.x.clamp(-self.size[0] / 2.0, self.size[0] / 2.0).remap(
+			-self.size[0] / 2.0,
+			self.size[0] / 2.0,
+			self.x_range.start,
+			self.x_range.end,
+		);
+		let y = p.y.clamp(-self.size[1] / 2.0, self.size[1] / 2.0).remap(
+			self.size[1] / 2.0,
+			-self.size[1] / 2.0,
+			self.y_range.start,
+			self.y_range.end,
+		);
 
-		([x, y].into(), interact_point.z)
+		([x, y], p.z)
 	}
+
 	pub fn input_to_points<'a>(
 		&self,
-		inputs: impl Iterator<Item = &'a Arc<InputData>>,
-	) -> Vec<Vector2<f32>> {
-		inputs.map(|i| self.interact_point(i).0).collect()
+		snaps: impl Iterator<Item = &'a Arc<InputSnapshot>>,
+	) -> Vec<[f32; 2]> {
+		snaps.map(|s| self.interact_point(s).0).collect()
 	}
 
 	pub fn root(&self) -> &Spatial {
@@ -115,25 +125,20 @@ impl TouchPlane {
 		&self.action
 	}
 
-	pub fn set_size(&mut self, size: impl Into<Vector2<f32>>) -> Result<(), NodeError> {
-		let size = size.into();
+	pub fn set_size(&mut self, size: [f32; 2]) {
 		self.size = size;
-		self.field
-			.set_shape(Shape::Box([size.x, size.y, self.thickness].into()))?;
-		Ok(())
+		let _ = self.field.set_shape(Shape::Box {
+			size: [size[0], size[1], self.thickness].into(),
+		});
 	}
-	pub fn set_thickness(&mut self, thickness: f32) -> Result<(), NodeError> {
+	pub fn set_thickness(&mut self, thickness: f32) {
 		self.thickness = thickness;
-		self.field
-			.set_local_transform(Transform::from_translation([0.0, 0.0, thickness * -0.5]))?;
-		self.field
-			.set_shape(Shape::Box([self.size.x, self.size.y, thickness].into()))?;
-		Ok(())
-	}
-
-	/// Set whether this will receive input or not
-	pub fn set_enabled(&self, enabled: bool) -> Result<(), NodeError> {
-		self.input.handler().set_enabled(enabled)
+		let _ = self
+			.field_spatial
+			.set_local_transform(Transform::from_translation([0.0, 0.0, thickness * -0.5]));
+		let _ = self.field.set_shape(Shape::Box {
+			size: [self.size[0], self.size[1], thickness].into(),
+		});
 	}
 }
 impl UIElement for TouchPlane {
@@ -141,19 +146,26 @@ impl UIElement for TouchPlane {
 		if !self.input.handle_events() {
 			return false;
 		}
+		let size = self.size;
 		self.action.update(
 			&self.input,
-			|input| match &input.input {
-				InputDataType::Pointer(_) => input.distance < 0.0,
-				InputDataType::Hand(h) => Self::hover(self.size, h.index.tip.position, true),
-				InputDataType::Tip(t) => Self::hover(self.size, t.origin, true),
-			},
-			|input| match &input.input {
-				InputDataType::Pointer(_) => {
-					input.datamap.with_data(|d| d.idx("select").as_f32() > 0.5)
+			|snap| match snap.input() {
+				InputDataType::Pointer { .. } => snap.distance() < 0.0,
+				InputDataType::Hand { data } => {
+					Self::hover(size, Vec3::from(data.index.tip.pose.position), true)
 				}
-				InputDataType::Hand(h) => Self::hover(self.size, h.index.tip.position, false),
-				InputDataType::Tip(t) => Self::hover(self.size, t.origin, false),
+				InputDataType::Tip { data } => {
+					Self::hover(size, Vec3::from(data.pose.position), true)
+				}
+			},
+			|snap| match snap.input() {
+				InputDataType::Pointer { .. } => snap.datamap_f32("select") > 0.5,
+				InputDataType::Hand { data } => {
+					Self::hover(size, Vec3::from(data.index.tip.pose.position), false)
+				}
+				InputDataType::Tip { data } => {
+					Self::hover(size, Vec3::from(data.pose.position), false)
+				}
 			},
 		);
 		true
@@ -161,10 +173,10 @@ impl UIElement for TouchPlane {
 }
 impl VisualDebug for TouchPlane {
 	fn set_debug(&mut self, settings: Option<DebugSettings>) {
-		self.debug_lines = settings.and_then(|settings| {
+		let lines = if let Some(settings) = settings {
 			let line_front = lines::rounded_rectangle(
-				self.size.x,
-				self.size.y,
+				self.size[0],
+				self.size[1],
 				settings.line_thickness * 0.5,
 				4,
 			)
@@ -179,14 +191,10 @@ impl VisualDebug for TouchPlane {
 					settings.line_color.a * 0.5
 				))
 				.transform(Mat4::from_translation(vec3(0.0, 0.0, -self.thickness)));
-
-			let lines = Lines::create(
-				&self.root,
-				Transform::from_translation([0.0, 0.0, 0.0]),
-				&[line_front, line_back],
-			)
-			.ok()?;
-			Some(lines)
-		})
+			vec![line_front, line_back]
+		} else {
+			vec![]
+		};
+		let _ = self.debug_lines.set_lines(lines);
 	}
 }

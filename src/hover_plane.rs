@@ -1,19 +1,18 @@
 use crate::{
 	DebugSettings, VisualDebug,
-	input_action::{DeltaSet, InputQueue, InputQueueable, SingleAction},
+	input_action::{DeltaSet, InputQueue, InputSnapshot, PointerExt, SingleAction},
 	lines::{self, LineExt},
 };
 use glam::{FloatExt, Mat4, Vec3, vec3};
+use gluon::Object;
 use stardust_xr_fusion::{
-	drawable::{Line, LinePoint, Lines, LinesAspect},
-	fields::{Field, FieldAspect, Shape},
-	input::{InputData, InputDataType, InputHandler},
-	node::{NodeError, NodeType},
-	spatial::{Spatial, SpatialAspect, SpatialRefAspect, Transform},
-	values::{
-		Vector2, Vector3,
-		color::{Rgba, color_space::LinearRgb, rgba_linear},
-	},
+	client::{Client, ClientHandler},
+	drawable::{Line, LinePoint, Lines, LinesExt},
+	error::ServerError,
+	fields::{Field, FieldExt, Shape},
+	spatial::{Spatial, SpatialExt, SpatialRef, Transform},
+	suis::InputDataType,
+	types::{Color, rgba_linear},
 };
 use std::{ops::Range, sync::Arc};
 
@@ -21,11 +20,11 @@ use std::{ops::Range, sync::Arc};
 pub struct HoverPlaneSettings {
 	pub distance_range: Range<f32>,
 	pub line_start_thickness: f32,
-	pub line_start_color_hover: Rgba<f32, LinearRgb>,
-	pub line_start_color_interact: Rgba<f32, LinearRgb>,
+	pub line_start_color_hover: Color,
+	pub line_start_color_interact: Color,
 	pub line_end_thickness: f32,
-	pub line_end_color_hover: Rgba<f32, LinearRgb>,
-	pub line_end_color_interact: Rgba<f32, LinearRgb>,
+	pub line_end_color_hover: Color,
+	pub line_end_color_interact: Color,
 }
 impl Default for HoverPlaneSettings {
 	fn default() -> Self {
@@ -43,102 +42,105 @@ impl Default for HoverPlaneSettings {
 
 pub struct HoverPlane {
 	root: Spatial,
-	input: InputQueue,
+	field_spatial: Spatial,
 	field: Field,
+	input: Object<InputQueue>,
 	interact: SingleAction,
-	size: Vector2<f32>,
+	size: [f32; 2],
 	pub x_range: Range<f32>,
 	pub y_range: Range<f32>,
 	thickness: f32,
 	settings: HoverPlaneSettings,
 	lines: Lines,
-	debug_lines: Option<Lines>,
+	debug_lines: Lines,
 }
 impl HoverPlane {
-	pub fn create(
-		parent: &impl SpatialRefAspect,
+	pub async fn new<H: ClientHandler>(
+		client: &Client<H>,
+		parent: &SpatialRef,
 		transform: Transform,
-		size: impl Into<Vector2<f32>>,
+		size: [f32; 2],
 		thickness: f32,
 		x_range: Range<f32>,
 		y_range: Range<f32>,
 		settings: HoverPlaneSettings,
-	) -> Result<Self, NodeError> {
-		let size = size.into();
-		let root = Spatial::create(parent, transform)?;
-		let field = Field::create(
-			&root,
+	) -> Result<Self, ServerError> {
+		let root = Spatial::create(client, parent, transform).await?;
+		let root_ref = root.spatial_ref().await?;
+		let field_spatial = Spatial::create(
+			client,
+			&root_ref,
 			Transform::from_translation([0.0, 0.0, thickness * -0.5]),
-			Shape::Box([size.x, size.y, thickness].into()),
-		)?;
-		let input = InputHandler::create(&root, Transform::none(), &field)?.queue()?;
+		)
+		.await?;
+		let field = Field::create(
+			client,
+			&field_spatial,
+			Shape::Box {
+				size: [size[0], size[1], thickness].into(),
+			},
+		)
+		.await?;
+		let input = InputQueue::new(client, root.clone(), field.clone(), root_ref.clone()).await?;
+		let lines = Lines::create(client, &root, vec![]).await?;
+		let debug_lines = Lines::create(client, &root, vec![]).await?;
 
-		let interact_action = SingleAction::default();
-
-		let lines = Lines::create(&root, Transform::identity(), &[])?;
 		Ok(HoverPlane {
 			root,
-			input,
+			field_spatial,
 			field,
-			interact: interact_action,
+			input,
+			interact: SingleAction::default(),
 			size,
 			x_range,
 			y_range,
 			thickness,
 			settings,
 			lines,
-			debug_lines: None,
+			debug_lines,
 		})
 	}
 
-	fn hover(size: Vector2<f32>, point: Vector3<f32>, front: bool) -> bool {
-		point.x.abs() * 2.0 < size.x
-			&& point.y.abs() * 2.0 < size.y
+	fn hover(size: [f32; 2], point: Vec3, front: bool) -> bool {
+		point.x.abs() * 2.0 < size[0]
+			&& point.y.abs() * 2.0 < size[1]
 			&& point.z.is_sign_positive() == front
 	}
-	pub fn interact_point_local(input: &InputData) -> Vec3 {
-		match &input.input {
-			InputDataType::Pointer(p) => {
-				let normal = vec3(0.0, 0.0, 1.0);
-				let denom = normal.dot(p.direction().into());
-				let t = -Vec3::from(p.origin).dot(normal) / denom;
-				Vec3::from(p.origin) + Vec3::from(p.direction()) * t
+
+	pub fn interact_point_local(snap: &InputSnapshot) -> Vec3 {
+		match snap.input() {
+			InputDataType::Pointer { data } => data.intersect_plane(vec3(0.0, 0.0, 1.0)),
+			InputDataType::Hand { data } => {
+				(Vec3::from(data.index.tip.pose.position)
+					+ Vec3::from(data.thumb.tip.pose.position))
+					* 0.5
 			}
-			InputDataType::Hand(h) => {
-				(Vec3::from(h.index.tip.position) + Vec3::from(h.thumb.tip.position)) * 0.5
-			}
-			InputDataType::Tip(t) => t.origin.into(),
+			InputDataType::Tip { data } => Vec3::from(data.pose.position),
 		}
 	}
-	pub fn interact_point(&self, input: &InputData) -> (Vector2<f32>, f32) {
-		let interact_point = Self::interact_point_local(input);
 
-		let x = interact_point
-			.x
-			.clamp(-self.size.x / 2.0, self.size.x / 2.0)
-			.remap(
-				-self.size.x / 2.0,
-				self.size.x / 2.0,
-				self.x_range.start,
-				self.x_range.end,
-			);
-		let y = interact_point
-			.y
-			.clamp(-self.size.y / 2.0, self.size.y / 2.0)
-			.remap(
-				self.size.y / 2.0,
-				-self.size.y / 2.0,
-				self.y_range.start,
-				self.y_range.end,
-			);
-
-		([x, y].into(), interact_point.z)
+	pub fn interact_point(&self, snap: &InputSnapshot) -> ([f32; 2], f32) {
+		let p = Self::interact_point_local(snap);
+		let x = p.x.clamp(-self.size[0] / 2.0, self.size[0] / 2.0).remap(
+			-self.size[0] / 2.0,
+			self.size[0] / 2.0,
+			self.x_range.start,
+			self.x_range.end,
+		);
+		let y = p.y.clamp(-self.size[1] / 2.0, self.size[1] / 2.0).remap(
+			self.size[1] / 2.0,
+			-self.size[1] / 2.0,
+			self.y_range.start,
+			self.y_range.end,
+		);
+		([x, y], p.z)
 	}
+
 	pub fn input_to_points<'a>(
 		&self,
-		inputs: impl Iterator<Item = &'a Arc<InputData>>,
-	) -> Vec<Vector2<f32>> {
-		inputs.map(|i| self.interact_point(i).0).collect()
+		snaps: impl Iterator<Item = &'a Arc<InputSnapshot>>,
+	) -> Vec<[f32; 2]> {
+		snaps.map(|s| self.interact_point(s).0).collect()
 	}
 
 	pub fn root(&self) -> &Spatial {
@@ -151,84 +153,71 @@ impl HoverPlane {
 		&self.field
 	}
 
-	pub fn set_size(&mut self, size: impl Into<Vector2<f32>>) -> Result<(), NodeError> {
-		let size = size.into();
+	pub fn set_size(&mut self, size: [f32; 2]) {
 		self.size = size;
-		self.field
-			.set_shape(Shape::Box([size.x, size.y, self.thickness].into()))?;
-		Ok(())
+		let _ = self.field.set_shape(Shape::Box {
+			size: [size[0], size[1], self.thickness].into(),
+		});
 	}
-	pub fn set_thickness(&mut self, thickness: f32) -> Result<(), NodeError> {
+	pub fn set_thickness(&mut self, thickness: f32) {
 		self.thickness = thickness;
-		self.field
-			.set_local_transform(Transform::from_translation([0.0, 0.0, thickness * -0.5]))?;
-		self.field
-			.set_shape(Shape::Box([self.size.x, self.size.y, thickness].into()))?;
-		Ok(())
+		let _ = self
+			.field_spatial
+			.set_local_transform(Transform::from_translation([0.0, 0.0, thickness * -0.5]));
+		let _ = self.field.set_shape(Shape::Box {
+			size: [self.size[0], self.size[1], thickness].into(),
+		});
 	}
 
-	/// Get all the raw inputs that are hovering
-	pub fn hovering(&self) -> &DeltaSet<Arc<InputData>> {
+	pub fn hovering(&self) -> &DeltaSet<Arc<InputSnapshot>> {
 		self.interact.hovering()
 	}
-	/// Get all the points hovering over the surface, in x_range and y_range
-	pub fn current_hover_points(&self) -> Vec<Vector2<f32>> {
+	pub fn current_hover_points(&self) -> Vec<[f32; 2]> {
 		self.input_to_points(self.hovering().current().iter())
 	}
-
-	/// Get the input that's interacting
 	pub fn interact_status(&self) -> &SingleAction {
 		&self.interact
 	}
 
-	/// Set whether this will receive input or not
-	pub fn set_enabled(&self, enabled: bool) -> Result<(), NodeError> {
-		self.input.handler().set_enabled(enabled)
-	}
-
-	/// Update the state of this touch plane. Run once every frame.
 	pub fn update(&mut self) {
 		self.input.handle_events();
+		let size = self.size;
+		let distance_range = self.settings.distance_range.clone();
 		self.interact.update(
 			false,
 			&self.input,
-			|input| match &input.input {
-				InputDataType::Pointer(_) => input.distance <= 0.0,
+			|snap| match snap.input() {
+				InputDataType::Pointer { .. } => snap.distance() <= 0.0,
 				_ => {
-					let interact_point = Self::interact_point_local(input);
-					self.settings
-						.distance_range
-						.contains(&interact_point.z.abs())
-						&& Self::hover(self.size, interact_point.into(), true)
+					let p = Self::interact_point_local(snap);
+					distance_range.contains(&p.z.abs()) && Self::hover(size, p, true)
 				}
 			},
-			|input| match &input.input {
-				InputDataType::Hand(_) => input
-					.datamap
-					.with_data(|d| d.idx("pinch_strength").as_f32() > 0.95),
-				_ => input.datamap.with_data(|d| d.idx("select").as_f32() > 0.9),
+			|snap| match snap.input() {
+				InputDataType::Hand { .. } => snap.datamap_f32("pinch_strength") > 0.95,
+				_ => snap.datamap_f32("select") > 0.9,
 			},
 		);
 
-		let mut hovered_lines = self
+		let mut lines: Vec<Line> = self
 			.hovering()
 			.current()
 			.iter()
-			.filter_map(|i| self.line_from_input(i, false))
-			.collect::<Vec<_>>();
-		if let Some(input) = self.interact.actor()
-			&& let Some(line) = self.line_from_input(input, true)
+			.filter_map(|s| self.line_from_snap(s, false))
+			.collect();
+		if let Some(actor) = self.interact.actor()
+			&& let Some(line) = self.line_from_snap(actor, true)
 		{
-			hovered_lines.push(line);
+			lines.push(line);
 		}
-		self.lines.set_lines(&hovered_lines).unwrap();
+		let _ = self.lines.set_lines(lines);
 	}
 
-	fn line_from_input(&self, input: &InputData, interacting: bool) -> Option<Line> {
-		if let InputDataType::Pointer(_) = &input.input {
+	fn line_from_snap(&self, snap: &InputSnapshot, interacting: bool) -> Option<Line> {
+		if let InputDataType::Pointer { .. } = snap.input() {
 			None
 		} else {
-			Some(self.line_from_point(Self::interact_point_local(input), interacting))
+			Some(self.line_from_point(Self::interact_point_local(snap), interacting))
 		}
 	}
 	fn line_from_point(&self, point: Vec3, interacting: bool) -> Line {
@@ -236,8 +225,8 @@ impl HoverPlane {
 			points: vec![
 				LinePoint {
 					point: [
-						point.x.clamp(self.size.x * -0.5, self.size.x * 0.5),
-						point.y.clamp(self.size.y * -0.5, self.size.y * 0.5),
+						point.x.clamp(self.size[0] * -0.5, self.size[0] * 0.5),
+						point.y.clamp(self.size[1] * -0.5, self.size[1] * 0.5),
 						0.0,
 					]
 					.into(),
@@ -264,10 +253,10 @@ impl HoverPlane {
 }
 impl VisualDebug for HoverPlane {
 	fn set_debug(&mut self, settings: Option<DebugSettings>) {
-		self.debug_lines = settings.and_then(|settings| {
+		let lines = if let Some(settings) = settings {
 			let line_front = lines::rounded_rectangle(
-				self.size.x,
-				self.size.y,
+				self.size[0],
+				self.size[1],
 				settings.line_thickness * 0.5,
 				4,
 			)
@@ -282,14 +271,10 @@ impl VisualDebug for HoverPlane {
 					settings.line_color.a * 0.5
 				))
 				.transform(Mat4::from_translation(vec3(0.0, 0.0, -self.thickness)));
-
-			let lines = Lines::create(
-				&self.root,
-				Transform::from_translation([0.0, 0.0, 0.0]),
-				&[line_front, line_back],
-			)
-			.ok()?;
-			Some(lines)
-		})
+			vec![line_front, line_back]
+		} else {
+			vec![]
+		};
+		let _ = self.debug_lines.set_lines(lines);
 	}
 }

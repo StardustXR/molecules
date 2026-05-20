@@ -20,8 +20,8 @@ use stardust_xr_fusion::{
 	},
 	types::Timestamp,
 };
+use stardust_xr_protocol::query::QueryableInterfaceGuard;
 use std::{
-	any::Any,
 	fmt::{Debug, Formatter, Result},
 	hash::Hash,
 	sync::{Arc, Mutex, OnceLock},
@@ -34,6 +34,35 @@ pub struct InputSnapshot {
 	pub spatial: SpatialData,
 	pub semantic: SemanticData,
 	pub time: Timestamp,
+}
+impl InputSnapshot {
+	pub fn distance(&self) -> f32 {
+		self.spatial.distance
+	}
+	pub fn input(&self) -> &InputDataType {
+		&self.spatial.input
+	}
+	pub fn captured(&self) -> bool {
+		self.semantic.captured
+	}
+	pub fn datamap_f32(&self, key: &str) -> f32 {
+		match self.semantic.datamap.get(key) {
+			Some(DatamapData::Float { value }) => *value,
+			_ => 0.0,
+		}
+	}
+	pub fn datamap_bool(&self, key: &str) -> bool {
+		match self.semantic.datamap.get(key) {
+			Some(DatamapData::Bool { value }) => *value,
+			_ => false,
+		}
+	}
+	pub fn datamap_vec2(&self, key: &str) -> [f32; 2] {
+		match self.semantic.datamap.get(key) {
+			Some(DatamapData::Vec2 { value }) => [value.x, value.y],
+			_ => [0.0, 0.0],
+		}
+	}
 }
 impl PartialEq for InputSnapshot {
 	fn eq(&self, other: &Self) -> bool {
@@ -57,7 +86,8 @@ pub struct InputQueue {
 	field: FieldRef,
 	reference_space: SpatialRef,
 	handler_proxy: OnceLock<InputHandlerProxy>,
-	_interface_guard: OnceLock<Box<dyn Any + Send + Sync>>,
+	_queryable: OnceLock<QueryableObject>,
+	_interface_guard: OnceLock<QueryableInterfaceGuard>,
 	inner: Mutex<InputQueueState>,
 }
 impl Debug for InputQueue {
@@ -88,6 +118,7 @@ impl InputQueue {
 			field: field.field_ref().await?,
 			reference_space,
 			handler_proxy: OnceLock::new(),
+			_queryable: OnceLock::new(),
 			_interface_guard: OnceLock::new(),
 			inner: Mutex::new(InputQueueState {
 				current: FxHashMap::default(),
@@ -98,14 +129,14 @@ impl InputQueue {
 		let proxy = InputHandlerProxy::from_handler(&queue_obj);
 		let _ = queue_obj.handler_proxy.set(proxy);
 
-		let queryable = QueryableObject::new(client, query_spatial, field).await?;
+		let queryable = QueryableObject::create(client, query_spatial, field)
+			.await?
+			.unwrap();
 		let guard = queryable
-			.unwrap()
 			.add_interface(&queue_obj, InputHandlerProxy::QUERY_INTERFACE)
 			.await?;
-		let _ = queue_obj
-			._interface_guard
-			.set(Box::new(guard) as Box<dyn Any + Send + Sync>);
+		let _ = queue_obj._queryable.set(queryable);
+		let _ = queue_obj._interface_guard.set(guard);
 
 		Ok(queue_obj)
 	}
@@ -132,6 +163,7 @@ impl InputQueue {
 			field,
 			reference_space,
 			handler_proxy: OnceLock::new(),
+			_queryable: OnceLock::new(),
 			_interface_guard: OnceLock::new(),
 			inner: Mutex::new(InputQueueState {
 				current: FxHashMap::default(),

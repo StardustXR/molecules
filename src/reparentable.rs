@@ -1,302 +1,163 @@
-use crate::dbus::{AbortOnDrop, DbusObjectHandle, DbusObjectHandles};
-use futures_util::StreamExt;
+use gluon::{Context, Object};
 use stardust_xr_fusion::{
+	client::{Client, ClientHandler},
+	error::ServerError,
 	fields::Field,
-	node::{NodeResult, NodeType},
-	objects::zbus::{
-		self, Connection, fdo,
-		message::Header,
-		names::{BusName, UniqueName},
-		zvariant::OwnedObjectPath,
-	},
-	objects::{FieldObject, SpatialObject},
-	spatial::{Spatial, SpatialAspect, SpatialRef, SpatialRefAspect, Transform},
+	query::{QueryExt, QueryableObject},
+	spatial::{PartialTransform, Spatial, SpatialRef},
+};
+use stardust_xr_molecules_protocols::reparentable::{
+	EXTERNAL_PROTOCOL, ReparentHandle, ReparentHandleHandler, ReparentKeepalive,
+	ReparentableHandler,
 };
 use std::{
-	marker::PhantomData,
-	ops::Deref,
-	path::Path,
+	any::Any,
 	sync::{
 		Arc, Mutex,
 		atomic::{AtomicBool, Ordering},
 	},
 };
-use tokio::sync::watch;
+
+enum ReparentState {
+	Idle,
+	NonLocked(ReparentKeepalive),
+	Locked(#[allow(dead_code)] ReparentKeepalive),
+}
+
+struct SharedState {
+	spatial: Spatial,
+	initial_parent: SpatialRef,
+	reparent_state: Mutex<ReparentState>,
+	reparented: AtomicBool,
+}
+
+#[derive(gluon::Handler)]
+struct ReparentHandleInner(Arc<SharedState>);
+impl std::fmt::Debug for ReparentHandleInner {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("ReparentHandleInner").finish()
+	}
+}
+impl ReparentHandleHandler for ReparentHandleInner {
+	async fn reset_transform(&self, _ctx: Context, relative_to: SpatialRef) {
+		let _ = self
+			.0
+			.spatial
+			.set_relative_transform(relative_to, PartialTransform::NONE);
+	}
+}
+
+#[derive(gluon::Handler)]
+struct ReparentableInner {
+	state: Arc<SharedState>,
+	handle_proxy: std::sync::OnceLock<ReparentHandle>,
+	_handle_obj: std::sync::OnceLock<Object<ReparentHandleInner>>,
+}
+impl std::fmt::Debug for ReparentableInner {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("ReparentableInner").finish()
+	}
+}
+impl ReparentableHandler for ReparentableInner {
+	async fn reparent_locking(
+		&self,
+		_ctx: Context,
+		new_parent: SpatialRef,
+		keepalive: ReparentKeepalive,
+	) -> Option<ReparentHandle> {
+		let mut guard = self.state.reparent_state.lock().unwrap();
+		match &*guard {
+			ReparentState::Idle | ReparentState::NonLocked(_) => {
+				if let ReparentState::NonLocked(old) = &*guard {
+					let _ = old.reparent_stolen();
+				}
+				let _ = self.state.spatial.set_parent_in_place(new_parent);
+				self.state.reparented.store(true, Ordering::Relaxed);
+				*guard = ReparentState::Locked(keepalive);
+				self.handle_proxy.get().cloned()
+			}
+			ReparentState::Locked(_) => None,
+		}
+	}
+	async fn reparent(
+		&self,
+		_ctx: Context,
+		new_parent: SpatialRef,
+		keepalive: ReparentKeepalive,
+	) -> Option<ReparentHandle> {
+		let mut guard = self.state.reparent_state.lock().unwrap();
+		match &*guard {
+			ReparentState::Idle | ReparentState::NonLocked(_) => {
+				if let ReparentState::NonLocked(old) = &*guard {
+					let _ = old.reparent_stolen();
+				}
+				let _ = self.state.spatial.set_parent_in_place(new_parent);
+				self.state.reparented.store(true, Ordering::Relaxed);
+				*guard = ReparentState::NonLocked(keepalive);
+				self.handle_proxy.get().cloned()
+			}
+			ReparentState::Locked(_) => None,
+		}
+	}
+}
 
 pub struct Reparentable {
-	pub spatial: SpatialRef,
-	_object_handles: DbusObjectHandles,
-	transform_changed: Arc<Mutex<Option<Transform>>>,
-	reparented: Arc<AtomicBool>,
+	state: Arc<SharedState>,
+	_obj: Object<ReparentableInner>,
+	_guards: Vec<Box<dyn Any + Send + Sync>>,
 }
 impl Reparentable {
-	pub fn reparented(&self) -> bool {
-		self.reparented.load(Ordering::Relaxed)
-	}
-	pub fn transform_recv(&self) -> ReparentTransformReceiver {
-		ReparentTransformReceiver(self.transform_changed.clone())
-	}
-	pub fn create(
-		connection: Connection,
-		path: impl AsRef<Path>,
-		initial_parent: SpatialRef,
+	pub async fn new<H: ClientHandler>(
+		client: &Client<H>,
 		spatial: Spatial,
-		field: Option<Field>,
-	) -> NodeResult<Self> {
-		let path: OwnedObjectPath = path.as_ref().to_str().unwrap().try_into().unwrap();
-
-		spatial.set_spatial_parent_in_place(&initial_parent)?;
-
-		let (captured_by_sender, captured_by) = watch::channel(None);
-		let transform_changed = Arc::new(Mutex::new(None));
-		let reparented = Arc::new(AtomicBool::new(false));
-		let reparentable = ReparentableInner {
-			initial_parent: initial_parent.clone(),
+		initial_parent: SpatialRef,
+		field: Field,
+	) -> Result<Self, ServerError> {
+		let _ = spatial.set_parent_in_place(initial_parent.clone());
+		let state = Arc::new(SharedState {
 			spatial: spatial.clone(),
-			captured_by,
-			parented_to: None,
-			transform_changed: transform_changed.clone(),
-			reparented: reparented.clone(),
+			initial_parent: initial_parent.clone(),
+			reparent_state: Mutex::new(ReparentState::Idle),
+			reparented: AtomicBool::new(false),
+		});
+
+		let handle_inner = ReparentHandleInner(state.clone());
+		let handle_obj = client.pion_device().register_object(handle_inner);
+		let handle_proxy = ReparentHandle::from_handler(&handle_obj);
+
+		let reparentable_inner = ReparentableInner {
+			state: state.clone(),
+			handle_proxy: std::sync::OnceLock::new(),
+			_handle_obj: std::sync::OnceLock::new(),
 		};
-		let reparent_lock = ReparentLock {
-			watch: captured_by_sender,
-			initial_parent,
-			spatial: spatial.clone().as_spatial_ref(),
-			lock_transform: None,
-		};
+		let reparentable_obj = client.pion_device().register_object(reparentable_inner);
+		let _ = reparentable_obj.handle_proxy.set(handle_proxy);
+		let _ = reparentable_obj._handle_obj.set(handle_obj);
 
-		let abort_handle = tokio::spawn({
-			let connection = connection.clone();
-			let path = path.clone();
-			let field = field.clone();
-			let spatial = spatial.clone();
-
-			async move {
-				if let Some(field) = field {
-					let field_object = FieldObject::new(field).await.unwrap();
-					let _ = connection
-						.object_server()
-						.at(path.clone(), field_object)
-						.await;
-				}
-				let spatial_object = SpatialObject::new(spatial).await.unwrap();
-				let _ = connection
-					.object_server()
-					.at(path.clone(), spatial_object)
-					.await;
-				let _ = connection
-					.object_server()
-					.at(path.clone(), reparentable)
-					.await;
-				let _ = connection
-					.object_server()
-					.at(path.clone(), reparent_lock)
-					.await;
-
-				let Ok(dbus_proxy) = fdo::DBusProxy::new(&connection).await else {
-					return;
-				};
-				let Ok(mut name_changes) = dbus_proxy.receive_name_owner_changed().await else {
-					return;
-				};
-				while let Some(signal) = name_changes.next().await {
-					let args = signal.args().unwrap();
-
-					if args.new_owner.is_none() {
-						let BusName::Unique(bus) = args.name else {
-							continue;
-						};
-						let Ok(lock_interface) = connection
-							.object_server()
-							.interface::<_, ReparentLock>(&path)
-							.await
-						else {
-							continue;
-						};
-						let unlock_transform =
-							lock_interface.get_mut().await.release_body(bus.to_owned());
-
-						let Ok(interface) = connection
-							.object_server()
-							.interface::<_, ReparentableInner>(&path)
-							.await
-						else {
-							continue;
-						};
-						interface
-							.get_mut()
-							.await
-							.client_lost(bus.to_owned(), unlock_transform);
-					}
-				}
-			}
-		})
-		.abort_handle();
+		let queryable = QueryableObject::create(client, spatial, field).await?;
+		let guard = queryable
+			.unwrap()
+			.add_interface(&reparentable_obj, EXTERNAL_PROTOCOL.protocol_name)
+			.await?;
 
 		Ok(Reparentable {
-			spatial: spatial.as_spatial_ref(),
-			transform_changed,
-			_object_handles: DbusObjectHandles(Box::new((
-				AbortOnDrop(abort_handle),
-				DbusObjectHandle::<SpatialObject>(connection.clone(), path.clone(), PhantomData),
-				DbusObjectHandle::<FieldObject>(connection.clone(), path.clone(), PhantomData),
-				DbusObjectHandle::<ReparentableInner>(
-					connection.clone(),
-					path.clone(),
-					PhantomData,
-				),
-				DbusObjectHandle::<ReparentLock>(connection.clone(), path.clone(), PhantomData),
-			))),
-			reparented,
+			state,
+			_obj: reparentable_obj,
+			_guards: vec![Box::new(guard) as Box<dyn Any + Send + Sync>],
 		})
 	}
-}
 
-struct ReparentableInner {
-	initial_parent: SpatialRef,
-	spatial: Spatial,
-	captured_by: watch::Receiver<Option<UniqueName<'static>>>,
-	parented_to: Option<UniqueName<'static>>,
-	transform_changed: Arc<Mutex<Option<Transform>>>,
-	reparented: Arc<AtomicBool>,
-}
-impl ReparentableInner {
-	fn client_lost(&mut self, name: UniqueName<'static>, lock_transform: Option<Transform>) {
-		if self.parented_to.as_ref() == Some(&name) {
-			self.parented_to = None;
-			self.reparented.store(false, Ordering::Relaxed);
-			if let Some(transform) = lock_transform {
-				let _ = self.spatial.set_spatial_parent(&self.initial_parent);
-				let _ = self.spatial.set_local_transform(transform);
-				self.transform_changed.lock().unwrap().replace(transform);
-			} else {
-				let _ = self
-					.spatial
-					.set_spatial_parent_in_place(&self.initial_parent);
-				self.request_relative_transform();
-			}
-		}
+	pub fn reparented(&self) -> bool {
+		self.state.reparented.load(Ordering::Relaxed)
 	}
-	fn request_relative_transform(&self) {
-		let tx = self.transform_changed.clone();
-		let initial_parent = self.initial_parent.clone();
-		let spatial = self.spatial.clone();
-		tokio::spawn(async move {
-			let transform = spatial.get_transform(&initial_parent).await.unwrap();
-			tx.lock().unwrap().replace(transform);
-		});
-	}
-}
-impl Drop for ReparentableInner {
-	fn drop(&mut self) {
-		_ = self
-			.spatial
-			.set_spatial_parent_in_place(&self.initial_parent);
-		self.reparented.store(false, Ordering::Relaxed);
-		self.request_relative_transform();
-	}
-}
-#[zbus::interface(name = "org.stardustxr.Reparentable")]
-impl ReparentableInner {
-	async fn parent(&mut self, #[zbus(header)] header: Header<'_>, spatial: u64) {
-		if let Some(captured) = self.captured_by.borrow_and_update().deref()
-			&& let Some(sender) = header.sender()
-			&& captured != sender
-		{
-			return;
-		}
-		let Ok(spatial_ref) = SpatialRef::import(self.initial_parent.client(), spatial).await
-		else {
-			return;
-		};
-		if let Some(sender) = header.sender() {
-			self.parented_to = Some(sender.to_owned());
-		}
-		let _ = self.spatial.set_spatial_parent_in_place(&spatial_ref);
-		self.reparented.store(true, Ordering::Relaxed);
-	}
-	async fn unparent(&mut self, #[zbus(header)] header: Header<'_>) {
-		if let Some(captured) = self.captured_by.borrow_and_update().deref()
-			&& let Some(sender) = header.sender()
-			&& captured != sender
-		{
-			return;
-		}
+
+	pub fn unparent(&self) {
+		let mut guard = self.state.reparent_state.lock().unwrap();
+		*guard = ReparentState::Idle;
+		self.state.reparented.store(false, Ordering::Relaxed);
 		let _ = self
+			.state
 			.spatial
-			.set_spatial_parent_in_place(&self.initial_parent);
-		self.request_relative_transform();
-		self.parented_to.take();
-		self.reparented.store(false, Ordering::Relaxed);
-	}
-	/// Use this to reset the local transform of the zoneable object relative to an object.
-	async fn reset_local_transform(
-		&mut self,
-		#[zbus(header)] header: Header<'_>,
-		relative_to: u64,
-	) {
-		if let Some(captured) = self.captured_by.borrow_and_update().deref()
-			&& let Some(sender) = header.sender()
-			&& captured != sender
-		{
-			return;
-		}
-
-		let Ok(relative_to) = SpatialRef::import(self.initial_parent.client(), relative_to).await
-		else {
-			return;
-		};
-		let _ = self
-			.spatial
-			.set_relative_transform(&relative_to, Transform::identity());
-	}
-}
-
-struct ReparentLock {
-	watch: watch::Sender<Option<UniqueName<'static>>>,
-	initial_parent: SpatialRef,
-	spatial: SpatialRef,
-	lock_transform: Option<Transform>,
-}
-impl ReparentLock {
-	fn release_body(&mut self, sender: UniqueName<'static>) -> Option<Transform> {
-		let uncaptured = self.watch.send_if_modified(move |capture| {
-			if let Some(current_capture) = capture
-				&& current_capture == &sender
-			{
-				*capture = None;
-				true
-			} else {
-				false
-			}
-		});
-		if uncaptured {
-			self.lock_transform.take()
-		} else {
-			None
-		}
-	}
-}
-#[zbus::interface(name = "org.stardustxr.ReparentLock")]
-impl ReparentLock {
-	async fn lock(&mut self, #[zbus(header)] header: Header<'_>) {
-		let Some(sender) = header.sender() else {
-			return;
-		};
-
-		self.lock_transform = self.spatial.get_transform(&self.initial_parent).await.ok();
-		let _ = self.watch.send(Some(sender.to_owned()));
-	}
-	async fn unlock(&mut self, #[zbus(header)] header: Header<'_>) {
-		let Some(sender) = header.sender() else {
-			return;
-		};
-		self.release_body(sender.to_owned());
-	}
-}
-pub struct ReparentTransformReceiver(Arc<Mutex<Option<Transform>>>);
-impl ReparentTransformReceiver {
-	pub fn try_changed(&self) -> Option<Transform> {
-		self.0.lock().unwrap().take()
+			.set_parent_in_place(self.state.initial_parent.clone());
 	}
 }
