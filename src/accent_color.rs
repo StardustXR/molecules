@@ -1,6 +1,6 @@
-use futures_util::StreamExt;
 use stardust_xr_fusion::types::{Color, rgba_linear};
 use tokio::{sync::watch, task::AbortHandle};
+use tokio_stream::StreamExt;
 use zbus::{
 	Connection, Proxy,
 	proxy::Builder,
@@ -41,14 +41,19 @@ async fn accent_color_loop(
 		.build()
 		.await?;
 
-	let initial: OwnedValue = proxy.call("Read", &(APPEARANCE_NAMESPACE, ACCENT_COLOR_KEY)).await?;
+	let initial: OwnedValue = proxy
+		.call("Read", &(APPEARANCE_NAMESPACE, ACCENT_COLOR_KEY))
+		.await?;
 	if let Some(color) = extract_accent_color(initial) {
 		let _ = accent_color_sender.send(color);
 		tracing::info!("Accent color initialized to {:?}", color);
 	}
 
 	let mut stream = proxy
-		.receive_signal_with_args("SettingChanged", &[(0, APPEARANCE_NAMESPACE), (1, ACCENT_COLOR_KEY)])
+		.receive_signal_with_args(
+			"SettingChanged",
+			&[(0, APPEARANCE_NAMESPACE), (1, ACCENT_COLOR_KEY)],
+		)
 		.await?;
 	tracing::info!("Got accent color stream");
 
