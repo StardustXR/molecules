@@ -16,10 +16,9 @@ async fn main() {
 		.with_env_filter(EnvFilter::from_default_env())
 		.init();
 	let (client, root) = Client::auto_connect(&[]).await.unwrap();
-	let root_spatial = Spatial::create(&client, &root, Transform::IDENTITY)
+	let (_root_spatial, root_ref) = Spatial::create(&client, &root, Transform::IDENTITY)
 		.await
 		.unwrap();
-	let root_ref = root_spatial.spatial_ref().await.unwrap();
 
 	let mut touch_plane = TouchPlane::new(
 		&client,

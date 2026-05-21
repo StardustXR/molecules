@@ -17,10 +17,9 @@ async fn main() {
 		.init();
 	let (client, root) = Client::auto_connect(&[]).await.unwrap();
 
-	let root_spatial = Spatial::create(&client, &root, Transform::IDENTITY)
+	let (_root_spatial, root_ref) = Spatial::create(&client, &root, Transform::IDENTITY)
 		.await
 		.unwrap();
-	let root_ref = root_spatial.spatial_ref().await.unwrap();
 
 	let mut button = Button::new(
 		&client,
@@ -33,7 +32,7 @@ async fn main() {
 	.unwrap();
 	button.set_debug(Some(DebugSettings::default()));
 
-	let text_spatial = Spatial::create(
+	let (text_spatial, _) = Spatial::create(
 		&client,
 		&root_ref,
 		Transform::from_translation([0.0, -0.06, 0.0]),

@@ -15,10 +15,9 @@ async fn main() {
 		.with_env_filter(EnvFilter::from_default_env())
 		.init();
 	let (client, root) = Client::auto_connect(&[]).await.unwrap();
-	let root_spatial = Spatial::create(&client, &root, Transform::IDENTITY)
+	let (root_spatial, _root_ref) = Spatial::create(&client, &root, Transform::IDENTITY)
 		.await
 		.unwrap();
-	let _root_ref = root_spatial.spatial_ref().await.unwrap();
 
 	let mut x_offset = -0.375f32;
 

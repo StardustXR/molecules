@@ -85,8 +85,7 @@ impl Grabbable {
 		field: Field,
 		settings: GrabbableSettings,
 	) -> Result<Self, ServerError> {
-		let content_parent = Spatial::create(client, &parent, content_transform).await?;
-		let _content_ref = content_parent.spatial_ref().await?;
+		let (content_parent, _) = Spatial::create(client, &parent, content_transform).await?;
 		let input = InputQueue::new(
 			client,
 			content_parent.clone(),

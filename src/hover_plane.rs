@@ -65,15 +65,14 @@ impl HoverPlane {
 		y_range: Range<f32>,
 		settings: HoverPlaneSettings,
 	) -> Result<Self, ServerError> {
-		let root = Spatial::create(client, parent, transform).await?;
-		let root_ref = root.spatial_ref().await?;
-		let field_spatial = Spatial::create(
+		let (root, root_ref) = Spatial::create(client, parent, transform).await?;
+		let (field_spatial, _) = Spatial::create(
 			client,
 			&root_ref,
 			Transform::from_translation([0.0, 0.0, thickness * -0.5]),
 		)
 		.await?;
-		let field = Field::create(
+		let (field, _) = Field::create(
 			client,
 			&field_spatial,
 			Shape::Box {
