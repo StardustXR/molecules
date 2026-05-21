@@ -631,7 +631,7 @@ dependencies = [
 [[package]]
 name = "stardust-xr-fusion"
 version = "0.51.1"
-source = "git+https://github.com/StardustXR/core.git?branch=binder#6d033ece22ebaad15931edd2a5946157c272251f"
+source = "git+https://github.com/StardustXR/core.git?branch=binder#1b8c0455b89ab6c4787e7a9be9a0d282bfee9134"
 dependencies = [
  "glam 0.30.7",
  "gluon",
@@ -658,7 +658,6 @@ dependencies = [
  "shiva-color-rs",
  "stardust-xr-fusion",
  "stardust-xr-molecules-protocols",
- "stardust-xr-protocol",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -676,7 +675,7 @@ dependencies = [
 [[package]]
 name = "stardust-xr-protocol"
 version = "0.51.1"
-source = "git+https://github.com/StardustXR/core.git?branch=binder#6d033ece22ebaad15931edd2a5946157c272251f"
+source = "git+https://github.com/StardustXR/core.git?branch=binder#1b8c0455b89ab6c4787e7a9be9a0d282bfee9134"
 dependencies = [
  "fnv",
  "glam 0.29.3",

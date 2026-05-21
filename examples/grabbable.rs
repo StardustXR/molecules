@@ -1,7 +1,7 @@
 use glam::Mat4;
 use stardust_xr_fusion::{
 	client::Client,
-	drawable::ModelExt,
+	drawable::{Model, ModelExt},
 	fields::{Field, FieldExt, Shape},
 	project_local_resources,
 	spatial::{Spatial, SpatialExt, Transform},
@@ -11,7 +11,6 @@ use stardust_xr_molecules::{
 	DebugSettings, FrameSensitive, UIElement, VisualDebug,
 	grabbable::{Grabbable, GrabbableSettings, PointerMode},
 };
-use stardust_xr_protocol::model::Model;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main(flavor = "current_thread")]
@@ -31,7 +30,7 @@ async fn main() {
 		.await
 		.unwrap();
 
-	let model = Model::create(
+	let _model = Model::create(
 		&client,
 		&content_spatial,
 		Resource::Namespaced {

@@ -12,7 +12,7 @@ use stardust_xr_fusion::{
 	client::{Client, ClientHandler},
 	error::ServerError,
 	fields::{Field, FieldRef},
-	query::{QueryExt, QueryableObject},
+	query::{QueryExt, QueryableInterfaceGuard, QueryableObject},
 	spatial::{Spatial, SpatialRef},
 	suis::{
 		DatamapData, InputDataType, InputHandler as InputHandlerProxy, InputHandlerHandler,
@@ -20,7 +20,6 @@ use stardust_xr_fusion::{
 	},
 	types::Timestamp,
 };
-use stardust_xr_protocol::query::QueryableInterfaceGuard;
 use std::{
 	fmt::{Debug, Formatter, Result},
 	hash::Hash,

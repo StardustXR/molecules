@@ -7,8 +7,12 @@ use stardust_xr_fusion::{
 	spatial::{PartialTransform, Spatial, SpatialRef},
 };
 use stardust_xr_molecules_protocols::reparentable::{
-	EXTERNAL_PROTOCOL, ReparentHandle, ReparentHandleHandler, ReparentKeepalive,
-	ReparentableHandler,
+	EXTERNAL_PROTOCOL, ReparentHandleHandler, ReparentableHandler,
+};
+pub use stardust_xr_molecules_protocols::reparentable::{
+	EXTERNAL_PROTOCOL as REPARENTABLE_PROTOCOL,
+	Reparentable as ReparentableProxy,
+	ReparentHandle, ReparentKeepalive, ReparentKeepaliveHandler,
 };
 use std::{
 	any::Any,

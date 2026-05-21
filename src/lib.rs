@@ -18,8 +18,10 @@ pub use derezzable::Derezzable;
 pub use exposure::Exposure;
 pub use reparentable::Reparentable;
 
-use stardust_xr_fusion::types::{Color, rgba_linear};
-pub use stardust_xr_protocol::client::FrameInfo;
+use stardust_xr_fusion::{
+	client::FrameInfo,
+	types::{Color, rgba_linear},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DebugSettings {

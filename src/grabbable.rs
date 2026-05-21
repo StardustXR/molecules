@@ -6,14 +6,13 @@ use crate::{
 use glam::{Affine3A, Quat, Vec3, vec3};
 use gluon::Object;
 use stardust_xr_fusion::{
-	client::{Client, ClientHandler},
+	client::{Client, ClientHandler, FrameInfo},
 	drawable::{Lines, LinesExt},
 	error::ServerError,
 	fields::Field,
 	spatial::{Spatial, SpatialExt, SpatialRef, Transform},
 	suis::InputDataType,
 };
-use stardust_xr_protocol::client::FrameInfo;
 use std::f32::consts::PI;
 use tracing::{debug, trace};
 
