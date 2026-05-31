@@ -1,18 +1,17 @@
 use gluon::{Context, Object};
+use stardust_xr_fusion::Result;
 use stardust_xr_fusion::{
 	client::{Client, ClientHandler},
-	error::ServerError,
 	fields::Field,
 	query::{QueryExt, QueryableObject},
 	spatial::{PartialTransform, Spatial, SpatialRef},
 };
+pub use stardust_xr_molecules_protocols::reparentable::{
+	EXTERNAL_PROTOCOL as REPARENTABLE_PROTOCOL, ReparentHandle, ReparentKeepalive,
+	ReparentKeepaliveHandler, Reparentable as ReparentableProxy,
+};
 use stardust_xr_molecules_protocols::reparentable::{
 	EXTERNAL_PROTOCOL, ReparentHandleHandler, ReparentableHandler,
-};
-pub use stardust_xr_molecules_protocols::reparentable::{
-	EXTERNAL_PROTOCOL as REPARENTABLE_PROTOCOL,
-	Reparentable as ReparentableProxy,
-	ReparentHandle, ReparentKeepalive, ReparentKeepaliveHandler,
 };
 use std::{
 	any::Any,
@@ -116,7 +115,7 @@ impl Reparentable {
 		spatial: Spatial,
 		initial_parent: SpatialRef,
 		field: Field,
-	) -> Result<Self, ServerError> {
+	) -> Result<Self> {
 		let _ = spatial.set_parent_in_place(initial_parent.clone());
 		let state = Arc::new(SharedState {
 			spatial: spatial.clone(),
@@ -140,7 +139,6 @@ impl Reparentable {
 
 		let queryable = QueryableObject::create(client, spatial, field).await?;
 		let guard = queryable
-			.unwrap()
 			.add_interface(&reparentable_obj, EXTERNAL_PROTOCOL.protocol_name)
 			.await?;
 

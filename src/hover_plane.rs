@@ -6,9 +6,9 @@ use crate::{
 use glam::{FloatExt, Mat4, Vec3, vec3};
 use gluon::Object;
 use stardust_xr_fusion::{
+	Result,
 	client::{Client, ClientHandler},
 	drawable::{Line, LinePoint, Lines, LinesExt},
-	error::ServerError,
 	fields::{Field, FieldExt, Shape},
 	spatial::{Spatial, SpatialExt, SpatialRef, Transform},
 	suis::InputDataType,
@@ -55,6 +55,7 @@ pub struct HoverPlane {
 	debug_lines: Lines,
 }
 impl HoverPlane {
+	#[allow(clippy::too_many_arguments)]
 	pub async fn new<H: ClientHandler>(
 		client: &Client<H>,
 		parent: &SpatialRef,
@@ -64,7 +65,7 @@ impl HoverPlane {
 		x_range: Range<f32>,
 		y_range: Range<f32>,
 		settings: HoverPlaneSettings,
-	) -> Result<Self, ServerError> {
+	) -> Result<Self> {
 		let (root, root_ref) = Spatial::create(client, parent, transform).await?;
 		let (field_spatial, _) = Spatial::create(
 			client,

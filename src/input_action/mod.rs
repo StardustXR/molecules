@@ -9,8 +9,8 @@ use glam::Vec3;
 use gluon::{Context, Handler, Object};
 use rustc_hash::{FxHashMap, FxHashSet};
 use stardust_xr_fusion::{
+	Result,
 	client::{Client, ClientHandler},
-	error::ServerError,
 	fields::{Field, FieldRef},
 	query::{QueryExt, QueryableInterfaceGuard, QueryableObject},
 	spatial::{Spatial, SpatialRef},
@@ -21,7 +21,7 @@ use stardust_xr_fusion::{
 	types::Timestamp,
 };
 use std::{
-	fmt::{Debug, Formatter, Result},
+	fmt::{Debug, Formatter},
 	hash::Hash,
 	sync::{Arc, Mutex, OnceLock},
 };
@@ -90,7 +90,7 @@ pub struct InputQueue {
 	inner: Mutex<InputQueueState>,
 }
 impl Debug for InputQueue {
-	fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("InputQueue")
 			.field(
 				"current",
@@ -112,7 +112,7 @@ impl InputQueue {
 		query_spatial: Spatial,
 		field: Field,
 		reference_space: SpatialRef,
-	) -> std::result::Result<Object<InputQueue>, ServerError> {
+	) -> Result<Object<InputQueue>> {
 		let queue = InputQueue {
 			field: field.field_ref().await?,
 			reference_space,
@@ -128,9 +128,7 @@ impl InputQueue {
 		let proxy = InputHandlerProxy::from_handler(&queue_obj);
 		let _ = queue_obj.handler_proxy.set(proxy);
 
-		let queryable = QueryableObject::create(client, query_spatial, field)
-			.await?
-			.unwrap();
+		let queryable = QueryableObject::create(client, query_spatial, field).await?;
 		let guard = queryable
 			.add_interface(&queue_obj, InputHandlerProxy::QUERY_INTERFACE)
 			.await?;

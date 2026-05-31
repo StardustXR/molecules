@@ -5,11 +5,10 @@ use crate::{
 };
 use glam::{FloatExt, Mat4, vec3};
 use stardust_xr_fusion::{
+	Result,
 	client::{Client, ClientHandler},
 	drawable::{Lines, LinesExt},
-	error::ServerError,
-	spatial::SpatialRef,
-	spatial::Transform,
+	spatial::{SpatialRef, Transform},
 	types::{Color, rgba_linear},
 };
 use std::f32::consts::PI;
@@ -54,7 +53,7 @@ impl Button {
 		transform: Transform,
 		size: [f32; 2],
 		settings: ButtonSettings,
-	) -> Result<Self, ServerError> {
+	) -> Result<Self> {
 		let half_size_x = size[0] * 0.5;
 		let half_size_y = size[1] * 0.5;
 		let touch_plane = TouchPlane::new(
@@ -124,7 +123,7 @@ impl ButtonVisuals {
 		parent: &stardust_xr_fusion::spatial::Spatial,
 		size: [f32; 2],
 		settings: ButtonVisualSettings,
-	) -> Result<Self, ServerError> {
+	) -> Result<Self> {
 		let min_size = size[0].min(size[1]);
 		let segment_count = if min_size < 0.1 {
 			32

@@ -1,7 +1,7 @@
 use gluon::{Context, Object};
 use stardust_xr_fusion::{
+	Result,
 	client::{Client, ClientHandler},
-	error::ServerError,
 	fields::Field,
 	query::{QueryExt, QueryableObject},
 	spatial::Spatial,
@@ -66,7 +66,7 @@ impl Mouse {
 		on_motion: impl Fn([f32; 2]) + Send + Sync + 'static,
 		on_scroll_smooth: impl Fn([f32; 2], ScrollSource) + Send + Sync + 'static,
 		on_scroll_discrete: impl Fn([f32; 2], ScrollSource) + Send + Sync + 'static,
-	) -> Result<Self, ServerError> {
+	) -> Result<Self> {
 		let handler = MouseHandler(MouseCallbacks {
 			on_button: Box::new(on_button),
 			on_motion: Box::new(on_motion),
@@ -77,7 +77,6 @@ impl Mouse {
 
 		let queryable = QueryableObject::create(client, spatial, field).await?;
 		let guard = queryable
-			.unwrap()
 			.add_interface(&obj, EXTERNAL_PROTOCOL.protocol_name)
 			.await?;
 

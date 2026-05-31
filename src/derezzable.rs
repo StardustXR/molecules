@@ -1,7 +1,7 @@
 use gluon::{Context, Object};
 use stardust_xr_fusion::{
+	Result,
 	client::{Client, ClientHandler},
-	error::ServerError,
 	fields::Field,
 	query::{QueryExt, QueryableObject},
 	spatial::Spatial,
@@ -28,13 +28,12 @@ impl Derezzable {
 		client: &Client<H>,
 		spatial: Spatial,
 		field: Field,
-	) -> Result<Self, ServerError> {
+	) -> Result<Self> {
 		let (tx, rx) = mpsc::channel(8);
 		let obj = client.pion_device().register_object(DerezzableInner(tx));
 
 		let queryable = QueryableObject::create(client, spatial, field).await?;
 		let guard = queryable
-			.unwrap()
 			.add_interface(&obj, EXTERNAL_PROTOCOL.protocol_name)
 			.await?;
 

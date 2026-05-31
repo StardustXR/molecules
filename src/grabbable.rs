@@ -6,9 +6,9 @@ use crate::{
 use glam::{Affine3A, Quat, Vec3, vec3};
 use gluon::Object;
 use stardust_xr_fusion::{
+	Result,
 	client::{Client, ClientHandler, FrameInfo},
 	drawable::{Lines, LinesExt},
-	error::ServerError,
 	fields::Field,
 	spatial::{Spatial, SpatialExt, SpatialRef, Transform},
 	suis::InputDataType,
@@ -84,7 +84,7 @@ impl Grabbable {
 		content_transform: Transform,
 		field: Field,
 		settings: GrabbableSettings,
-	) -> Result<Self, ServerError> {
+	) -> Result<Self> {
 		let (content_parent, _) = Spatial::create(client, &parent, content_transform).await?;
 		let input = InputQueue::new(
 			client,

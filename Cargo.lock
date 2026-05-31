@@ -1074,7 +1074,7 @@ dependencies = [
 [[package]]
 name = "stardust-xr-fusion"
 version = "0.51.1"
-source = "git+https://github.com/StardustXR/core.git?branch=binder#d657fe53fb00571f199830c636fbdc12e5073db0"
+source = "git+https://github.com/StardustXR/core.git?branch=binder#7ae10bb50cdbb8f9f42409ff3adb776d9d9e74e6"
 dependencies = [
  "glam 0.30.7",
  "gluon",
@@ -1120,7 +1120,7 @@ dependencies = [
 [[package]]
 name = "stardust-xr-protocol"
 version = "0.51.1"
-source = "git+https://github.com/StardustXR/core.git?branch=binder#d657fe53fb00571f199830c636fbdc12e5073db0"
+source = "git+https://github.com/StardustXR/core.git?branch=binder#7ae10bb50cdbb8f9f42409ff3adb776d9d9e74e6"
 dependencies = [
  "fnv",
  "glam 0.29.3",

@@ -5,10 +5,10 @@ use crate::{
 };
 use glam::{FloatExt, Mat4, Vec3, vec3};
 use gluon::Object;
+use stardust_xr_fusion::Result;
 use stardust_xr_fusion::{
 	client::{Client, ClientHandler},
 	drawable::{Lines, LinesExt},
-	error::ServerError,
 	fields::{Field, FieldExt, Shape},
 	spatial::{Spatial, SpatialExt, SpatialRef, Transform},
 	suis::InputDataType,
@@ -39,7 +39,7 @@ impl TouchPlane {
 		thickness: f32,
 		x_range: Range<f32>,
 		y_range: Range<f32>,
-	) -> Result<Self, ServerError> {
+	) -> Result<Self> {
 		let (root, root_ref) = Spatial::create(client, parent, transform).await?;
 		let (field_spatial, _) = Spatial::create(
 			client,

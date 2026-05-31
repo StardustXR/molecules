@@ -1,7 +1,7 @@
 use gluon::{Context, Object};
 use stardust_xr_fusion::{
+	Result,
 	client::{Client, ClientHandler},
-	error::ServerError,
 	fields::Field,
 	query::{QueryExt, QueryableObject},
 	spatial::Spatial,
@@ -58,7 +58,7 @@ impl Keyboard {
 		spatial: Spatial,
 		field: Field,
 		on_key: impl Fn(KeypressInfo) + Send + Sync + 'static,
-	) -> Result<Self, ServerError> {
+	) -> Result<Self> {
 		let handler = KeyboardHandler(KeyboardInner {
 			on_key: Box::new(on_key),
 		});
@@ -66,7 +66,6 @@ impl Keyboard {
 
 		let queryable = QueryableObject::create(client, spatial, field).await?;
 		let guard = queryable
-			.unwrap()
 			.add_interface(&obj, EXTERNAL_PROTOCOL.protocol_name)
 			.await?;
 
