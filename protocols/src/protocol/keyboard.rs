@@ -10,12 +10,12 @@ pub const EXTERNAL_PROTOCOL: gluon::ExternalProtocol = gluon::ExternalProtocol {
         },
         gluon::ExternalGluonType {
             name: "ModifierState",
-            supported_derives: gluon::Derives::from_bits_truncate(255u32),
+            supported_derives: gluon::Derives::from_bits_truncate(1023u32),
             proxy: None,
         },
         gluon::ExternalGluonType {
             name: "KeymapExchangeError",
-            supported_derives: gluon::Derives::from_bits_truncate(127u32),
+            supported_derives: gluon::Derives::from_bits_truncate(895u32),
             proxy: None,
         },
     ],
@@ -55,6 +55,7 @@ impl gluon::Convertable for XkbcommonKeymapFd {
 }
 ///Modifier state driven by xkbcommon
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ModifierState {
     pub depressed: u32,
     pub latched: u32,
@@ -92,6 +93,7 @@ impl gluon::Convertable for ModifierState {
 }
 ///Error returned by KeymapStore::exchange
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum KeymapExchangeError {
     InvalidKeymap,
 }
@@ -164,6 +166,10 @@ impl KeyboardHandler {
         let timestamp: Option<stardust_xr_protocol::types::Timestamp> = timestamp.into();
         let modifiers: ModifierState = modifiers.into();
         let keymap: Keymap = keymap.into();
+        tracing::trace!(
+            interface = "KeyboardHandler", method = "key_state", ? keycode, ? pressed, ?
+            timestamp, ? modifiers, keymap = "Keymap", "→"
+        );
         let mut gluon_builder = gluon::DataBuilder::new();
         keycode.write(&mut gluon_builder)?;
         pressed.write(&mut gluon_builder)?;
@@ -229,6 +235,11 @@ pub trait KeyboardHandlerHandler: gluon::Handler + Send + Sync + 'static {
                     let param_timestamp = gluon::Convertable::read(&mut gluon_data)?;
                     let param_modifiers = gluon::Convertable::read(&mut gluon_data)?;
                     let param_keymap = gluon::Convertable::read(&mut gluon_data)?;
+                    tracing::trace!(
+                        interface = "KeyboardHandler", method = "key_state", ?
+                        param_keycode, ? param_pressed, ? param_timestamp, ?
+                        param_modifiers, param_keymap = "Keymap", "dispatching"
+                    );
                     drop(gluon_data);
                     self.key_state(
                             ctx,
@@ -275,6 +286,7 @@ impl KeymapStore {
         keymap: impl Into<String>,
     ) -> Result<Result<Keymap, KeymapExchangeError>, gluon::SendError> {
         let keymap: String = keymap.into();
+        tracing::trace!(interface = "KeymapStore", method = "exchange", ? keymap, "→");
         let mut gluon_builder = gluon::DataBuilder::new();
         let (gluon_ret_handler, mut gluon_recv) = gluon::ReturnHandler::new();
         let gluon_ret = self.obj.device().register_object(gluon_ret_handler);
@@ -283,13 +295,20 @@ impl KeymapStore {
         self.obj.device().transact_one_way(&self.obj, 8u32, gluon_builder.to_payload())?;
         let transaction = gluon_recv.recv().await.unwrap();
         let mut reader = gluon::DataReader::from_payload(transaction.payload);
-        Ok(gluon::Convertable::read(&mut reader)?)
+        let __ret_keymap = gluon::Convertable::read(&mut reader)?;
+        tracing::trace!(
+            interface = "KeymapStore", method = "exchange", ? __ret_keymap, "←"
+        );
+        Ok(__ret_keymap)
     }
     pub async fn get(
         &self,
         keymap: impl Into<Keymap>,
     ) -> Result<Option<XkbcommonKeymapFd>, gluon::SendError> {
         let keymap: Keymap = keymap.into();
+        tracing::trace!(
+            interface = "KeymapStore", method = "get", keymap = "Keymap", "→"
+        );
         let mut gluon_builder = gluon::DataBuilder::new();
         let (gluon_ret_handler, mut gluon_recv) = gluon::ReturnHandler::new();
         let gluon_ret = self.obj.device().register_object(gluon_ret_handler);
@@ -298,7 +317,11 @@ impl KeymapStore {
         self.obj.device().transact_one_way(&self.obj, 9u32, gluon_builder.to_payload())?;
         let transaction = gluon_recv.recv().await.unwrap();
         let mut reader = gluon::DataReader::from_payload(transaction.payload);
-        Ok(gluon::Convertable::read(&mut reader)?)
+        let __ret_keymap = gluon::Convertable::read(&mut reader)?;
+        tracing::trace!(
+            interface = "KeymapStore", method = "get", ? __ret_keymap, "←"
+        );
+        Ok(__ret_keymap)
     }
     pub fn from_handler<H: KeymapStoreHandler>(
         obj: &impl gluon::OwnedObjectRef<H>,
@@ -355,8 +378,15 @@ pub trait KeymapStoreHandler: gluon::Handler + Send + Sync + 'static {
                     let return_callback = gluon_data.read_binder()?;
                     let mut gluon_out = gluon::DataBuilder::new();
                     let param_keymap = gluon::Convertable::read(&mut gluon_data)?;
+                    tracing::trace!(
+                        interface = "KeymapStore", method = "exchange", ? param_keymap,
+                        "dispatching"
+                    );
                     let (keymap) = self.exchange(ctx, param_keymap).await;
                     drop(gluon_data);
+                    tracing::trace!(
+                        interface = "KeymapStore", method = "exchange", ? keymap, "←"
+                    );
                     keymap.write_owned(&mut gluon_out)?;
                     return_callback
                         .device()
@@ -366,8 +396,15 @@ pub trait KeymapStoreHandler: gluon::Handler + Send + Sync + 'static {
                     let return_callback = gluon_data.read_binder()?;
                     let mut gluon_out = gluon::DataBuilder::new();
                     let param_keymap = gluon::Convertable::read(&mut gluon_data)?;
+                    tracing::trace!(
+                        interface = "KeymapStore", method = "get", param_keymap =
+                        "Keymap", "dispatching"
+                    );
                     let (keymap) = self.get(ctx, param_keymap).await;
                     drop(gluon_data);
+                    tracing::trace!(
+                        interface = "KeymapStore", method = "get", ? keymap, "←"
+                    );
                     keymap.write_owned(&mut gluon_out)?;
                     return_callback
                         .device()

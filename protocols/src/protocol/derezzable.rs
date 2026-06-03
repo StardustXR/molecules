@@ -31,6 +31,7 @@ impl gluon::Convertable for Derezzable {
 }
 impl Derezzable {
     pub fn derez(&self) -> Result<(), gluon::SendError> {
+        tracing::trace!(interface = "Derezzable", method = "derez", "→");
         let mut gluon_builder = gluon::DataBuilder::new();
         self.obj.device().transact_one_way(&self.obj, 8u32, gluon_builder.to_payload())?;
         Ok(())
@@ -77,6 +78,9 @@ pub trait DerezzableHandler: gluon::Handler + Send + Sync + 'static {
         async move {
             match transaction_code {
                 8u32 => {
+                    tracing::trace!(
+                        interface = "Derezzable", method = "derez", "dispatching"
+                    );
                     drop(gluon_data);
                     self.derez(ctx).await;
                 }

@@ -5,7 +5,7 @@ pub const EXTERNAL_PROTOCOL: gluon::ExternalProtocol = gluon::ExternalProtocol {
     types: &[
         gluon::ExternalGluonType {
             name: "ScrollSource",
-            supported_derives: gluon::Derives::from_bits_truncate(127u32),
+            supported_derives: gluon::Derives::from_bits_truncate(895u32),
             proxy: None,
         },
     ],
@@ -15,6 +15,7 @@ pub mod proxies {
 }
 ///The physical source type of a scroll event
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ScrollSource {
     Wheel,
     Finger,
@@ -104,6 +105,9 @@ impl MouseHandler {
     ) -> Result<(), gluon::SendError> {
         let delta: stardust_xr_protocol::types::proxied::Vec2F = delta.into();
         let timestamp: Option<stardust_xr_protocol::types::Timestamp> = timestamp.into();
+        tracing::trace!(
+            interface = "MouseHandler", method = "motion", ? delta, ? timestamp, "→"
+        );
         let mut gluon_builder = gluon::DataBuilder::new();
         delta.write(&mut gluon_builder)?;
         timestamp.write(&mut gluon_builder)?;
@@ -120,6 +124,10 @@ impl MouseHandler {
         let button: u32 = button.into();
         let pressed: bool = pressed.into();
         let timestamp: Option<stardust_xr_protocol::types::Timestamp> = timestamp.into();
+        tracing::trace!(
+            interface = "MouseHandler", method = "button", ? button, ? pressed, ?
+            timestamp, "→"
+        );
         let mut gluon_builder = gluon::DataBuilder::new();
         button.write(&mut gluon_builder)?;
         pressed.write(&mut gluon_builder)?;
@@ -136,6 +144,10 @@ impl MouseHandler {
         let delta: stardust_xr_protocol::types::proxied::Vec2F = delta.into();
         let source: ScrollSource = source.into();
         let timestamp: Option<stardust_xr_protocol::types::Timestamp> = timestamp.into();
+        tracing::trace!(
+            interface = "MouseHandler", method = "scroll_smooth", ? delta, ? source, ?
+            timestamp, "→"
+        );
         let mut gluon_builder = gluon::DataBuilder::new();
         delta.write(&mut gluon_builder)?;
         source.write(&mut gluon_builder)?;
@@ -154,6 +166,10 @@ impl MouseHandler {
         let delta: stardust_xr_protocol::types::proxied::Vec2F = delta.into();
         let source: ScrollSource = source.into();
         let timestamp: Option<stardust_xr_protocol::types::Timestamp> = timestamp.into();
+        tracing::trace!(
+            interface = "MouseHandler", method = "scroll_discrete", ? delta, ? source, ?
+            timestamp, "→"
+        );
         let mut gluon_builder = gluon::DataBuilder::new();
         delta.write(&mut gluon_builder)?;
         source.write(&mut gluon_builder)?;
@@ -232,13 +248,18 @@ pub trait MouseHandlerHandler: gluon::Handler + Send + Sync + 'static {
         async move {
             match transaction_code {
                 8u32 => {
+                    let __wire_param_delta: stardust_xr_protocol::types::proxied::Vec2F = gluon::Convertable::read(
+                        &mut gluon_data,
+                    )?;
+                    let param_timestamp = gluon::Convertable::read(&mut gluon_data)?;
+                    tracing::trace!(
+                        interface = "MouseHandler", method = "motion", param_delta = ?
+                        __wire_param_delta, ? param_timestamp, "dispatching"
+                    );
                     let param_delta: stardust_xr_protocol::types::proxies::Vec2F = {
-                        let __w: stardust_xr_protocol::types::proxied::Vec2F = gluon::Convertable::read(
-                            &mut gluon_data,
-                        )?;
+                        let __w = __wire_param_delta;
                         __w.into()
                     };
-                    let param_timestamp = gluon::Convertable::read(&mut gluon_data)?;
                     drop(gluon_data);
                     self.motion(ctx, param_delta, param_timestamp).await;
                 }
@@ -246,31 +267,47 @@ pub trait MouseHandlerHandler: gluon::Handler + Send + Sync + 'static {
                     let param_button = gluon::Convertable::read(&mut gluon_data)?;
                     let param_pressed = gluon::Convertable::read(&mut gluon_data)?;
                     let param_timestamp = gluon::Convertable::read(&mut gluon_data)?;
+                    tracing::trace!(
+                        interface = "MouseHandler", method = "button", ? param_button, ?
+                        param_pressed, ? param_timestamp, "dispatching"
+                    );
                     drop(gluon_data);
                     self.button(ctx, param_button, param_pressed, param_timestamp).await;
                 }
                 10u32 => {
-                    let param_delta: stardust_xr_protocol::types::proxies::Vec2F = {
-                        let __w: stardust_xr_protocol::types::proxied::Vec2F = gluon::Convertable::read(
-                            &mut gluon_data,
-                        )?;
-                        __w.into()
-                    };
+                    let __wire_param_delta: stardust_xr_protocol::types::proxied::Vec2F = gluon::Convertable::read(
+                        &mut gluon_data,
+                    )?;
                     let param_source = gluon::Convertable::read(&mut gluon_data)?;
                     let param_timestamp = gluon::Convertable::read(&mut gluon_data)?;
+                    tracing::trace!(
+                        interface = "MouseHandler", method = "scroll_smooth", param_delta
+                        = ? __wire_param_delta, ? param_source, ? param_timestamp,
+                        "dispatching"
+                    );
+                    let param_delta: stardust_xr_protocol::types::proxies::Vec2F = {
+                        let __w = __wire_param_delta;
+                        __w.into()
+                    };
                     drop(gluon_data);
                     self.scroll_smooth(ctx, param_delta, param_source, param_timestamp)
                         .await;
                 }
                 11u32 => {
-                    let param_delta: stardust_xr_protocol::types::proxies::Vec2F = {
-                        let __w: stardust_xr_protocol::types::proxied::Vec2F = gluon::Convertable::read(
-                            &mut gluon_data,
-                        )?;
-                        __w.into()
-                    };
+                    let __wire_param_delta: stardust_xr_protocol::types::proxied::Vec2F = gluon::Convertable::read(
+                        &mut gluon_data,
+                    )?;
                     let param_source = gluon::Convertable::read(&mut gluon_data)?;
                     let param_timestamp = gluon::Convertable::read(&mut gluon_data)?;
+                    tracing::trace!(
+                        interface = "MouseHandler", method = "scroll_discrete",
+                        param_delta = ? __wire_param_delta, ? param_source, ?
+                        param_timestamp, "dispatching"
+                    );
+                    let param_delta: stardust_xr_protocol::types::proxies::Vec2F = {
+                        let __w = __wire_param_delta;
+                        __w.into()
+                    };
                     drop(gluon_data);
                     self.scroll_discrete(ctx, param_delta, param_source, param_timestamp)
                         .await;

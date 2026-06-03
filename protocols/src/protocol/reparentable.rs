@@ -38,6 +38,10 @@ impl Reparentable {
     ) -> Result<Option<ReparentHandle>, gluon::SendError> {
         let new_parent: stardust_xr_protocol::spatial::SpatialRef = new_parent.into();
         let keepalive: ReparentKeepalive = keepalive.into();
+        tracing::trace!(
+            interface = "Reparentable", method = "reparent_locking", new_parent =
+            "spatial::SpatialRef", keepalive = "ReparentKeepalive", "→"
+        );
         let mut gluon_builder = gluon::DataBuilder::new();
         let (gluon_ret_handler, mut gluon_recv) = gluon::ReturnHandler::new();
         let gluon_ret = self.obj.device().register_object(gluon_ret_handler);
@@ -47,7 +51,12 @@ impl Reparentable {
         self.obj.device().transact_one_way(&self.obj, 8u32, gluon_builder.to_payload())?;
         let transaction = gluon_recv.recv().await.unwrap();
         let mut reader = gluon::DataReader::from_payload(transaction.payload);
-        Ok(gluon::Convertable::read(&mut reader)?)
+        let __ret_handle = gluon::Convertable::read(&mut reader)?;
+        tracing::trace!(
+            interface = "Reparentable", method = "reparent_locking", ? __ret_handle,
+            "←"
+        );
+        Ok(__ret_handle)
     }
     ///Reparents this object, this is non-locking, others can steal this reparent
     pub async fn reparent(
@@ -57,6 +66,10 @@ impl Reparentable {
     ) -> Result<Option<ReparentHandle>, gluon::SendError> {
         let new_parent: stardust_xr_protocol::spatial::SpatialRef = new_parent.into();
         let keepalive: ReparentKeepalive = keepalive.into();
+        tracing::trace!(
+            interface = "Reparentable", method = "reparent", new_parent =
+            "spatial::SpatialRef", keepalive = "ReparentKeepalive", "→"
+        );
         let mut gluon_builder = gluon::DataBuilder::new();
         let (gluon_ret_handler, mut gluon_recv) = gluon::ReturnHandler::new();
         let gluon_ret = self.obj.device().register_object(gluon_ret_handler);
@@ -66,7 +79,11 @@ impl Reparentable {
         self.obj.device().transact_one_way(&self.obj, 9u32, gluon_builder.to_payload())?;
         let transaction = gluon_recv.recv().await.unwrap();
         let mut reader = gluon::DataReader::from_payload(transaction.payload);
-        Ok(gluon::Convertable::read(&mut reader)?)
+        let __ret_handle = gluon::Convertable::read(&mut reader)?;
+        tracing::trace!(
+            interface = "Reparentable", method = "reparent", ? __ret_handle, "←"
+        );
+        Ok(__ret_handle)
     }
     pub fn from_handler<H: ReparentableHandler>(
         obj: &impl gluon::OwnedObjectRef<H>,
@@ -127,10 +144,19 @@ pub trait ReparentableHandler: gluon::Handler + Send + Sync + 'static {
                     let mut gluon_out = gluon::DataBuilder::new();
                     let param_new_parent = gluon::Convertable::read(&mut gluon_data)?;
                     let param_keepalive = gluon::Convertable::read(&mut gluon_data)?;
+                    tracing::trace!(
+                        interface = "Reparentable", method = "reparent_locking",
+                        param_new_parent = "spatial::SpatialRef", param_keepalive =
+                        "ReparentKeepalive", "dispatching"
+                    );
                     let (handle) = self
                         .reparent_locking(ctx, param_new_parent, param_keepalive)
                         .await;
                     drop(gluon_data);
+                    tracing::trace!(
+                        interface = "Reparentable", method = "reparent_locking", ?
+                        handle, "←"
+                    );
                     handle.write_owned(&mut gluon_out)?;
                     return_callback
                         .device()
@@ -141,10 +167,18 @@ pub trait ReparentableHandler: gluon::Handler + Send + Sync + 'static {
                     let mut gluon_out = gluon::DataBuilder::new();
                     let param_new_parent = gluon::Convertable::read(&mut gluon_data)?;
                     let param_keepalive = gluon::Convertable::read(&mut gluon_data)?;
+                    tracing::trace!(
+                        interface = "Reparentable", method = "reparent", param_new_parent
+                        = "spatial::SpatialRef", param_keepalive = "ReparentKeepalive",
+                        "dispatching"
+                    );
                     let (handle) = self
                         .reparent(ctx, param_new_parent, param_keepalive)
                         .await;
                     drop(gluon_data);
+                    tracing::trace!(
+                        interface = "Reparentable", method = "reparent", ? handle, "←"
+                    );
                     handle.write_owned(&mut gluon_out)?;
                     return_callback
                         .device()
@@ -181,6 +215,9 @@ impl gluon::Convertable for ReparentKeepalive {
 impl ReparentKeepalive {
     ///The reparent this object was associated with was stolen, the ReparentHandle becomes invalid
     pub fn reparent_stolen(&self) -> Result<(), gluon::SendError> {
+        tracing::trace!(
+            interface = "ReparentKeepalive", method = "reparent_stolen", "→"
+        );
         let mut gluon_builder = gluon::DataBuilder::new();
         self.obj.device().transact_one_way(&self.obj, 8u32, gluon_builder.to_payload())?;
         Ok(())
@@ -233,6 +270,10 @@ pub trait ReparentKeepaliveHandler: gluon::Handler + Send + Sync + 'static {
         async move {
             match transaction_code {
                 8u32 => {
+                    tracing::trace!(
+                        interface = "ReparentKeepalive", method = "reparent_stolen",
+                        "dispatching"
+                    );
                     drop(gluon_data);
                     self.reparent_stolen(ctx).await;
                 }
@@ -271,6 +312,10 @@ impl ReparentHandle {
         relative_to: impl Into<stardust_xr_protocol::spatial::SpatialRef>,
     ) -> Result<(), gluon::SendError> {
         let relative_to: stardust_xr_protocol::spatial::SpatialRef = relative_to.into();
+        tracing::trace!(
+            interface = "ReparentHandle", method = "reset_transform", relative_to =
+            "spatial::SpatialRef", "→"
+        );
         let mut gluon_builder = gluon::DataBuilder::new();
         relative_to.write(&mut gluon_builder)?;
         self.obj.device().transact_one_way(&self.obj, 8u32, gluon_builder.to_payload())?;
@@ -324,6 +369,10 @@ pub trait ReparentHandleHandler: gluon::Handler + Send + Sync + 'static {
             match transaction_code {
                 8u32 => {
                     let param_relative_to = gluon::Convertable::read(&mut gluon_data)?;
+                    tracing::trace!(
+                        interface = "ReparentHandle", method = "reset_transform",
+                        param_relative_to = "spatial::SpatialRef", "dispatching"
+                    );
                     drop(gluon_data);
                     self.reset_transform(ctx, param_relative_to).await;
                 }

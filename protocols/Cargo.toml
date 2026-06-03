@@ -3,8 +3,14 @@ name = "stardust-xr-molecules-protocols"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = []
+serde = ["dep:serde"]
+
 [dependencies]
 gluon = { git = "https://github.com/technobaboo/gluon" }
+serde = { version = "1.0.228", optional = true }
+tracing = "0.1.44"
 
 [build-dependencies]
 gluon-codegen = { git = "https://github.com/technobaboo/gluon" }

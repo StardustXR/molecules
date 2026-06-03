@@ -28,6 +28,7 @@ fn main() {
 		],
 		Derives::all(),
 		&[],
+		true,
 		"./src/protocol",
 	);
 }
