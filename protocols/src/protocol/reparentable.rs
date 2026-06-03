@@ -39,8 +39,8 @@ impl Reparentable {
         let new_parent: stardust_xr_protocol::spatial::SpatialRef = new_parent.into();
         let keepalive: ReparentKeepalive = keepalive.into();
         tracing::trace!(
-            interface = "Reparentable", method = "reparent_locking", new_parent =
-            "spatial::SpatialRef", keepalive = "ReparentKeepalive", "→"
+            interface = "Reparentable", method = "reparent_locking", ? new_parent, ?
+            keepalive, "→"
         );
         let mut gluon_builder = gluon::DataBuilder::new();
         let (gluon_ret_handler, mut gluon_recv) = gluon::ReturnHandler::new();
@@ -67,8 +67,8 @@ impl Reparentable {
         let new_parent: stardust_xr_protocol::spatial::SpatialRef = new_parent.into();
         let keepalive: ReparentKeepalive = keepalive.into();
         tracing::trace!(
-            interface = "Reparentable", method = "reparent", new_parent =
-            "spatial::SpatialRef", keepalive = "ReparentKeepalive", "→"
+            interface = "Reparentable", method = "reparent", ? new_parent, ? keepalive,
+            "→"
         );
         let mut gluon_builder = gluon::DataBuilder::new();
         let (gluon_ret_handler, mut gluon_recv) = gluon::ReturnHandler::new();
@@ -145,9 +145,8 @@ pub trait ReparentableHandler: gluon::Handler + Send + Sync + 'static {
                     let param_new_parent = gluon::Convertable::read(&mut gluon_data)?;
                     let param_keepalive = gluon::Convertable::read(&mut gluon_data)?;
                     tracing::trace!(
-                        interface = "Reparentable", method = "reparent_locking",
-                        param_new_parent = "spatial::SpatialRef", param_keepalive =
-                        "ReparentKeepalive", "dispatching"
+                        interface = "Reparentable", method = "reparent_locking", ?
+                        param_new_parent, ? param_keepalive, "dispatching"
                     );
                     let (handle) = self
                         .reparent_locking(ctx, param_new_parent, param_keepalive)
@@ -168,9 +167,8 @@ pub trait ReparentableHandler: gluon::Handler + Send + Sync + 'static {
                     let param_new_parent = gluon::Convertable::read(&mut gluon_data)?;
                     let param_keepalive = gluon::Convertable::read(&mut gluon_data)?;
                     tracing::trace!(
-                        interface = "Reparentable", method = "reparent", param_new_parent
-                        = "spatial::SpatialRef", param_keepalive = "ReparentKeepalive",
-                        "dispatching"
+                        interface = "Reparentable", method = "reparent", ?
+                        param_new_parent, ? param_keepalive, "dispatching"
                     );
                     let (handle) = self
                         .reparent(ctx, param_new_parent, param_keepalive)
@@ -313,8 +311,8 @@ impl ReparentHandle {
     ) -> Result<(), gluon::SendError> {
         let relative_to: stardust_xr_protocol::spatial::SpatialRef = relative_to.into();
         tracing::trace!(
-            interface = "ReparentHandle", method = "reset_transform", relative_to =
-            "spatial::SpatialRef", "→"
+            interface = "ReparentHandle", method = "reset_transform", ? relative_to,
+            "→"
         );
         let mut gluon_builder = gluon::DataBuilder::new();
         relative_to.write(&mut gluon_builder)?;
@@ -370,8 +368,8 @@ pub trait ReparentHandleHandler: gluon::Handler + Send + Sync + 'static {
                 8u32 => {
                     let param_relative_to = gluon::Convertable::read(&mut gluon_data)?;
                     tracing::trace!(
-                        interface = "ReparentHandle", method = "reset_transform",
-                        param_relative_to = "spatial::SpatialRef", "dispatching"
+                        interface = "ReparentHandle", method = "reset_transform", ?
+                        param_relative_to, "dispatching"
                     );
                     drop(gluon_data);
                     self.reset_transform(ctx, param_relative_to).await;

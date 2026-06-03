@@ -168,7 +168,7 @@ impl KeyboardHandler {
         let keymap: Keymap = keymap.into();
         tracing::trace!(
             interface = "KeyboardHandler", method = "key_state", ? keycode, ? pressed, ?
-            timestamp, ? modifiers, keymap = "Keymap", "→"
+            timestamp, ? modifiers, ? keymap, "→"
         );
         let mut gluon_builder = gluon::DataBuilder::new();
         keycode.write(&mut gluon_builder)?;
@@ -238,7 +238,7 @@ pub trait KeyboardHandlerHandler: gluon::Handler + Send + Sync + 'static {
                     tracing::trace!(
                         interface = "KeyboardHandler", method = "key_state", ?
                         param_keycode, ? param_pressed, ? param_timestamp, ?
-                        param_modifiers, param_keymap = "Keymap", "dispatching"
+                        param_modifiers, ? param_keymap, "dispatching"
                     );
                     drop(gluon_data);
                     self.key_state(
@@ -306,9 +306,7 @@ impl KeymapStore {
         keymap: impl Into<Keymap>,
     ) -> Result<Option<XkbcommonKeymapFd>, gluon::SendError> {
         let keymap: Keymap = keymap.into();
-        tracing::trace!(
-            interface = "KeymapStore", method = "get", keymap = "Keymap", "→"
-        );
+        tracing::trace!(interface = "KeymapStore", method = "get", ? keymap, "→");
         let mut gluon_builder = gluon::DataBuilder::new();
         let (gluon_ret_handler, mut gluon_recv) = gluon::ReturnHandler::new();
         let gluon_ret = self.obj.device().register_object(gluon_ret_handler);
@@ -397,8 +395,8 @@ pub trait KeymapStoreHandler: gluon::Handler + Send + Sync + 'static {
                     let mut gluon_out = gluon::DataBuilder::new();
                     let param_keymap = gluon::Convertable::read(&mut gluon_data)?;
                     tracing::trace!(
-                        interface = "KeymapStore", method = "get", param_keymap =
-                        "Keymap", "dispatching"
+                        interface = "KeymapStore", method = "get", ? param_keymap,
+                        "dispatching"
                     );
                     let (keymap) = self.get(ctx, param_keymap).await;
                     drop(gluon_data);
