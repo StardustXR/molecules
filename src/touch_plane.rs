@@ -5,7 +5,7 @@ use crate::{
 };
 use glam::{FloatExt, Mat4, Vec3, vec3};
 use gluon::Object;
-use stardust_xr_fusion::Result;
+use stardust_xr_fusion::{Result, types::Vec2F};
 use stardust_xr_fusion::{
 	client::{Client, ClientHandler},
 	drawable::{Lines, LinesExt},
@@ -17,7 +17,7 @@ use stardust_xr_fusion::{
 use std::{ops::Range, sync::Arc};
 
 pub struct TouchPlane {
-	size: [f32; 2],
+	size: Vec2F,
 	pub x_range: Range<f32>,
 	pub y_range: Range<f32>,
 	thickness: f32,
@@ -35,7 +35,7 @@ impl TouchPlane {
 		client: &Client<H>,
 		parent: &SpatialRef,
 		transform: Transform,
-		size: [f32; 2],
+		size: Vec2F,
 		thickness: f32,
 		x_range: Range<f32>,
 		y_range: Range<f32>,
@@ -51,7 +51,7 @@ impl TouchPlane {
 			client,
 			&field_spatial,
 			Shape::Box {
-				size: [size[0], size[1], thickness].into(),
+				size: [size.x, size.y, thickness].into(),
 			},
 		)
 		.await?;
@@ -72,10 +72,10 @@ impl TouchPlane {
 		})
 	}
 
-	fn hover(size: [f32; 2], point: Vec3, front: bool) -> bool {
+	fn hover(size: Vec2F, point: Vec3, front: bool) -> bool {
 		point.z.is_sign_positive() == front
-			&& point.x.abs() * 2.0 < size[0]
-			&& point.y.abs() * 2.0 < size[1]
+			&& point.x.abs() * 2.0 < size.x
+			&& point.y.abs() * 2.0 < size.y
 	}
 
 	pub fn interact_point(&self, snap: &InputSnapshot) -> ([f32; 2], f32) {
@@ -91,15 +91,15 @@ impl TouchPlane {
 			InputDataType::Tip { data } => Vec3::from(data.pose.position),
 		};
 
-		let x = p.x.clamp(-self.size[0] / 2.0, self.size[0] / 2.0).remap(
-			-self.size[0] / 2.0,
-			self.size[0] / 2.0,
+		let x = p.x.clamp(-self.size.x / 2.0, self.size.x / 2.0).remap(
+			-self.size.x / 2.0,
+			self.size.x / 2.0,
 			self.x_range.start,
 			self.x_range.end,
 		);
-		let y = p.y.clamp(-self.size[1] / 2.0, self.size[1] / 2.0).remap(
-			self.size[1] / 2.0,
-			-self.size[1] / 2.0,
+		let y = p.y.clamp(-self.size.y / 2.0, self.size.y / 2.0).remap(
+			self.size.y / 2.0,
+			-self.size.y / 2.0,
 			self.y_range.start,
 			self.y_range.end,
 		);
@@ -124,10 +124,10 @@ impl TouchPlane {
 		&self.action
 	}
 
-	pub fn set_size(&mut self, size: [f32; 2]) {
+	pub fn set_size(&mut self, size: Vec2F) {
 		self.size = size;
 		let _ = self.field.set_shape(Shape::Box {
-			size: [size[0], size[1], self.thickness].into(),
+			size: [size.x, size.y, self.thickness].into(),
 		});
 	}
 	pub fn set_thickness(&mut self, thickness: f32) {
@@ -136,7 +136,7 @@ impl TouchPlane {
 			.field_spatial
 			.set_local_transform(Transform::from_translation([0.0, 0.0, thickness * -0.5]));
 		let _ = self.field.set_shape(Shape::Box {
-			size: [self.size[0], self.size[1], thickness].into(),
+			size: [self.size.x, self.size.y, thickness].into(),
 		});
 	}
 }
@@ -174,8 +174,8 @@ impl VisualDebug for TouchPlane {
 	fn set_debug(&mut self, settings: Option<DebugSettings>) {
 		let lines = if let Some(settings) = settings {
 			let line_front = lines::rounded_rectangle(
-				self.size[0],
-				self.size[1],
+				self.size.x,
+				self.size.y,
 				settings.line_thickness * 0.5,
 				4,
 			)

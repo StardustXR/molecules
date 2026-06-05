@@ -9,7 +9,7 @@ use stardust_xr_fusion::{
 	client::{Client, ClientHandler},
 	drawable::{Lines, LinesExt},
 	spatial::{SpatialRef, Transform},
-	types::{Color, rgba_linear},
+	types::{Color, Vec2F, rgba_linear},
 };
 use std::f32::consts::PI;
 
@@ -51,11 +51,11 @@ impl Button {
 		client: &Client<H>,
 		parent: &SpatialRef,
 		transform: Transform,
-		size: [f32; 2],
+		size: Vec2F,
 		settings: ButtonSettings,
 	) -> Result<Self> {
-		let half_size_x = size[0] * 0.5;
-		let half_size_y = size[1] * 0.5;
+		let half_size_x = size.x * 0.5;
+		let half_size_y = size.y * 0.5;
 		let touch_plane = TouchPlane::new(
 			client,
 			parent,
@@ -78,6 +78,25 @@ impl Button {
 			touch_plane,
 			visuals,
 		})
+	}
+
+	pub fn set_size(&mut self, size: Vec2F) {
+		self.touch_plane.set_size(size);
+		if let Some(visuals) = &mut self.visuals {
+			visuals.size = size;
+		}
+	}
+
+	pub fn set_visual_settings(&mut self, visual_settings: Option<ButtonVisualSettings>) {
+		self.settings.visuals = visual_settings;
+		match (&mut self.visuals, visual_settings) {
+			(Some(visuals), Some(vs)) => visuals.visual_settings = vs,
+			(Some(visuals), None) => {
+				let _ = visuals.lines.set_lines(vec![]);
+				self.visuals = None;
+			}
+			_ => {}
+		}
 	}
 
 	pub fn touch_plane(&self) -> &TouchPlane {
@@ -112,7 +131,7 @@ impl VisualDebug for Button {
 }
 
 struct ButtonVisuals {
-	size: [f32; 2],
+	size: Vec2F,
 	visual_settings: ButtonVisualSettings,
 	segment_count: usize,
 	lines: Lines,
@@ -121,10 +140,10 @@ impl ButtonVisuals {
 	async fn new<H: ClientHandler>(
 		client: &Client<H>,
 		parent: &stardust_xr_fusion::spatial::Spatial,
-		size: [f32; 2],
+		size: Vec2F,
 		settings: ButtonVisualSettings,
 	) -> Result<Self> {
-		let min_size = size[0].min(size[1]);
+		let min_size = size.x.min(size.y);
 		let segment_count = if min_size < 0.1 {
 			32
 		} else if min_size < 1.0 {
@@ -159,8 +178,8 @@ impl ButtonVisuals {
 			});
 
 		let rounded_rect = rounded_rectangle(
-			self.size[0],
-			self.size[1],
+			self.size.x,
+			self.size.y,
 			self.visual_settings.line_thickness * 0.5,
 			self.segment_count / 4 - 1,
 		)
