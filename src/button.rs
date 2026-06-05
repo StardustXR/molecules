@@ -42,7 +42,7 @@ impl Default for ButtonSettings {
 }
 
 pub struct Button {
-	settings: ButtonSettings,
+	pub settings: ButtonSettings,
 	touch_plane: TouchPlane,
 	visuals: Option<ButtonVisuals>,
 }

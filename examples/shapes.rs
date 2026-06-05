@@ -31,8 +31,8 @@ async fn main() {
 		},
 		Shape::Sphere { radius: 0.1 },
 		Shape::Torus {
-			major_radius: 0.1,
-			minor_radius: 0.03,
+			major_radius: 0.03,
+			minor_radius: 0.1,
 		},
 	]
 	.into_iter()
