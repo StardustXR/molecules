@@ -152,7 +152,9 @@ impl InputQueue {
 		while let Ok((method, capture)) = s.capture_rx.try_recv() {
 			match capture {
 				Some(c) => {
-					s.capture_requests.insert(method, c);
+					if s.current.contains_key(&method) {
+						s.capture_requests.insert(method, c);
+					}
 				}
 				None => {
 					s.capture_requests.remove(&method);
