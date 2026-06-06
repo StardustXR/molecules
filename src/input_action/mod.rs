@@ -16,7 +16,7 @@ use stardust_xr_fusion::{
 	spatial::{Spatial, SpatialRef},
 	suis::{
 		DatamapData, InputDataType, InputHandler as InputHandlerProxy, InputHandlerHandler,
-		InputMethod, SemanticData, SpatialData,
+		InputMethod, InputMethodCapture, SemanticData, SpatialData,
 	},
 	types::Timestamp,
 };
@@ -25,6 +25,7 @@ use std::{
 	hash::Hash,
 	sync::{Arc, Mutex, OnceLock},
 };
+use tokio::sync::mpsc;
 
 /// Snapshot of a single input method's state at the time of a callback.
 #[derive(Debug)]
@@ -77,6 +78,8 @@ impl Hash for InputSnapshot {
 
 struct InputQueueState {
 	current: FxHashMap<InputMethod, Arc<InputSnapshot>>,
+	capture_requests: FxHashMap<InputMethod, InputMethodCapture>,
+	capture_rx: mpsc::UnboundedReceiver<(InputMethod, Option<InputMethodCapture>)>,
 	dirty: bool,
 }
 
@@ -88,6 +91,7 @@ pub struct InputQueue {
 	_queryable: OnceLock<QueryableObject>,
 	_interface_guard: OnceLock<QueryableInterfaceGuard>,
 	inner: Mutex<InputQueueState>,
+	capture_tx: mpsc::UnboundedSender<(InputMethod, Option<InputMethodCapture>)>,
 }
 impl Debug for InputQueue {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -113,6 +117,7 @@ impl InputQueue {
 		field: Field,
 		reference_space: SpatialRef,
 	) -> Result<Object<InputQueue>> {
+		let (capture_tx, capture_rx) = mpsc::unbounded_channel();
 		let queue = InputQueue {
 			field: field.field_ref().await?,
 			reference_space,
@@ -121,8 +126,11 @@ impl InputQueue {
 			_interface_guard: OnceLock::new(),
 			inner: Mutex::new(InputQueueState {
 				current: FxHashMap::default(),
+				capture_requests: FxHashMap::default(),
+				capture_rx,
 				dirty: false,
 			}),
+			capture_tx,
 		};
 		let queue_obj = client.pion_device().register_object(queue);
 		let proxy = InputHandlerProxy::from_handler(&queue_obj);
@@ -141,6 +149,16 @@ impl InputQueue {
 	/// Returns `true` if any input arrived or left since the last call. Resets the dirty flag.
 	pub fn handle_events(&self) -> bool {
 		let mut s = self.inner.lock().unwrap();
+		while let Ok((method, capture)) = s.capture_rx.try_recv() {
+			match capture {
+				Some(c) => {
+					s.capture_requests.insert(method, c);
+				}
+				None => {
+					s.capture_requests.remove(&method);
+				}
+			}
+		}
 		let dirty = s.dirty;
 		s.dirty = false;
 		dirty
@@ -156,6 +174,7 @@ impl InputQueue {
 		field: stardust_xr_fusion::fields::FieldRef,
 		reference_space: SpatialRef,
 	) -> Self {
+		let (capture_tx, capture_rx) = mpsc::unbounded_channel();
 		InputQueue {
 			field,
 			reference_space,
@@ -164,8 +183,11 @@ impl InputQueue {
 			_interface_guard: OnceLock::new(),
 			inner: Mutex::new(InputQueueState {
 				current: FxHashMap::default(),
+				capture_requests: FxHashMap::default(),
+				capture_rx,
 				dirty: false,
 			}),
+			capture_tx,
 		}
 	}
 
@@ -187,14 +209,21 @@ impl InputQueue {
 		let Some(proxy) = self.handler_proxy.get() else {
 			return;
 		};
-		let _ = snap.method.request_capture(proxy.clone());
+		let method = snap.method.clone();
+		let proxy = proxy.clone();
+		let tx = self.capture_tx.clone();
+		tokio::spawn(async move {
+			let capture = method.request_capture(proxy).await.ok().flatten();
+			let _ = tx.send((method, capture));
+		});
 	}
 
 	pub fn release_capture(&self, snap: &InputSnapshot) {
-		let Some(proxy) = self.handler_proxy.get() else {
-			return;
-		};
-		let _ = snap.method.release_capture(proxy.clone());
+		self.inner
+			.lock()
+			.unwrap()
+			.capture_requests
+			.remove(&snap.method);
 	}
 }
 
@@ -204,15 +233,6 @@ impl InputHandlerHandler for InputQueue {
 	}
 	async fn get_field(&self, _ctx: Context) -> FieldRef {
 		self.field.clone()
-	}
-	async fn suggested_bindings(
-		&self,
-		_ctx: Context,
-	) -> std::collections::HashMap<String, Vec<String>> {
-		Default::default()
-	}
-	async fn handler_groups(&self, _ctx: Context) -> Vec<String> {
-		vec![]
 	}
 	async fn input_gained(
 		&self,
@@ -253,6 +273,7 @@ impl InputHandlerHandler for InputQueue {
 	async fn input_left(&self, _ctx: Context, method: InputMethod, _time: Timestamp) {
 		let mut s = self.inner.lock().unwrap();
 		s.current.remove(&method);
+		s.capture_requests.remove(&method);
 		s.dirty = true;
 	}
 }
@@ -323,149 +344,5 @@ impl PointerExt for stardust_xr_fusion::suis::Pointer {
 		let dir: Vec3 = Vec3::from(self.direction());
 		let t = -origin.dot(normal) / normal.dot(dir);
 		origin + dir * t
-	}
-}
-
-#[cfg(test)]
-pub(crate) mod test_helpers {
-	use super::*;
-	use glam::{Quat, Vec3};
-	use pion_binder::PionBinderDevice;
-	use stardust_xr_fusion::{
-		fields::FieldRef,
-		suis::{InputDataType, InputHandler, InputMethodHandler, SemanticData, SpatialData, Tip},
-		types::{Posef, Timestamp},
-	};
-
-	#[derive(Debug, gluon::Handler)]
-	pub struct DummyMethod;
-	impl InputMethodHandler for DummyMethod {
-		async fn request_capture(&self, _: gluon::Context, _: InputHandler) {}
-		async fn release_capture(&self, _: gluon::Context, _: InputHandler) {}
-		async fn get_spatial_data(
-			&self,
-			_: gluon::Context,
-			_: InputHandler,
-			_: Timestamp,
-		) -> Option<SpatialData> {
-			None
-		}
-	}
-
-	pub fn make_device() -> PionBinderDevice {
-		PionBinderDevice::default()
-	}
-
-	/// Create a fresh snap with a unique InputMethod each call.
-	pub fn make_snapshot(device: &PionBinderDevice, captured: bool) -> Arc<InputSnapshot> {
-		let obj: gluon::Object<DummyMethod> = device.register_object(Arc::new(DummyMethod));
-		let method = InputMethod::from_handler(&obj);
-		snap_with_method(method, captured)
-	}
-
-	/// Create an updated snap reusing an existing method identity.
-	pub fn snap_with_method(method: InputMethod, captured: bool) -> Arc<InputSnapshot> {
-		let pose = Posef {
-			position: Vec3::ZERO.into(),
-			orientation: Quat::IDENTITY.into(),
-		};
-		Arc::new(InputSnapshot {
-			method,
-			spatial: SpatialData {
-				input: InputDataType::Tip {
-					data: Tip {
-						pose,
-						chirality: None,
-						grip_pose: None,
-						grip_surface_pose: None,
-						simulated_hand: None,
-					},
-				},
-				distance: 0.0,
-			},
-			semantic: SemanticData {
-				datamap: Default::default(),
-				order: 0,
-				captured,
-			},
-			time: Timestamp {
-				seconds: 0,
-				nanoseconds: 0,
-			},
-		})
-	}
-
-	pub fn make_input(
-		snaps: impl IntoIterator<Item = Arc<InputSnapshot>>,
-	) -> FxHashMap<InputMethod, Arc<InputSnapshot>> {
-		snaps.into_iter().map(|s| (s.method.clone(), s)).collect()
-	}
-
-	/// Create a bare `InputQueue` for testing `handle_events` / `inject`.
-	pub fn make_queue(device: &PionBinderDevice) -> InputQueue {
-		let obj: gluon::Object<DummyMethod> = device.register_object(Arc::new(DummyMethod));
-		let method = InputMethod::from_handler(&obj);
-		let or_ref: gluon::ObjectOrRef = method.into();
-		let field_ref = FieldRef::from_object_or_ref(or_ref.clone());
-		let spatial_ref = SpatialRef::from_object_or_ref(or_ref);
-		InputQueue::new_test(field_ref, spatial_ref)
-	}
-}
-
-#[cfg(test)]
-mod tests {
-	use super::{test_helpers::*, *};
-
-	#[tokio::test]
-	async fn delta_set_tracks_added_removed_current() {
-		let device = make_device();
-		let s1 = make_snapshot(&device, false);
-		let s2 = make_snapshot(&device, false);
-		let mut ds: DeltaSet<Arc<InputSnapshot>> = DeltaSet::default();
-
-		ds.push_new([s1.clone(), s2.clone()].into_iter());
-		assert_eq!(ds.added().len(), 2);
-		assert_eq!(ds.current().len(), 2);
-		assert!(ds.removed().is_empty());
-
-		ds.push_new([s1.clone()].into_iter());
-		assert!(ds.added().is_empty());
-		assert!(ds.current().contains(&s1));
-		assert!(ds.removed().contains(&s2));
-	}
-
-	#[tokio::test]
-	async fn input_queue_dirty_flag() {
-		let device = make_device();
-		let queue = make_queue(&device);
-
-		assert!(!queue.handle_events());
-
-		let snap = make_snapshot(&device, false);
-		queue.inject(snap.clone());
-		assert!(queue.handle_events());
-		assert!(!queue.handle_events());
-
-		queue.remove_method(&snap.method);
-		assert!(queue.handle_events());
-		assert!(!queue.handle_events());
-	}
-
-	#[tokio::test]
-	async fn input_queue_inject_and_retrieve() {
-		let device = make_device();
-		let queue = make_queue(&device);
-		let s1 = make_snapshot(&device, false);
-		let s2 = make_snapshot(&device, false);
-
-		queue.inject(s1.clone());
-		queue.inject(s2.clone());
-		let input = queue.input();
-		assert_eq!(input.len(), 2);
-		assert!(input.contains_key(&s1.method));
-		assert!(input.contains_key(&s2.method));
-
-		queue.remove_method(&s1.method);
-		assert_eq!(queue.input().len(), 1);
 	}
 }

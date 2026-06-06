@@ -24,7 +24,7 @@ async fn main() {
 		&client,
 		&root_ref,
 		Transform::from_rotation(glam::Quat::from_rotation_x(-std::f32::consts::PI / 4.0)),
-		[0.3, 0.2],
+		[0.3, 0.2].into(),
 		0.01,
 		-0.15..0.15,
 		0.1..-0.1,

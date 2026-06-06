@@ -25,7 +25,7 @@ async fn main() {
 		&client,
 		&root_ref,
 		Transform::IDENTITY,
-		[0.1; 2],
+		[0.1; 2].into(),
 		ButtonSettings::default(),
 	)
 	.await
