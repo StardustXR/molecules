@@ -238,11 +238,6 @@ impl InputHandlerHandler for InputQueueInner {
 		s.dirty = true;
 	}
 }
-impl Drop for InputQueueInner {
-	fn drop(&mut self) {
-		println!("bye bye queue state :)");
-	}
-}
 
 pub struct DeltaSet<T: Clone + Hash + Eq> {
 	added: FxHashSet<T>,
