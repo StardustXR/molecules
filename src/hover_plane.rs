@@ -4,7 +4,6 @@ use crate::{
 	lines::{self, LineExt},
 };
 use glam::{FloatExt, Mat4, Vec3, vec3};
-use gluon::Object;
 use stardust_xr_fusion::{
 	Result,
 	client::{Client, ClientHandler},
@@ -44,7 +43,7 @@ pub struct HoverPlane {
 	root: Spatial,
 	field_spatial: Spatial,
 	field: Field,
-	input: Object<InputQueue>,
+	input: InputQueue,
 	interact: SingleAction,
 	size: [f32; 2],
 	pub x_range: Range<f32>,

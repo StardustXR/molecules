@@ -23,6 +23,7 @@ tracing = "0.1.40"
 lerp = "0.5.0"
 shiva-color-rs = "0.0.1"
 zbus = { version = "5.11.0", features = ["tokio"] }
+futures = { version = "0.3.32", default-features = false }
 
 [dependencies.stardust-xr-fusion]
 version = "0.51.0"
@@ -38,6 +39,7 @@ git = "https://github.com/technobaboo/gluon"
 [dev-dependencies]
 tokio = { version = "1.38.0", features = ["full"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+tracing-tracy = "0.11.4"
 
 [dev-dependencies.pion-binder]
 git = "https://github.com/technobaboo/pion"

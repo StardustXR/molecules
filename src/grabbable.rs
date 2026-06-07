@@ -4,7 +4,6 @@ use crate::{
 	lines::{LineExt, axes, bounding_box},
 };
 use glam::{Affine3A, Quat, Vec3, vec3};
-use gluon::Object;
 use stardust_xr_fusion::{
 	Result,
 	client::{Client, ClientHandler, FrameInfo},
@@ -63,7 +62,7 @@ pub struct Grabbable {
 	parent: SpatialRef,
 	content_parent: Spatial,
 	field: Field,
-	input: Object<InputQueue>,
+	input: InputQueue,
 	grab_action: SingleAction,
 
 	content_lines: Lines,

@@ -1,4 +1,5 @@
 mod single_action;
+use futures::FutureExt;
 pub use single_action::*;
 mod simple_action;
 pub use simple_action::*;
@@ -25,7 +26,7 @@ use std::{
 	hash::Hash,
 	sync::{Arc, Mutex, OnceLock},
 };
-use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
 
 /// Snapshot of a single input method's state at the time of a callback.
 #[derive(Debug)]
@@ -76,30 +77,30 @@ impl Hash for InputSnapshot {
 	}
 }
 
+pub struct InputQueue(Object<InputQueueInner>);
+
 struct InputQueueState {
 	current: FxHashMap<InputMethod, Arc<InputSnapshot>>,
+	capture_queue: FxHashMap<InputMethod, JoinHandle<Option<InputMethodCapture>>>,
 	capture_requests: FxHashMap<InputMethod, InputMethodCapture>,
-	capture_rx: mpsc::UnboundedReceiver<(InputMethod, Option<InputMethodCapture>)>,
 	dirty: bool,
 }
 
 #[derive(Handler)]
-pub struct InputQueue {
+struct InputQueueInner {
 	field: FieldRef,
 	reference_space: SpatialRef,
-	handler_proxy: OnceLock<InputHandlerProxy>,
 	_queryable: OnceLock<QueryableObject>,
 	_interface_guard: OnceLock<QueryableInterfaceGuard>,
-	inner: Mutex<InputQueueState>,
-	capture_tx: mpsc::UnboundedSender<(InputMethod, Option<InputMethodCapture>)>,
+	state: Mutex<InputQueueState>,
 }
-impl Debug for InputQueue {
+impl Debug for InputQueueInner {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("InputQueue")
 			.field(
 				"current",
 				&self
-					.inner
+					.state
 					.lock()
 					.unwrap()
 					.current
@@ -116,25 +117,20 @@ impl InputQueue {
 		query_spatial: Spatial,
 		field: Field,
 		reference_space: SpatialRef,
-	) -> Result<Object<InputQueue>> {
-		let (capture_tx, capture_rx) = mpsc::unbounded_channel();
-		let queue = InputQueue {
+	) -> Result<Self> {
+		let queue = InputQueueInner {
 			field: field.field_ref().await?,
 			reference_space,
-			handler_proxy: OnceLock::new(),
 			_queryable: OnceLock::new(),
 			_interface_guard: OnceLock::new(),
-			inner: Mutex::new(InputQueueState {
+			state: Mutex::new(InputQueueState {
 				current: FxHashMap::default(),
 				capture_requests: FxHashMap::default(),
-				capture_rx,
+				capture_queue: FxHashMap::default(),
 				dirty: false,
 			}),
-			capture_tx,
 		};
 		let queue_obj = client.pion_device().register_object(queue);
-		let proxy = InputHandlerProxy::from_handler(&queue_obj);
-		let _ = queue_obj.handler_proxy.set(proxy);
 
 		let queryable = QueryableObject::create(client, query_spatial, field).await?;
 		let guard = queryable
@@ -143,24 +139,22 @@ impl InputQueue {
 		let _ = queue_obj._queryable.set(queryable);
 		let _ = queue_obj._interface_guard.set(guard);
 
-		Ok(queue_obj)
+		Ok(InputQueue(queue_obj))
 	}
 
 	/// Returns `true` if any input arrived or left since the last call. Resets the dirty flag.
 	pub fn handle_events(&self) -> bool {
-		let mut s = self.inner.lock().unwrap();
-		while let Ok((method, capture)) = s.capture_rx.try_recv() {
-			match capture {
-				Some(c) => {
-					if s.current.contains_key(&method) {
-						s.capture_requests.insert(method, c);
-					}
-				}
-				None => {
-					s.capture_requests.remove(&method);
-				}
-			}
-		}
+		let mut s = self.0.state.lock().unwrap();
+		let s = &mut *s;
+
+		// drain the queue of all capture requests that got their handler
+		s.capture_requests.extend(
+			s.capture_queue
+				.extract_if(|_, v| v.is_finished())
+				.filter_map(|(method, capture)| Some((method, capture.now_or_never()?.ok()??)))
+				.filter(|(method, _)| s.current.contains_key(method)),
+		);
+
 		let dirty = s.dirty;
 		s.dirty = false;
 		dirty
@@ -168,60 +162,25 @@ impl InputQueue {
 
 	/// Current snapshot of all active input methods.
 	pub fn input(&self) -> FxHashMap<InputMethod, Arc<InputSnapshot>> {
-		self.inner.lock().unwrap().current.clone()
-	}
-
-	#[cfg(test)]
-	pub fn new_test(
-		field: stardust_xr_fusion::fields::FieldRef,
-		reference_space: SpatialRef,
-	) -> Self {
-		let (capture_tx, capture_rx) = mpsc::unbounded_channel();
-		InputQueue {
-			field,
-			reference_space,
-			handler_proxy: OnceLock::new(),
-			_queryable: OnceLock::new(),
-			_interface_guard: OnceLock::new(),
-			inner: Mutex::new(InputQueueState {
-				current: FxHashMap::default(),
-				capture_requests: FxHashMap::default(),
-				capture_rx,
-				dirty: false,
-			}),
-			capture_tx,
-		}
-	}
-
-	#[cfg(test)]
-	pub fn inject(&self, snap: Arc<InputSnapshot>) {
-		let mut s = self.inner.lock().unwrap();
-		s.current.insert(snap.method.clone(), snap);
-		s.dirty = true;
-	}
-
-	#[cfg(test)]
-	pub fn remove_method(&self, method: &InputMethod) {
-		let mut s = self.inner.lock().unwrap();
-		s.current.remove(method);
-		s.dirty = true;
+		self.0.state.lock().unwrap().current.clone()
 	}
 
 	pub fn start_capture(&self, snap: &InputSnapshot) {
-		let Some(proxy) = self.handler_proxy.get() else {
-			return;
-		};
 		let method = snap.method.clone();
-		let proxy = proxy.clone();
-		let tx = self.capture_tx.clone();
-		tokio::spawn(async move {
-			let capture = method.request_capture(proxy).await.ok().flatten();
-			let _ = tx.send((method, capture));
-		});
+		let proxy = InputHandlerProxy::from_handler(&self.0);
+		let capture_return_task =
+			tokio::spawn(async move { method.request_capture(proxy).await.ok().flatten() });
+		self.0
+			.state
+			.lock()
+			.unwrap()
+			.capture_queue
+			.insert(snap.method.clone(), capture_return_task);
 	}
 
 	pub fn release_capture(&self, snap: &InputSnapshot) {
-		self.inner
+		self.0
+			.state
 			.lock()
 			.unwrap()
 			.capture_requests
@@ -229,7 +188,7 @@ impl InputQueue {
 	}
 }
 
-impl InputHandlerHandler for InputQueue {
+impl InputHandlerHandler for InputQueueInner {
 	async fn get_spatial(&self, _ctx: Context) -> SpatialRef {
 		self.reference_space.clone()
 	}
@@ -250,7 +209,7 @@ impl InputHandlerHandler for InputQueue {
 			semantic,
 			time,
 		});
-		let mut s = self.inner.lock().unwrap();
+		let mut s = self.state.lock().unwrap();
 		s.current.insert(method, snap);
 		s.dirty = true;
 	}
@@ -268,15 +227,20 @@ impl InputHandlerHandler for InputQueue {
 			semantic,
 			time,
 		});
-		let mut s = self.inner.lock().unwrap();
+		let mut s = self.state.lock().unwrap();
 		s.current.insert(method, snap);
 		s.dirty = true;
 	}
 	async fn input_left(&self, _ctx: Context, method: InputMethod, _time: Timestamp) {
-		let mut s = self.inner.lock().unwrap();
+		let mut s = self.state.lock().unwrap();
 		s.current.remove(&method);
 		s.capture_requests.remove(&method);
 		s.dirty = true;
+	}
+}
+impl Drop for InputQueueInner {
+	fn drop(&mut self) {
+		println!("bye bye queue state :)");
 	}
 }
 

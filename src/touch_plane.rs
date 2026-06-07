@@ -4,7 +4,6 @@ use crate::{
 	lines::{self, LineExt},
 };
 use glam::{FloatExt, Mat4, Vec3, vec3};
-use gluon::Object;
 use stardust_xr_fusion::{Result, types::Vec2F};
 use stardust_xr_fusion::{
 	client::{Client, ClientHandler},
@@ -25,7 +24,7 @@ pub struct TouchPlane {
 	root: Spatial,
 	field_spatial: Spatial,
 	field: Field,
-	input: Object<InputQueue>,
+	input: InputQueue,
 	action: MultiAction,
 
 	debug_lines: Lines,
