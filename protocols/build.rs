@@ -5,7 +5,7 @@ use gluon_codegen::{Derives, ModuleExternalProtocol};
 fn main() {
 	gluon_codegen::helpers::gen_multiple_modules(
 		&[
-			("keyboard", Path::new("./gluon/org.stardustxr.XKBv1.gluon")),
+			("keyboard_handler", Path::new("./gluon/org.stardustxr.KeyboardHandler.gluon")),
 			("mouse", Path::new("./gluon/org.stardustxr.Mousev1.gluon")),
 			(
 				"reparentable",
