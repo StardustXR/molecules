@@ -6,7 +6,7 @@ fn main() {
 	gluon_codegen::helpers::gen_multiple_modules(
 		&[
 			("keyboard_handler", Path::new("./gluon/org.stardustxr.KeyboardHandler.gluon")),
-			("mouse", Path::new("./gluon/org.stardustxr.Mousev1.gluon")),
+			("mouse_handler", Path::new("./gluon/org.stardustxr.MouseHandler.gluon")),
 			(
 				"reparentable",
 				Path::new("./gluon/org.stardustxr.Reparentable.gluon"),

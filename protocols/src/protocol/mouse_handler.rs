@@ -1,7 +1,7 @@
 #![allow(unused, clippy::all, private_bounds, private_interfaces)]
 use gluon::Convertable;
 pub const EXTERNAL_PROTOCOL: gluon::ExternalProtocol = gluon::ExternalProtocol {
-    protocol_name: "org.stardustxr.Mousev1",
+    protocol_name: "org.stardustxr.MouseHandler",
     types: &[
         gluon::ExternalGluonType {
             name: "ScrollSource",

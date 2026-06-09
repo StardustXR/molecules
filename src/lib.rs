@@ -9,7 +9,7 @@ pub mod hover_plane;
 pub mod input_action;
 pub mod keyboard_handler;
 pub mod lines;
-pub mod mouse;
+pub mod mouse_handler;
 pub mod multi;
 pub mod reparentable;
 pub mod touch_plane;
