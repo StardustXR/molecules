@@ -98,6 +98,7 @@ impl gluon::Convertable for MouseHandler {
     }
 }
 impl MouseHandler {
+    ///delta is +Y == Up +X == Right
     pub fn motion(
         &self,
         delta: stardust_xr_protocol::types::proxies::Vec2F,
@@ -135,6 +136,7 @@ impl MouseHandler {
         self.obj.device().transact_one_way(&self.obj, 9u32, gluon_builder.to_payload())?;
         Ok(())
     }
+    ///delta is +Y == Up +X == Right
     pub fn scroll_smooth(
         &self,
         delta: stardust_xr_protocol::types::proxies::Vec2F,
@@ -157,6 +159,7 @@ impl MouseHandler {
             .transact_one_way(&self.obj, 10u32, gluon_builder.to_payload())?;
         Ok(())
     }
+    ///delta is +Y == Up +X == Right
     pub fn scroll_discrete(
         &self,
         delta: stardust_xr_protocol::types::proxies::Vec2F,
@@ -211,6 +214,7 @@ impl PartialEq for MouseHandler {
 }
 impl Eq for MouseHandler {}
 pub trait MouseHandlerHandler: gluon::Handler + Send + Sync + 'static {
+    ///delta is +Y == Up +X == Right
     fn motion(
         &self,
         _ctx: gluon::Context,
@@ -225,6 +229,7 @@ pub trait MouseHandlerHandler: gluon::Handler + Send + Sync + 'static {
         pressed: bool,
         timestamp: Option<stardust_xr_protocol::types::Timestamp>,
     ) -> impl Future<Output = ()> + Send + Sync;
+    ///delta is +Y == Up +X == Right
     fn scroll_smooth(
         &self,
         _ctx: gluon::Context,
@@ -232,6 +237,7 @@ pub trait MouseHandlerHandler: gluon::Handler + Send + Sync + 'static {
         source: ScrollSource,
         timestamp: Option<stardust_xr_protocol::types::Timestamp>,
     ) -> impl Future<Output = ()> + Send + Sync;
+    ///delta is +Y == Up +X == Right
     fn scroll_discrete(
         &self,
         _ctx: gluon::Context,
