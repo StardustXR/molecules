@@ -7,7 +7,7 @@ pub mod exposure;
 pub mod grabbable;
 pub mod hover_plane;
 pub mod input_action;
-pub mod keyboard;
+pub mod keyboard_handler;
 pub mod lines;
 pub mod mouse;
 pub mod multi;
