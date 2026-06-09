@@ -25,6 +25,10 @@ fn main() {
 				rust_module: "stardust_xr_protocol::spatial",
 				external_protocol: stardust_xr_protocol::spatial::EXTERNAL_PROTOCOL,
 			},
+			&ModuleExternalProtocol {
+				rust_module: "stardust_xr_protocol::keymap",
+				external_protocol: stardust_xr_protocol::keymap::EXTERNAL_PROTOCOL,
+			},
 		],
 		Derives::all(),
 		&[],

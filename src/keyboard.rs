@@ -1,17 +1,13 @@
 use gluon::{Context, Object};
 use stardust_xr_fusion::{
-	Result,
-	client::{Client, ClientHandler},
-	fields::Field,
-	query::{QueryExt, QueryableObject},
-	spatial::Spatial,
-	types::Timestamp,
+	Result, client::{Client, ClientHandler}, fields::Field, keymap::Keymap, query::{QueryExt, QueryableObject}, spatial::Spatial, types::Timestamp
 };
+pub use stardust_xr_molecules_protocols::keyboard::ModifierState;
 use stardust_xr_molecules_protocols::keyboard::{EXTERNAL_PROTOCOL, KeyboardHandlerHandler};
-pub use stardust_xr_molecules_protocols::keyboard::{Keymap, ModifierState};
 use std::any::Any;
 
-pub struct KeypressInfo {
+#[derive(Clone)]
+pub struct KeyInfo {
 	pub keycode: u32,
 	pub pressed: bool,
 	pub modifiers: ModifierState,
@@ -19,7 +15,7 @@ pub struct KeypressInfo {
 }
 
 struct KeyboardInner {
-	on_key: Box<dyn Fn(KeypressInfo) + Send + Sync>,
+	on_key: Box<dyn Fn(KeyInfo) + Send + Sync>,
 }
 
 #[derive(gluon::Handler)]
@@ -39,7 +35,7 @@ impl KeyboardHandlerHandler for KeyboardHandler {
 		modifiers: ModifierState,
 		keymap: Keymap,
 	) {
-		(self.0.on_key)(KeypressInfo {
+		(self.0.on_key)(KeyInfo {
 			keycode,
 			pressed,
 			modifiers,
@@ -57,7 +53,7 @@ impl Keyboard {
 		client: &Client<H>,
 		spatial: Spatial,
 		field: Field,
-		on_key: impl Fn(KeypressInfo) + Send + Sync + 'static,
+		on_key: impl Fn(KeyInfo) + Send + Sync + 'static,
 	) -> Result<Self> {
 		let handler = KeyboardHandler(KeyboardInner {
 			on_key: Box::new(on_key),

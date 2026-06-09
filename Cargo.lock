@@ -198,7 +198,7 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 [[package]]
 name = "binderbinder"
 version = "0.1.0"
-source = "git+https://github.com/technobaboo/binderbinder#01af0fdca90a4f99e72c4c861d698818ad5a8a36"
+source = "git+https://github.com/technobaboo/binderbinder#81d5c28b9940650984c3a6997c4b5f45005d51dd"
 dependencies = [
  "bitflags",
  "dashmap",
@@ -829,7 +829,7 @@ checksum = "3b3cff922bd51709b605d9ead9aa71031d81447142d828eb4a6eba76fe619f9b"
 [[package]]
 name = "pion-binder"
 version = "0.1.0"
-source = "git+https://github.com/technobaboo/pion#5bb58a961dbee630af8c9476249d8b43a931a77c"
+source = "git+https://github.com/technobaboo/pion#c11a613d26a493e0da8a1e82ea4c06c350a10a59"
 dependencies = [
  "async-trait",
  "binderbinder",
@@ -1132,7 +1132,7 @@ dependencies = [
 [[package]]
 name = "stardust-xr-fusion"
 version = "0.51.1"
-source = "git+https://github.com/StardustXR/core.git?branch=binder#41d00cf4bce58a085ca8fe4b9de492fa13acb48a"
+source = "git+https://github.com/StardustXR/core.git?branch=binder#665454348c85f9c7f60a3af231797840da812645"
 dependencies = [
  "glam 0.30.7",
  "gluon",
@@ -1182,7 +1182,7 @@ dependencies = [
 [[package]]
 name = "stardust-xr-protocol"
 version = "0.51.1"
-source = "git+https://github.com/StardustXR/core.git?branch=binder#41d00cf4bce58a085ca8fe4b9de492fa13acb48a"
+source = "git+https://github.com/StardustXR/core.git?branch=binder#665454348c85f9c7f60a3af231797840da812645"
 dependencies = [
  "fnv",
  "glam 0.29.3",
