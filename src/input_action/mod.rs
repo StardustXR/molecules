@@ -19,7 +19,7 @@ use stardust_xr_fusion::{
 		DatamapData, InputDataType, InputHandler as InputHandlerProxy, InputHandlerHandler,
 		InputMethod, InputMethodCapture, SemanticData, SpatialData,
 	},
-	types::Timestamp,
+	types::{Timestamp, Vec2F},
 };
 use std::{
 	fmt::{Debug, Formatter},
@@ -58,10 +58,10 @@ impl InputSnapshot {
 			_ => false,
 		}
 	}
-	pub fn datamap_vec2(&self, key: &str) -> [f32; 2] {
+	pub fn datamap_vec2(&self, key: &str) -> Vec2F {
 		match self.semantic.datamap.get(key) {
-			Some(DatamapData::Vec2 { value }) => [value.x, value.y],
-			_ => [0.0, 0.0],
+			Some(DatamapData::Vec2 { value }) => *value,
+			_ => [0.0, 0.0].into(),
 		}
 	}
 }

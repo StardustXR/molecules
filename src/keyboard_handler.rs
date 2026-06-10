@@ -32,6 +32,7 @@ impl KeyboardHandlerHandler for KeyboardHandlerInner {
 #[derive(Debug)]
 pub struct KeyboardHandler {
 	_obj: Object<KeyboardHandlerInner>,
+	_queryable: QueryableObject,
 	_guard: QueryableInterfaceGuard,
 }
 impl KeyboardHandler {
@@ -47,10 +48,14 @@ impl KeyboardHandler {
 		let obj = client.pion_device().register_object(handler);
 
 		let queryable = QueryableObject::create(client, spatial, field).await?;
-		let _guard = queryable
+		let guard = queryable
 			.add_interface(&obj, EXTERNAL_PROTOCOL.protocol_name)
 			.await?;
 
-		Ok(KeyboardHandler { _obj: obj, _guard })
+		Ok(KeyboardHandler {
+			_obj: obj,
+			_queryable: queryable,
+			_guard: guard,
+		})
 	}
 }
