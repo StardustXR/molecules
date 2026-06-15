@@ -3,7 +3,7 @@ use stardust_xr_fusion::{
 	Result,
 	client::{Client, ClientHandler},
 	fields::Field,
-	query::{QueryExt, QueryableObject},
+	query::{QueryableExt, QueryableObject},
 	spatial::Spatial,
 	types::{Timestamp, proxies::Vec2F},
 };
@@ -78,7 +78,7 @@ impl MouseHandler {
 		};
 		let obj = client.pion_device().register_object(handler);
 
-		let queryable = QueryableObject::create(client, spatial, field).await?;
+		let queryable = QueryableObject::new(client, spatial, field).await?;
 		let guard = queryable
 			.add_interface(&obj, EXTERNAL_PROTOCOL.protocol_name)
 			.await?;

@@ -84,7 +84,7 @@ impl Grabbable {
 		field: Field,
 		settings: GrabbableSettings,
 	) -> Result<Self> {
-		let (content_parent, _) = Spatial::create(client, &parent, content_transform).await?;
+		let (content_parent, _) = Spatial::new(client, &parent, content_transform).await?;
 		let input = InputQueue::new(
 			client,
 			content_parent.clone(),
@@ -92,8 +92,8 @@ impl Grabbable {
 			parent.clone(),
 		)
 		.await?;
-		let content_lines = Lines::create(client, &content_parent, vec![]).await?;
-		let root_lines = Lines::create(client, &content_parent, vec![]).await?;
+		let content_lines = Lines::new(client, &content_parent, vec![]).await?;
+		let root_lines = Lines::new(client, &content_parent, vec![]).await?;
 
 		Ok(Grabbable {
 			parent,

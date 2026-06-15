@@ -151,7 +151,7 @@ impl ButtonVisuals {
 		} else {
 			128
 		};
-		let outline = Lines::create(client, parent, vec![]).await?;
+		let outline = Lines::new(client, parent, vec![]).await?;
 
 		Ok(ButtonVisuals {
 			size,

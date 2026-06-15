@@ -13,7 +13,7 @@ use stardust_xr_fusion::{
 	Result,
 	client::{Client, ClientHandler},
 	fields::{Field, FieldRef},
-	query::{QueryExt, QueryableInterfaceGuard, QueryableObject},
+	query::{QueryableExt, QueryableInterfaceGuard, QueryableObject},
 	spatial::{Spatial, SpatialRef},
 	suis::{
 		DatamapData, InputDataType, InputHandler as InputHandlerProxy, InputHandlerHandler,
@@ -132,7 +132,7 @@ impl InputQueue {
 		};
 		let queue_obj = client.pion_device().register_object(queue);
 
-		let queryable = QueryableObject::create(client, query_spatial, field).await?;
+		let queryable = QueryableObject::new(client, query_spatial, field).await?;
 		let guard = queryable
 			.add_interface(&queue_obj, InputHandlerProxy::QUERY_INTERFACE)
 			.await?;

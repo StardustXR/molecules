@@ -65,14 +65,14 @@ impl HoverPlane {
 		y_range: Range<f32>,
 		settings: HoverPlaneSettings,
 	) -> Result<Self> {
-		let (root, root_ref) = Spatial::create(client, parent, transform).await?;
-		let (field_spatial, _) = Spatial::create(
+		let (root, root_ref) = Spatial::new(client, parent, transform).await?;
+		let (field_spatial, _) = Spatial::new(
 			client,
 			&root_ref,
 			Transform::from_translation([0.0, 0.0, thickness * -0.5]),
 		)
 		.await?;
-		let (field, _) = Field::create(
+		let (field, _) = Field::new(
 			client,
 			&field_spatial,
 			Shape::Box {
@@ -81,8 +81,8 @@ impl HoverPlane {
 		)
 		.await?;
 		let input = InputQueue::new(client, root.clone(), field.clone(), root_ref.clone()).await?;
-		let lines = Lines::create(client, &root, vec![]).await?;
-		let debug_lines = Lines::create(client, &root, vec![]).await?;
+		let lines = Lines::new(client, &root, vec![]).await?;
+		let debug_lines = Lines::new(client, &root, vec![]).await?;
 
 		Ok(HoverPlane {
 			root,

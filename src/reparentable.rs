@@ -3,7 +3,7 @@ use stardust_xr_fusion::Result;
 use stardust_xr_fusion::{
 	client::{Client, ClientHandler},
 	fields::Field,
-	query::{QueryExt, QueryableObject},
+	query::{QueryableExt, QueryableObject},
 	spatial::{PartialTransform, Spatial, SpatialRef},
 };
 pub use stardust_xr_molecules_protocols::reparentable::{
@@ -137,7 +137,7 @@ impl Reparentable {
 		let _ = reparentable_obj.handle_proxy.set(handle_proxy);
 		let _ = reparentable_obj._handle_obj.set(handle_obj);
 
-		let queryable = QueryableObject::create(client, spatial, field).await?;
+		let queryable = QueryableObject::new(client, spatial, field).await?;
 		let guard = queryable
 			.add_interface(&reparentable_obj, EXTERNAL_PROTOCOL.protocol_name)
 			.await?;

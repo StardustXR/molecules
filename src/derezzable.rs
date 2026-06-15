@@ -3,7 +3,7 @@ use stardust_xr_fusion::{
 	Result,
 	client::{Client, ClientHandler},
 	fields::Field,
-	query::{QueryExt, QueryableObject},
+	query::{QueryableExt, QueryableObject},
 	spatial::Spatial,
 };
 use stardust_xr_molecules_protocols::derezzable::{DerezzableHandler, EXTERNAL_PROTOCOL};
@@ -32,7 +32,7 @@ impl Derezzable {
 		let (tx, rx) = mpsc::channel(8);
 		let obj = client.pion_device().register_object(DerezzableInner(tx));
 
-		let queryable = QueryableObject::create(client, spatial, field).await?;
+		let queryable = QueryableObject::new(client, spatial, field).await?;
 		let guard = queryable
 			.add_interface(&obj, EXTERNAL_PROTOCOL.protocol_name)
 			.await?;

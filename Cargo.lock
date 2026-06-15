@@ -198,7 +198,7 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 [[package]]
 name = "binderbinder"
 version = "0.1.0"
-source = "git+https://github.com/technobaboo/binderbinder#81d5c28b9940650984c3a6997c4b5f45005d51dd"
+source = "git+https://github.com/technobaboo/binderbinder#be24952c02486e745c7b9d63f9cd77b42ecefdc7"
 dependencies = [
  "bitflags",
  "dashmap",
@@ -1132,7 +1132,7 @@ dependencies = [
 [[package]]
 name = "stardust-xr-fusion"
 version = "0.51.1"
-source = "git+https://github.com/StardustXR/core.git?branch=binder#665454348c85f9c7f60a3af231797840da812645"
+source = "git+https://github.com/StardustXR/core.git?branch=binder#7f0147719c754fa6620fcdc4d1e8dfb9539e0691"
 dependencies = [
  "glam 0.30.7",
  "gluon",
@@ -1182,7 +1182,7 @@ dependencies = [
 [[package]]
 name = "stardust-xr-protocol"
 version = "0.51.1"
-source = "git+https://github.com/StardustXR/core.git?branch=binder#665454348c85f9c7f60a3af231797840da812645"
+source = "git+https://github.com/StardustXR/core.git?branch=binder#7f0147719c754fa6620fcdc4d1e8dfb9539e0691"
 dependencies = [
  "fnv",
  "glam 0.29.3",
