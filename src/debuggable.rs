@@ -74,20 +74,19 @@ async fn debuggable() {
 	let _async_event_loop = client.async_event_loop();
 
 	// Create a mock field and spatial
-	let field = Field::create(
+	let field = Field::new(
 		ch.get_root(),
 		stardust_xr_fusion::spatial::Transform::identity(),
 		stardust_xr_fusion::fields::Shape::Sphere(0.05),
 	)
 	.unwrap();
-	let spatial =
-		Spatial::create(&field, stardust_xr_fusion::spatial::Transform::identity()).unwrap();
+	let spatial = Spatial::new(&field, stardust_xr_fusion::spatial::Transform::identity()).unwrap();
 
 	// Create a mock object path
 	let path = OwnedObjectPath::try_from("/org/stardustxr/DebuggableTest").unwrap();
 
 	// Create the Debuggable instance
-	let debuggable = Debuggable::create(connection, &path, &field, Some(&spatial));
+	let debuggable = Debuggable::new(connection, &path, &field, Some(&spatial));
 
 	// Assert initial state is false
 	assert!(!debuggable.active());

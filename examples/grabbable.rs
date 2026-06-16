@@ -21,15 +21,15 @@ async fn main() {
 	let (client, root) = Client::auto_connect(&[&project_local_resources!("res")])
 		.await
 		.unwrap();
-	let (_root_spatial, root_ref) = Spatial::create(&client, &root, Transform::IDENTITY)
+	let (_root_spatial, root_ref) = Spatial::new(&client, &root, Transform::IDENTITY)
 		.await
 		.unwrap();
 
-	let (content_spatial, _) = Spatial::create(&client, &root_ref, Transform::IDENTITY)
+	let (content_spatial, _) = Spatial::new(&client, &root_ref, Transform::IDENTITY)
 		.await
 		.unwrap();
 
-	let _model = Model::create(
+	let _model = Model::new(
 		&client,
 		&content_spatial,
 		Resource::Namespaced {
@@ -42,7 +42,7 @@ async fn main() {
 
 	let bounds = content_spatial.get_local_bounding_box().await.unwrap();
 
-	let (field, _) = Field::create(
+	let (field, _) = Field::new(
 		&client,
 		&content_spatial,
 		Shape::Transform {

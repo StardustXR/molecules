@@ -12,11 +12,11 @@ async fn main() {
 	tracing_subscriber::fmt::init();
 	let (client, root) = Client::auto_connect(&[]).await.unwrap();
 
-	let (root_spatial, root_ref) = Spatial::create(&client, &root, Transform::IDENTITY)
+	let (root_spatial, root_ref) = Spatial::new(&client, &root, Transform::IDENTITY)
 		.await
 		.unwrap();
 
-	let (field, _) = Field::create(&client, &root_spatial, Shape::Sphere { radius: 0.1 })
+	let (field, _) = Field::new(&client, &root_spatial, Shape::Sphere { radius: 0.1 })
 		.await
 		.unwrap();
 

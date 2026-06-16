@@ -16,7 +16,7 @@ async fn main() {
 		.with_env_filter(EnvFilter::from_default_env())
 		.init();
 	let (client, root) = Client::auto_connect(&[]).await.unwrap();
-	let (_root_spatial, root_ref) = Spatial::create(&client, &root, Transform::IDENTITY)
+	let (_root_spatial, root_ref) = Spatial::new(&client, &root, Transform::IDENTITY)
 		.await
 		.unwrap();
 
@@ -33,7 +33,7 @@ async fn main() {
 	.unwrap();
 	touch_plane.set_debug(Some(DebugSettings::default()));
 
-	let touch_visualizer = Lines::create(&client, touch_plane.root(), vec![])
+	let touch_visualizer = Lines::new(&client, touch_plane.root(), vec![])
 		.await
 		.unwrap();
 

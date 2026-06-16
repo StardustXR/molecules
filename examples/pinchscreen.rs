@@ -16,7 +16,7 @@ async fn main() {
 		.with_env_filter(EnvFilter::from_default_env())
 		.init();
 	let (client, root) = Client::auto_connect(&[]).await.unwrap();
-	let (_root_spatial, root_ref) = Spatial::create(&client, &root, Transform::IDENTITY)
+	let (_root_spatial, root_ref) = Spatial::new(&client, &root, Transform::IDENTITY)
 		.await
 		.unwrap();
 
@@ -37,7 +37,7 @@ async fn main() {
 		..Default::default()
 	}));
 
-	let text = Text::create(
+	let text = Text::new(
 		&client,
 		hover_plane.root(),
 		"Unpinched".to_string(),

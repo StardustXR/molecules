@@ -17,7 +17,7 @@ async fn main() {
 		.init();
 	let (client, root) = Client::auto_connect(&[]).await.unwrap();
 
-	let (_root_spatial, root_ref) = Spatial::create(&client, &root, Transform::IDENTITY)
+	let (_root_spatial, root_ref) = Spatial::new(&client, &root, Transform::IDENTITY)
 		.await
 		.unwrap();
 
@@ -32,14 +32,14 @@ async fn main() {
 	.unwrap();
 	button.set_debug(Some(DebugSettings::default()));
 
-	let (text_spatial, _) = Spatial::create(
+	let (text_spatial, _) = Spatial::new(
 		&client,
 		&root_ref,
 		Transform::from_translation([0.0, -0.06, 0.0]),
 	)
 	.await
 	.unwrap();
-	let text = Text::create(
+	let text = Text::new(
 		&client,
 		&text_spatial,
 		"Unpressed".to_string(),

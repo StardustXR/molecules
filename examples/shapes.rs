@@ -15,7 +15,7 @@ async fn main() {
 		.with_env_filter(EnvFilter::from_default_env())
 		.init();
 	let (client, root) = Client::auto_connect(&[]).await.unwrap();
-	let (root_spatial, _root_ref) = Spatial::create(&client, &root, Transform::IDENTITY)
+	let (root_spatial, _root_ref) = Spatial::new(&client, &root, Transform::IDENTITY)
 		.await
 		.unwrap();
 
@@ -50,7 +50,7 @@ async fn main() {
 	.map(|l| l.thickness(0.005))
 	.collect();
 
-	let lines_obj = Lines::create(&client, &root_spatial, shapes.clone())
+	let lines_obj = Lines::new(&client, &root_spatial, shapes.clone())
 		.await
 		.unwrap();
 
