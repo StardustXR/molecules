@@ -53,27 +53,9 @@ impl SingleAction {
 		interact_condition: impl Fn(&InputSnapshot) -> bool,
 	) {
 		let input = queue.input();
-		self.multi.update_from_map(
-			&input,
-			hover_condition,
-			interact_condition,
-			|snap| queue.start_capture(snap),
-			|snap| queue.release_capture(snap),
-		);
-		self.update_actor(change_actor, &input);
-	}
-
-	#[cfg(test)]
-	pub fn test_update(
-		&mut self,
-		change_actor: bool,
-		input: &FxHashMap<InputMethod, Arc<InputSnapshot>>,
-		hover_condition: impl Fn(&InputSnapshot) -> bool,
-		interact_condition: impl Fn(&InputSnapshot) -> bool,
-	) {
 		self.multi
-			.update_from_map(input, hover_condition, interact_condition, |_| {}, |_| {});
-		self.update_actor(change_actor, input);
+			.update_from_map(queue, hover_condition, interact_condition);
+		self.update_actor(change_actor, &input);
 	}
 
 	pub fn hovering(&self) -> &DeltaSet<Arc<InputSnapshot>> {
