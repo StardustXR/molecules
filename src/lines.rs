@@ -632,3 +632,43 @@ pub fn bounding_box(bounding_box: BoundingBox) -> Vec<Line> {
 		),
 	]
 }
+
+/// Build an arrow [`Line`] from `from` to `to`: a shaft of constant `thickness`
+/// that flares to a wider point just before the tip, then tapers to nothing at
+/// `to`, forming an arrowhead.
+pub fn arrow(
+	from: impl Into<Vec3F>,
+	to: impl Into<Vec3F>,
+	thickness: f32,
+	tip_length: f32,
+	color: Color,
+) -> Line {
+	let from = Vec3::from(from.into());
+	let to = Vec3::from(to.into());
+	let direction = (to - from).normalize_or_zero();
+	Line {
+		cyclic: false,
+		points: vec![
+			LinePoint {
+				point: from.into(),
+				thickness,
+				color,
+			},
+			LinePoint {
+				point: (to - (direction * tip_length)).into(),
+				thickness,
+				color,
+			},
+			LinePoint {
+				point: (to - (direction * tip_length)).into(),
+				thickness: thickness * 2.0,
+				color,
+			},
+			LinePoint {
+				point: to.into(),
+				thickness: 0.0,
+				color,
+			},
+		],
+	}
+}
