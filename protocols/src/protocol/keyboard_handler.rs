@@ -70,6 +70,7 @@ pub struct ModifierState {
     pub depressed: u32,
     pub latched: u32,
     pub locked: u32,
+    pub layout_group: u32,
 }
 impl gluon::Convertable for ModifierState {
     fn write<'a, 'b: 'a>(
@@ -79,16 +80,19 @@ impl gluon::Convertable for ModifierState {
         self.depressed.write(gluon_data)?;
         self.latched.write(gluon_data)?;
         self.locked.write(gluon_data)?;
+        self.layout_group.write(gluon_data)?;
         Ok(())
     }
     fn read(gluon_data: &mut gluon::DataReader) -> Result<Self, gluon::ReadError> {
         let depressed = gluon::Convertable::read(gluon_data)?;
         let latched = gluon::Convertable::read(gluon_data)?;
         let locked = gluon::Convertable::read(gluon_data)?;
+        let layout_group = gluon::Convertable::read(gluon_data)?;
         Ok(ModifierState {
             depressed,
             latched,
             locked,
+            layout_group,
         })
     }
     fn write_owned(
@@ -98,6 +102,7 @@ impl gluon::Convertable for ModifierState {
         self.depressed.write_owned(gluon_data)?;
         self.latched.write_owned(gluon_data)?;
         self.locked.write_owned(gluon_data)?;
+        self.layout_group.write_owned(gluon_data)?;
         Ok(())
     }
 }

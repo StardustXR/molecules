@@ -22,4 +22,5 @@ struct ModifierState {
 	depressed: u32,
 	latched: u32,
 	locked: u32,
+	layout_group: u32,
 }
