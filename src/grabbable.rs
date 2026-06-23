@@ -226,7 +226,7 @@ impl UIElement for Grabbable {
 			if matches!(actor.input(), InputDataType::Pointer { .. }) {
 				let scroll_amount = actor.datamap_vec2("scroll_continuous").y * 0.01
 					+ actor.datamap_vec2("scroll_discrete").y * 0.01;
-				let offset = Affine3A::from_translation(vec3(0.0, 0.0, scroll_amount));
+				let offset = Affine3A::from_translation(vec3(0.0, 0.0, -scroll_amount));
 				self.relative_transform = offset * self.relative_transform;
 			}
 
