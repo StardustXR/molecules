@@ -1,4 +1,5 @@
 use gluon::{Context, Object};
+use pion_binder::PionBinderDevice;
 use stardust_xr_fusion::Result;
 use stardust_xr_fusion::{
 	client::{Client, ClientHandler},
@@ -13,6 +14,7 @@ pub use stardust_xr_molecules_protocols::reparentable::{
 use stardust_xr_molecules_protocols::reparentable::{
 	EXTERNAL_PROTOCOL, ReparentHandleHandler, ReparentableHandler,
 };
+use std::sync::atomic::AtomicU64;
 use std::{
 	any::Any,
 	sync::{
@@ -23,8 +25,9 @@ use std::{
 
 enum ReparentState {
 	Idle,
-	NonLocked(ReparentKeepalive),
-	Locked(#[allow(dead_code)] ReparentKeepalive),
+	NonLocked(u64, ReparentKeepalive),
+    // we want to keep this handle alive, even if we don't use it directly
+	Locked(u64, #[allow(dead_code)] ReparentKeepalive),
 }
 
 struct SharedState {
@@ -35,7 +38,10 @@ struct SharedState {
 }
 
 #[derive(gluon::Handler)]
-struct ReparentHandleInner(Arc<SharedState>);
+struct ReparentHandleInner {
+	state: Arc<SharedState>,
+	id: u64,
+}
 impl std::fmt::Debug for ReparentHandleInner {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("ReparentHandleInner").finish()
@@ -44,45 +50,42 @@ impl std::fmt::Debug for ReparentHandleInner {
 impl ReparentHandleHandler for ReparentHandleInner {
 	async fn reset_transform(&self, _ctx: Context, relative_to: SpatialRef) {
 		let _ = self
-			.0
+			.state
 			.spatial
 			.set_relative_transform(relative_to, PartialTransform::NONE);
+	}
+}
+impl Drop for ReparentHandleInner {
+	fn drop(&mut self) {
+		let mut guard = self.state.reparent_state.lock().unwrap();
+		let still_current = match &*guard {
+			ReparentState::NonLocked(current, _) | ReparentState::Locked(current, _) => {
+				*current == self.id
+			}
+			ReparentState::Idle => false,
+		};
+		if still_current {
+			*guard = ReparentState::Idle;
+			self.state.reparented.store(false, Ordering::Relaxed);
+			let _ = self
+				.state
+				.spatial
+				.set_parent_in_place(self.state.initial_parent.clone());
+		}
 	}
 }
 
 #[derive(gluon::Handler)]
 struct ReparentableInner {
 	state: Arc<SharedState>,
-	handle_proxy: std::sync::OnceLock<ReparentHandle>,
-	_handle_obj: std::sync::OnceLock<Object<ReparentHandleInner>>,
+	dev: PionBinderDevice,
 }
 impl std::fmt::Debug for ReparentableInner {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("ReparentableInner").finish()
 	}
 }
-impl ReparentableInner {
-	/// Resets back to the initial parent once `keepalive` dies, unless someone else
-	/// has already taken over the reparent by then.
-	fn watch_keepalive(&self, keepalive: ReparentKeepalive) {
-		let state = self.state.clone();
-		tokio::spawn(async move {
-			gluon::Liveness::death_notification(&keepalive).await;
-			let mut guard = state.reparent_state.lock().unwrap();
-			let still_current = match &*guard {
-				ReparentState::NonLocked(current) | ReparentState::Locked(current) => {
-					*current == keepalive
-				}
-				ReparentState::Idle => false,
-			};
-			if still_current {
-				*guard = ReparentState::Idle;
-				state.reparented.store(false, Ordering::Relaxed);
-				let _ = state.spatial.set_parent_in_place(state.initial_parent.clone());
-			}
-		});
-	}
-}
+static HANDLE_ID: AtomicU64 = AtomicU64::new(0);
 impl ReparentableHandler for ReparentableInner {
 	async fn reparent_locking(
 		&self,
@@ -92,18 +95,24 @@ impl ReparentableHandler for ReparentableInner {
 	) -> Option<ReparentHandle> {
 		let mut guard = self.state.reparent_state.lock().unwrap();
 		match &*guard {
-			ReparentState::Idle | ReparentState::NonLocked(_) => {
-				if let ReparentState::NonLocked(old) = &*guard {
+			ReparentState::Idle | ReparentState::NonLocked(_, _) => {
+				if let ReparentState::NonLocked(_, old) = &*guard {
 					let _ = old.reparent_stolen();
 				}
 				let _ = self.state.spatial.set_parent_in_place(new_parent);
 				self.state.reparented.store(true, Ordering::Relaxed);
-				*guard = ReparentState::Locked(keepalive.clone());
+				let handle_obj = self
+					.dev
+					.register_object(ReparentHandleInner {
+						state: self.state.clone(),
+						id: HANDLE_ID.fetch_add(1, Ordering::Relaxed),
+					})
+					.to_service();
+				*guard = ReparentState::Locked(handle_obj.id, keepalive.clone());
 				drop(guard);
-				self.watch_keepalive(keepalive);
-				self.handle_proxy.get().cloned()
+				Some(ReparentHandle::from_handler(&handle_obj))
 			}
-			ReparentState::Locked(_) => None,
+			ReparentState::Locked(_, _) => None,
 		}
 	}
 	async fn reparent(
@@ -114,18 +123,24 @@ impl ReparentableHandler for ReparentableInner {
 	) -> Option<ReparentHandle> {
 		let mut guard = self.state.reparent_state.lock().unwrap();
 		match &*guard {
-			ReparentState::Idle | ReparentState::NonLocked(_) => {
-				if let ReparentState::NonLocked(old) = &*guard {
+			ReparentState::Idle | ReparentState::NonLocked(_, _) => {
+				if let ReparentState::NonLocked(_, old) = &*guard {
 					let _ = old.reparent_stolen();
 				}
 				let _ = self.state.spatial.set_parent_in_place(new_parent);
 				self.state.reparented.store(true, Ordering::Relaxed);
-				*guard = ReparentState::NonLocked(keepalive.clone());
+				let handle_obj = self
+					.dev
+					.register_object(ReparentHandleInner {
+						state: self.state.clone(),
+						id: HANDLE_ID.fetch_add(1, Ordering::Relaxed),
+					})
+					.to_service();
+				*guard = ReparentState::NonLocked(handle_obj.id, keepalive.clone());
 				drop(guard);
-				self.watch_keepalive(keepalive);
-				self.handle_proxy.get().cloned()
+				Some(ReparentHandle::from_handler(&handle_obj))
 			}
-			ReparentState::Locked(_) => None,
+			ReparentState::Locked(_, _) => None,
 		}
 	}
 }
@@ -151,18 +166,11 @@ impl Reparentable {
 			reparented: AtomicBool::new(false),
 		});
 
-		let handle_inner = ReparentHandleInner(state.clone());
-		let handle_obj = client.pion_device().register_object(handle_inner);
-		let handle_proxy = ReparentHandle::from_handler(&handle_obj);
-
 		let reparentable_inner = ReparentableInner {
 			state: state.clone(),
-			handle_proxy: std::sync::OnceLock::new(),
-			_handle_obj: std::sync::OnceLock::new(),
+			dev: client.pion_device().clone(),
 		};
 		let reparentable_obj = client.pion_device().register_object(reparentable_inner);
-		let _ = reparentable_obj.handle_proxy.set(handle_proxy);
-		let _ = reparentable_obj._handle_obj.set(handle_obj);
 
 		let queryable = QueryableObject::new(client, spatial, field).await?;
 		let guard = queryable
@@ -208,35 +216,35 @@ async fn reparentable_query() {
 	#[derive(Debug, Handler)]
 	struct Logger;
 	impl PointsQueryHandlerHandler for Logger {
-			async fn entered(
-				&self,
-				_ctx: gluon::Context,
-				obj: QueryableObjectRef,
-				_field: FieldRef,
-				_spatial: SpatialRef,
-				interfaces: Vec<QueriedInterface>,
-				_spatial_info: FieldSample,
-			) {
-				tracing::info!(?obj, ?interfaces, "ENTERED");
-			}
-			async fn interfaces_changed(
-				&self,
-				_ctx: gluon::Context,
-				obj: QueryableObjectRef,
-				interfaces: Vec<QueriedInterface>,
-			) {
-				tracing::info!(?obj, ?interfaces, "INTERFACES CHANGED");
-			}
-			async fn moved(
-				&self,
-				_ctx: gluon::Context,
-				_obj: QueryableObjectRef,
-				_spatial_info: FieldSample,
-			) {
-			}
-			async fn left(&self, _ctx: gluon::Context, obj: QueryableObjectRef) {
-				tracing::info!(?obj, "LEFT");
-			}
+		async fn entered(
+			&self,
+			_ctx: gluon::Context,
+			obj: QueryableObjectRef,
+			_field: FieldRef,
+			_spatial: SpatialRef,
+			interfaces: Vec<QueriedInterface>,
+			_spatial_info: FieldSample,
+		) {
+			tracing::info!(?obj, ?interfaces, "ENTERED");
+		}
+		async fn interfaces_changed(
+			&self,
+			_ctx: gluon::Context,
+			obj: QueryableObjectRef,
+			interfaces: Vec<QueriedInterface>,
+		) {
+			tracing::info!(?obj, ?interfaces, "INTERFACES CHANGED");
+		}
+		async fn moved(
+			&self,
+			_ctx: gluon::Context,
+			_obj: QueryableObjectRef,
+			_spatial_info: FieldSample,
+		) {
+		}
+		async fn left(&self, _ctx: gluon::Context, obj: QueryableObjectRef) {
+			tracing::info!(?obj, "LEFT");
+		}
 	}
 
 	tracing_subscriber::fmt().pretty().with_file(false).init();

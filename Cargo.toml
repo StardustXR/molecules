@@ -41,5 +41,5 @@ tokio = { version = "1.38.0", features = ["full"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 tracing-tracy = "0.11.4"
 
-[dev-dependencies.pion-binder]
+[dependencies.pion-binder]
 git = "https://github.com/technobaboo/pion"
