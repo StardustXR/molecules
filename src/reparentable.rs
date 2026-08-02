@@ -61,6 +61,28 @@ impl std::fmt::Debug for ReparentableInner {
 		f.debug_struct("ReparentableInner").finish()
 	}
 }
+impl ReparentableInner {
+	/// Resets back to the initial parent once `keepalive` dies, unless someone else
+	/// has already taken over the reparent by then.
+	fn watch_keepalive(&self, keepalive: ReparentKeepalive) {
+		let state = self.state.clone();
+		tokio::spawn(async move {
+			gluon::Liveness::death_notification(&keepalive).await;
+			let mut guard = state.reparent_state.lock().unwrap();
+			let still_current = match &*guard {
+				ReparentState::NonLocked(current) | ReparentState::Locked(current) => {
+					*current == keepalive
+				}
+				ReparentState::Idle => false,
+			};
+			if still_current {
+				*guard = ReparentState::Idle;
+				state.reparented.store(false, Ordering::Relaxed);
+				let _ = state.spatial.set_parent_in_place(state.initial_parent.clone());
+			}
+		});
+	}
+}
 impl ReparentableHandler for ReparentableInner {
 	async fn reparent_locking(
 		&self,
@@ -76,7 +98,9 @@ impl ReparentableHandler for ReparentableInner {
 				}
 				let _ = self.state.spatial.set_parent_in_place(new_parent);
 				self.state.reparented.store(true, Ordering::Relaxed);
-				*guard = ReparentState::Locked(keepalive);
+				*guard = ReparentState::Locked(keepalive.clone());
+				drop(guard);
+				self.watch_keepalive(keepalive);
 				self.handle_proxy.get().cloned()
 			}
 			ReparentState::Locked(_) => None,
@@ -96,7 +120,9 @@ impl ReparentableHandler for ReparentableInner {
 				}
 				let _ = self.state.spatial.set_parent_in_place(new_parent);
 				self.state.reparented.store(true, Ordering::Relaxed);
-				*guard = ReparentState::NonLocked(keepalive);
+				*guard = ReparentState::NonLocked(keepalive.clone());
+				drop(guard);
+				self.watch_keepalive(keepalive);
 				self.handle_proxy.get().cloned()
 			}
 			ReparentState::Locked(_) => None,
