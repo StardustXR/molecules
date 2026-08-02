@@ -21,6 +21,7 @@ impl DerezzableHandler for DerezzableInner {
 pub struct Derezzable {
 	pub receiver: mpsc::Receiver<()>,
 	_obj: Object<DerezzableInner>,
+	_queryable: QueryableObject,
 	_guard: Box<dyn Any + Send + Sync>,
 }
 impl Derezzable {
@@ -40,6 +41,7 @@ impl Derezzable {
 		Ok(Derezzable {
 			receiver: rx,
 			_obj: obj,
+			_queryable: queryable,
 			_guard: Box::new(guard) as Box<dyn Any + Send + Sync>,
 		})
 	}

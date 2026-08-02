@@ -56,6 +56,7 @@ impl MouseHandlerHandler for MouseHandlerInner {
 #[derive(Debug)]
 pub struct MouseHandler {
 	_obj: Object<MouseHandlerInner>,
+	_queryable: QueryableObject,
 	_guard: Box<dyn Any + Send + Sync>,
 }
 
@@ -85,6 +86,7 @@ impl MouseHandler {
 
 		Ok(MouseHandler {
 			_obj: obj,
+			_queryable: queryable,
 			_guard: Box::new(guard) as Box<dyn Any + Send + Sync>,
 		})
 	}
