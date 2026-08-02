@@ -1,5 +1,6 @@
 #![allow(unused, clippy::all, private_bounds, private_interfaces)]
-use gluon::Convertable;
+use gluon::Convertable as _;
+use tracing::Instrument as _;
 pub const EXTERNAL_PROTOCOL: gluon::ExternalProtocol = gluon::ExternalProtocol {
     protocol_name: "org.stardustxr.KeyboardHandler",
     types: &[
@@ -165,6 +166,16 @@ impl gluon::ToObjectOrRef for KeyboardHandler {
         self.obj.clone()
     }
 }
+impl gluon::Liveness for KeyboardHandler {
+    fn alive(&self) -> bool {
+        gluon::Liveness::alive(&self.obj)
+    }
+    fn death_notification(
+        &self,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> {
+        gluon::Liveness::death_notification(&self.obj)
+    }
+}
 impl std::hash::Hash for KeyboardHandler {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.obj.hash(state);
@@ -199,7 +210,14 @@ pub trait KeyboardHandlerHandler: gluon::Handler + Send + Sync + 'static {
                         param_timestamp, "dispatching"
                     );
                     drop(gluon_data);
-                    self.key(ctx, param_event, param_timestamp).await;
+                    self.key(ctx, param_event, param_timestamp)
+                        .instrument(
+                            tracing::trace_span!(
+                                "dispatching", interface = "KeyboardHandler", method =
+                                "key", method_id = 8u32
+                            ),
+                        )
+                        .await;
                 }
                 _ => {}
             }

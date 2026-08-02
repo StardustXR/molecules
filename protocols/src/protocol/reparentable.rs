@@ -1,5 +1,6 @@
 #![allow(unused, clippy::all, private_bounds, private_interfaces)]
-use gluon::Convertable;
+use gluon::Convertable as _;
+use tracing::Instrument as _;
 pub const EXTERNAL_PROTOCOL: gluon::ExternalProtocol = gluon::ExternalProtocol {
     protocol_name: "org.stardustxr.Reparentable",
     types: &[],
@@ -105,6 +106,16 @@ impl gluon::ToObjectOrRef for Reparentable {
         self.obj.clone()
     }
 }
+impl gluon::Liveness for Reparentable {
+    fn alive(&self) -> bool {
+        gluon::Liveness::alive(&self.obj)
+    }
+    fn death_notification(
+        &self,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> {
+        gluon::Liveness::death_notification(&self.obj)
+    }
+}
 impl std::hash::Hash for Reparentable {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.obj.hash(state);
@@ -124,6 +135,19 @@ pub trait ReparentableHandler: gluon::Handler + Send + Sync + 'static {
         new_parent: stardust_xr_protocol::spatial::SpatialRef,
         keepalive: ReparentKeepalive,
     ) -> impl Future<Output = Option<ReparentHandle>> + Send + Sync;
+    ///Dispatched instead of [`Self::reparent_locking`] so a slow reply doesn't hold up dispatch of the next transaction. The default implementation just awaits `reparent_locking` and sends the result through `reply`. Override this method instead of `reparent_locking` to defer the reply: stash `reply` (it's `Send + Sync + 'static`) somewhere else — a channel, a queue, another task — and return as soon as this method's future is done, without waiting for the reply to actually be sent.
+    fn reparent_locking_oneway(
+        &self,
+        _ctx: gluon::Context,
+        new_parent: stardust_xr_protocol::spatial::SpatialRef,
+        keepalive: ReparentKeepalive,
+        reply: gluon::ReplySender<Option<ReparentHandle>>,
+    ) -> impl Future<Output = Result<(), gluon::SendError>> + Send + Sync {
+        async move {
+            let handle = self.reparent_locking(_ctx, new_parent, keepalive).await;
+            reply.send(handle)
+        }
+    }
     ///Reparents this object, this is non-locking, others can steal this reparent
     fn reparent(
         &self,
@@ -131,6 +155,19 @@ pub trait ReparentableHandler: gluon::Handler + Send + Sync + 'static {
         new_parent: stardust_xr_protocol::spatial::SpatialRef,
         keepalive: ReparentKeepalive,
     ) -> impl Future<Output = Option<ReparentHandle>> + Send + Sync;
+    ///Dispatched instead of [`Self::reparent`] so a slow reply doesn't hold up dispatch of the next transaction. The default implementation just awaits `reparent` and sends the result through `reply`. Override this method instead of `reparent` to defer the reply: stash `reply` (it's `Send + Sync + 'static`) somewhere else — a channel, a queue, another task — and return as soon as this method's future is done, without waiting for the reply to actually be sent.
+    fn reparent_oneway(
+        &self,
+        _ctx: gluon::Context,
+        new_parent: stardust_xr_protocol::spatial::SpatialRef,
+        keepalive: ReparentKeepalive,
+        reply: gluon::ReplySender<Option<ReparentHandle>>,
+    ) -> impl Future<Output = Result<(), gluon::SendError>> + Send + Sync {
+        async move {
+            let handle = self.reparent(_ctx, new_parent, keepalive).await;
+            reply.send(handle)
+        }
+    }
     fn dispatch_one_way(
         &self,
         transaction_code: u32,
@@ -141,46 +178,66 @@ pub trait ReparentableHandler: gluon::Handler + Send + Sync + 'static {
             match transaction_code {
                 8u32 => {
                     let return_callback = gluon_data.read_binder()?;
-                    let mut gluon_out = gluon::DataBuilder::new();
                     let param_new_parent = gluon::Convertable::read(&mut gluon_data)?;
                     let param_keepalive = gluon::Convertable::read(&mut gluon_data)?;
                     tracing::trace!(
                         interface = "Reparentable", method = "reparent_locking", ?
                         param_new_parent, ? param_keepalive, "dispatching"
                     );
-                    let (handle) = self
-                        .reparent_locking(ctx, param_new_parent, param_keepalive)
-                        .await;
                     drop(gluon_data);
-                    tracing::trace!(
-                        interface = "Reparentable", method = "reparent_locking", ?
-                        handle, "←"
+                    let reply: gluon::ReplySender<Option<ReparentHandle>> = gluon::ReplySender::new(
+                        return_callback,
+                        |handle, gluon_out| {
+                            tracing::trace!(
+                                interface = "Reparentable", method = "reparent_locking", ?
+                                handle, "←"
+                            );
+                            handle.write_owned(gluon_out)?;
+                            Ok(())
+                        },
                     );
-                    handle.write_owned(&mut gluon_out)?;
-                    return_callback
-                        .device()
-                        .transact_one_way(&return_callback, 0, gluon_out.to_payload())?;
+                    self.reparent_locking_oneway(
+                            ctx,
+                            param_new_parent,
+                            param_keepalive,
+                            reply,
+                        )
+                        .instrument(
+                            tracing::trace_span!(
+                                "dispatching", interface = "Reparentable", method =
+                                "reparent_locking", method_id = 8u32
+                            ),
+                        )
+                        .await?;
                 }
                 9u32 => {
                     let return_callback = gluon_data.read_binder()?;
-                    let mut gluon_out = gluon::DataBuilder::new();
                     let param_new_parent = gluon::Convertable::read(&mut gluon_data)?;
                     let param_keepalive = gluon::Convertable::read(&mut gluon_data)?;
                     tracing::trace!(
                         interface = "Reparentable", method = "reparent", ?
                         param_new_parent, ? param_keepalive, "dispatching"
                     );
-                    let (handle) = self
-                        .reparent(ctx, param_new_parent, param_keepalive)
-                        .await;
                     drop(gluon_data);
-                    tracing::trace!(
-                        interface = "Reparentable", method = "reparent", ? handle, "←"
+                    let reply: gluon::ReplySender<Option<ReparentHandle>> = gluon::ReplySender::new(
+                        return_callback,
+                        |handle, gluon_out| {
+                            tracing::trace!(
+                                interface = "Reparentable", method = "reparent", ? handle,
+                                "←"
+                            );
+                            handle.write_owned(gluon_out)?;
+                            Ok(())
+                        },
                     );
-                    handle.write_owned(&mut gluon_out)?;
-                    return_callback
-                        .device()
-                        .transact_one_way(&return_callback, 0, gluon_out.to_payload())?;
+                    self.reparent_oneway(ctx, param_new_parent, param_keepalive, reply)
+                        .instrument(
+                            tracing::trace_span!(
+                                "dispatching", interface = "Reparentable", method =
+                                "reparent", method_id = 9u32
+                            ),
+                        )
+                        .await?;
                 }
                 _ => {}
             }
@@ -242,6 +299,16 @@ impl gluon::ToObjectOrRef for ReparentKeepalive {
         self.obj.clone()
     }
 }
+impl gluon::Liveness for ReparentKeepalive {
+    fn alive(&self) -> bool {
+        gluon::Liveness::alive(&self.obj)
+    }
+    fn death_notification(
+        &self,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> {
+        gluon::Liveness::death_notification(&self.obj)
+    }
+}
 impl std::hash::Hash for ReparentKeepalive {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.obj.hash(state);
@@ -273,7 +340,14 @@ pub trait ReparentKeepaliveHandler: gluon::Handler + Send + Sync + 'static {
                         "dispatching"
                     );
                     drop(gluon_data);
-                    self.reparent_stolen(ctx).await;
+                    self.reparent_stolen(ctx)
+                        .instrument(
+                            tracing::trace_span!(
+                                "dispatching", interface = "ReparentKeepalive", method =
+                                "reparent_stolen", method_id = 8u32
+                            ),
+                        )
+                        .await;
                 }
                 _ => {}
             }
@@ -339,6 +413,16 @@ impl gluon::ToObjectOrRef for ReparentHandle {
         self.obj.clone()
     }
 }
+impl gluon::Liveness for ReparentHandle {
+    fn alive(&self) -> bool {
+        gluon::Liveness::alive(&self.obj)
+    }
+    fn death_notification(
+        &self,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> {
+        gluon::Liveness::death_notification(&self.obj)
+    }
+}
 impl std::hash::Hash for ReparentHandle {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.obj.hash(state);
@@ -372,7 +456,14 @@ pub trait ReparentHandleHandler: gluon::Handler + Send + Sync + 'static {
                         param_relative_to, "dispatching"
                     );
                     drop(gluon_data);
-                    self.reset_transform(ctx, param_relative_to).await;
+                    self.reset_transform(ctx, param_relative_to)
+                        .instrument(
+                            tracing::trace_span!(
+                                "dispatching", interface = "ReparentHandle", method =
+                                "reset_transform", method_id = 8u32
+                            ),
+                        )
+                        .await;
                 }
                 _ => {}
             }

@@ -1,5 +1,6 @@
 #![allow(unused, clippy::all, private_bounds, private_interfaces)]
-use gluon::Convertable;
+use gluon::Convertable as _;
+use tracing::Instrument as _;
 pub const EXTERNAL_PROTOCOL: gluon::ExternalProtocol = gluon::ExternalProtocol {
     protocol_name: "org.stardustxr.MouseHandler",
     types: &[
@@ -202,6 +203,16 @@ impl gluon::ToObjectOrRef for MouseHandler {
         self.obj.clone()
     }
 }
+impl gluon::Liveness for MouseHandler {
+    fn alive(&self) -> bool {
+        gluon::Liveness::alive(&self.obj)
+    }
+    fn death_notification(
+        &self,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> {
+        gluon::Liveness::death_notification(&self.obj)
+    }
+}
 impl std::hash::Hash for MouseHandler {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.obj.hash(state);
@@ -267,7 +278,14 @@ pub trait MouseHandlerHandler: gluon::Handler + Send + Sync + 'static {
                         __w.into()
                     };
                     drop(gluon_data);
-                    self.motion(ctx, param_delta, param_timestamp).await;
+                    self.motion(ctx, param_delta, param_timestamp)
+                        .instrument(
+                            tracing::trace_span!(
+                                "dispatching", interface = "MouseHandler", method =
+                                "motion", method_id = 8u32
+                            ),
+                        )
+                        .await;
                 }
                 9u32 => {
                     let param_button = gluon::Convertable::read(&mut gluon_data)?;
@@ -278,7 +296,14 @@ pub trait MouseHandlerHandler: gluon::Handler + Send + Sync + 'static {
                         param_pressed, ? param_timestamp, "dispatching"
                     );
                     drop(gluon_data);
-                    self.button(ctx, param_button, param_pressed, param_timestamp).await;
+                    self.button(ctx, param_button, param_pressed, param_timestamp)
+                        .instrument(
+                            tracing::trace_span!(
+                                "dispatching", interface = "MouseHandler", method =
+                                "button", method_id = 9u32
+                            ),
+                        )
+                        .await;
                 }
                 10u32 => {
                     let __wire_param_delta: stardust_xr_protocol::types::proxied::Vec2F = gluon::Convertable::read(
@@ -297,6 +322,12 @@ pub trait MouseHandlerHandler: gluon::Handler + Send + Sync + 'static {
                     };
                     drop(gluon_data);
                     self.scroll_smooth(ctx, param_delta, param_source, param_timestamp)
+                        .instrument(
+                            tracing::trace_span!(
+                                "dispatching", interface = "MouseHandler", method =
+                                "scroll_smooth", method_id = 10u32
+                            ),
+                        )
                         .await;
                 }
                 11u32 => {
@@ -316,6 +347,12 @@ pub trait MouseHandlerHandler: gluon::Handler + Send + Sync + 'static {
                     };
                     drop(gluon_data);
                     self.scroll_discrete(ctx, param_delta, param_source, param_timestamp)
+                        .instrument(
+                            tracing::trace_span!(
+                                "dispatching", interface = "MouseHandler", method =
+                                "scroll_discrete", method_id = 11u32
+                            ),
+                        )
                         .await;
                 }
                 _ => {}
