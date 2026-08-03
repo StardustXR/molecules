@@ -1,4 +1,4 @@
-use gluon::{Context, Object};
+use gluon::{Context, Interface, Object};
 use pion_binder::PionBinderDevice;
 use stardust_xr_fusion::Result;
 use stardust_xr_fusion::{
@@ -8,18 +8,18 @@ use stardust_xr_fusion::{
 	spatial::{PartialTransform, Spatial, SpatialRef},
 };
 pub use stardust_xr_molecules_protocols::reparentable::{
-	EXTERNAL_PROTOCOL as REPARENTABLE_PROTOCOL, ReparentHandle, ReparentKeepalive,
+	ReparentHandle, ReparentKeepalive,
 	ReparentKeepaliveHandler, Reparentable as ReparentableProxy,
+	ReparentableLocked as ReparentableLockedProxy,
 };
 use stardust_xr_molecules_protocols::reparentable::{
-	EXTERNAL_PROTOCOL, ReparentHandleHandler, ReparentableHandler,
+	ReparentHandleHandler, ReparentableHandler, ReparentableLockedHandler,
 };
-use std::sync::atomic::AtomicU64;
 use std::{
 	any::Any,
 	sync::{
 		Arc, Mutex,
-		atomic::{AtomicBool, Ordering},
+		atomic::{AtomicBool, AtomicU64, Ordering},
 	},
 };
 
@@ -86,12 +86,14 @@ impl std::fmt::Debug for ReparentableInner {
 	}
 }
 static HANDLE_ID: AtomicU64 = AtomicU64::new(0);
-impl ReparentableHandler for ReparentableInner {
-	async fn reparent_locking(
+
+impl ReparentableInner {
+	/// Shared reparent logic used by both the locking and non-locking interfaces.
+	async fn do_reparent(
 		&self,
-		_ctx: Context,
 		new_parent: SpatialRef,
 		keepalive: ReparentKeepalive,
+		locking: bool,
 	) -> Option<ReparentHandle> {
 		let mut guard = self.state.reparent_state.lock().unwrap();
 		match &*guard {
@@ -108,35 +110,11 @@ impl ReparentableHandler for ReparentableInner {
 						id: HANDLE_ID.fetch_add(1, Ordering::Relaxed),
 					})
 					.to_service();
-				*guard = ReparentState::Locked(handle_obj.id, keepalive.clone());
-				drop(guard);
-				Some(ReparentHandle::from_handler(&handle_obj))
-			}
-			ReparentState::Locked(_, _) => None,
-		}
-	}
-	async fn reparent(
-		&self,
-		_ctx: Context,
-		new_parent: SpatialRef,
-		keepalive: ReparentKeepalive,
-	) -> Option<ReparentHandle> {
-		let mut guard = self.state.reparent_state.lock().unwrap();
-		match &*guard {
-			ReparentState::Idle | ReparentState::NonLocked(_, _) => {
-				if let ReparentState::NonLocked(_, old) = &*guard {
-					let _ = old.reparent_stolen();
-				}
-				let _ = self.state.spatial.set_parent_in_place(new_parent);
-				self.state.reparented.store(true, Ordering::Relaxed);
-				let handle_obj = self
-					.dev
-					.register_object(ReparentHandleInner {
-						state: self.state.clone(),
-						id: HANDLE_ID.fetch_add(1, Ordering::Relaxed),
-					})
-					.to_service();
-				*guard = ReparentState::NonLocked(handle_obj.id, keepalive.clone());
+				*guard = if locking {
+					ReparentState::Locked(handle_obj.id, keepalive.clone())
+				} else {
+					ReparentState::NonLocked(handle_obj.id, keepalive.clone())
+				};
 				drop(guard);
 				Some(ReparentHandle::from_handler(&handle_obj))
 			}
@@ -144,10 +122,42 @@ impl ReparentableHandler for ReparentableInner {
 		}
 	}
 }
+impl ReparentableHandler for ReparentableInner {
+	async fn reparent(
+		&self,
+		_ctx: Context,
+		new_parent: SpatialRef,
+		keepalive: ReparentKeepalive,
+	) -> Option<ReparentHandle> {
+		self.do_reparent(new_parent, keepalive, false).await
+	}
+}
+
+/// Locking counterpart to [`ReparentableInner`], registered as its own gluon object so the
+/// two capabilities can be permission-gated independently. Delegates the actual work to the
+/// [`ReparentableInner`] it wraps.
+#[derive(gluon::Handler)]
+struct ReparentableLockedInner(Arc<ReparentableInner>);
+impl std::fmt::Debug for ReparentableLockedInner {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("ReparentableLockedInner").finish()
+	}
+}
+impl ReparentableLockedHandler for ReparentableLockedInner {
+	async fn reparent_locking(
+		&self,
+		_ctx: Context,
+		new_parent: SpatialRef,
+		keepalive: ReparentKeepalive,
+	) -> Option<ReparentHandle> {
+		self.0.do_reparent(new_parent, keepalive, true).await
+	}
+}
 
 pub struct Reparentable {
 	state: Arc<SharedState>,
 	_obj: Object<ReparentableInner>,
+	_locked_obj: Object<ReparentableLockedInner>,
 	_queryable: QueryableObject,
 	_guards: Vec<Box<dyn Any + Send + Sync>>,
 }
@@ -172,16 +182,30 @@ impl Reparentable {
 		};
 		let reparentable_obj = client.pion_device().register_object(reparentable_inner);
 
+		let reparentable_locked_obj = client
+			.pion_device()
+			.register_object(ReparentableLockedInner(Arc::clone(&reparentable_obj)));
+
 		let queryable = QueryableObject::new(client, spatial, field).await?;
 		let guard = queryable
-			.add_interface(&reparentable_obj, EXTERNAL_PROTOCOL.protocol_name)
+			.add_interface(&reparentable_obj, ReparentableProxy::ID)
+			.await?;
+		let locked_guard = queryable
+			.add_interface(
+				&reparentable_locked_obj,
+				ReparentableLockedProxy::ID,
+			)
 			.await?;
 
 		Ok(Reparentable {
 			state,
 			_obj: reparentable_obj,
+			_locked_obj: reparentable_locked_obj,
 			_queryable: queryable,
-			_guards: vec![Box::new(guard) as Box<dyn Any + Send + Sync>],
+			_guards: vec![
+				Box::new(guard) as Box<dyn Any + Send + Sync>,
+				Box::new(locked_guard) as Box<dyn Any + Send + Sync>,
+			],
 		})
 	}
 
@@ -272,7 +296,7 @@ async fn reparentable_query() {
 		.points_query(PointsQuery {
 			handler: PointsQueryHandler::from_handler(&handler),
 			interfaces: vec![InterfaceDependency {
-				id: REPARENTABLE_PROTOCOL.protocol_name.into(),
+				id: ReparentableProxy::ID.into(),
 				optional: false,
 			}],
 			reference_spatial: root.clone(),

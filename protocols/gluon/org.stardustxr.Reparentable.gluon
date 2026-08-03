@@ -1,9 +1,13 @@
 import "org.stardustxr.Spatial" as spatial
 
 /// Interface for moving other objects
-interface Reparentable {
+interface ReparentableLocked {
 	/// Reparents this object, locking this Reparentable to make sure others can't steal this reparent, can steal from non-locking reparents
 	reparent_locking(new_parent: Ref<spatial::SpatialRef>, keepalive: Ref<ReparentKeepalive>) -> (handle: Option<Ref<ReparentHandle>>)
+}
+
+/// Interface for moving other objects
+interface Reparentable {
 	/// Reparents this object, this is non-locking, others can steal this reparent
 	reparent(new_parent: Ref<spatial::SpatialRef>, keepalive: Ref<ReparentKeepalive>) -> (handle: Option<Ref<ReparentHandle>>)
 }

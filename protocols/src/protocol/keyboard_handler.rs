@@ -129,6 +129,9 @@ impl gluon::Convertable for KeyboardHandler {
         self.obj.write_owned(gluon_data)
     }
 }
+impl gluon::Interface for KeyboardHandler {
+    const ID: &'static str = "org.stardustxr.KeyboardHandler.KeyboardHandler";
+}
 impl KeyboardHandler {
     pub fn key(
         &self,

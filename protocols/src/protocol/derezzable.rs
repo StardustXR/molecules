@@ -30,6 +30,9 @@ impl gluon::Convertable for Derezzable {
         self.obj.write_owned(gluon_data)
     }
 }
+impl gluon::Interface for Derezzable {
+    const ID: &'static str = "org.stardustxr.Derezzable.Derezzable";
+}
 impl Derezzable {
     pub fn derez(&self) -> Result<(), gluon::SendError> {
         tracing::trace!(interface = "Derezzable", method = "derez", "→");

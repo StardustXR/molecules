@@ -98,6 +98,9 @@ impl gluon::Convertable for MouseHandler {
         self.obj.write_owned(gluon_data)
     }
 }
+impl gluon::Interface for MouseHandler {
+    const ID: &'static str = "org.stardustxr.MouseHandler.MouseHandler";
+}
 impl MouseHandler {
     ///delta is +Y == Up +X == Right
     pub fn motion(
