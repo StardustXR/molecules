@@ -107,6 +107,43 @@ impl MouseHandler {
         &self,
         delta: stardust_xr_protocol::types::proxies::Vec2F,
         timestamp: impl Into<Option<stardust_xr_protocol::types::Timestamp>>,
+    ) -> gluon::OnewayFuture {
+        use gluon::ToObjectOrRef as _;
+        let delta: stardust_xr_protocol::types::proxied::Vec2F = delta.into();
+        let timestamp: Option<stardust_xr_protocol::types::Timestamp> = timestamp.into();
+        tracing::trace!(
+            interface = "MouseHandler", method = "motion", ? delta, ? timestamp, "→"
+        );
+        let mut gluon_builder = gluon::DataBuilder::new();
+        let (gluon_ret_handler, mut gluon_recv) = gluon::ReturnHandler::new();
+        let gluon_ret = self.obj.device().register_object(gluon_ret_handler);
+        let gluon_ret: Option<gluon::ObjectOrRef> = Some(
+            gluon_ret.to_binder_object_or_ref(),
+        );
+        if let Err(err) = gluon_ret.write(&mut gluon_builder) {
+            return err.into();
+        }
+        if let Err(err) = delta.write(&mut gluon_builder) {
+            return err.into();
+        }
+        if let Err(err) = timestamp.write(&mut gluon_builder) {
+            return err.into();
+        }
+        if let Err(err) = self
+            .obj
+            .device()
+            .transact_one_way(&self.obj, 8u32, gluon_builder.to_payload())
+        {
+            return err.into();
+        }
+        gluon_recv.into()
+    }
+    ///delta is +Y == Up +X == Right
+    ///Fire and Forget, events sent to different objects may not be handled in order
+    pub fn motion_event(
+        &self,
+        delta: stardust_xr_protocol::types::proxies::Vec2F,
+        timestamp: impl Into<Option<stardust_xr_protocol::types::Timestamp>>,
     ) -> Result<(), gluon::SendError> {
         let delta: stardust_xr_protocol::types::proxied::Vec2F = delta.into();
         let timestamp: Option<stardust_xr_protocol::types::Timestamp> = timestamp.into();
@@ -114,6 +151,8 @@ impl MouseHandler {
             interface = "MouseHandler", method = "motion", ? delta, ? timestamp, "→"
         );
         let mut gluon_builder = gluon::DataBuilder::new();
+        let gluon_ret: Option<gluon::ObjectOrRef> = None;
+        gluon_ret.write(&mut gluon_builder)?;
         delta.write(&mut gluon_builder)?;
         timestamp.write(&mut gluon_builder)?;
         self.obj.device().transact_one_way(&self.obj, 8u32, gluon_builder.to_payload())?;
@@ -121,6 +160,49 @@ impl MouseHandler {
     }
     ///button code from `input_event_codes.h`
     pub fn button(
+        &self,
+        button: impl Into<u32>,
+        pressed: impl Into<bool>,
+        timestamp: impl Into<Option<stardust_xr_protocol::types::Timestamp>>,
+    ) -> gluon::OnewayFuture {
+        use gluon::ToObjectOrRef as _;
+        let button: u32 = button.into();
+        let pressed: bool = pressed.into();
+        let timestamp: Option<stardust_xr_protocol::types::Timestamp> = timestamp.into();
+        tracing::trace!(
+            interface = "MouseHandler", method = "button", ? button, ? pressed, ?
+            timestamp, "→"
+        );
+        let mut gluon_builder = gluon::DataBuilder::new();
+        let (gluon_ret_handler, mut gluon_recv) = gluon::ReturnHandler::new();
+        let gluon_ret = self.obj.device().register_object(gluon_ret_handler);
+        let gluon_ret: Option<gluon::ObjectOrRef> = Some(
+            gluon_ret.to_binder_object_or_ref(),
+        );
+        if let Err(err) = gluon_ret.write(&mut gluon_builder) {
+            return err.into();
+        }
+        if let Err(err) = button.write(&mut gluon_builder) {
+            return err.into();
+        }
+        if let Err(err) = pressed.write(&mut gluon_builder) {
+            return err.into();
+        }
+        if let Err(err) = timestamp.write(&mut gluon_builder) {
+            return err.into();
+        }
+        if let Err(err) = self
+            .obj
+            .device()
+            .transact_one_way(&self.obj, 9u32, gluon_builder.to_payload())
+        {
+            return err.into();
+        }
+        gluon_recv.into()
+    }
+    ///button code from `input_event_codes.h`
+    ///Fire and Forget, events sent to different objects may not be handled in order
+    pub fn button_event(
         &self,
         button: impl Into<u32>,
         pressed: impl Into<bool>,
@@ -134,6 +216,8 @@ impl MouseHandler {
             timestamp, "→"
         );
         let mut gluon_builder = gluon::DataBuilder::new();
+        let gluon_ret: Option<gluon::ObjectOrRef> = None;
+        gluon_ret.write(&mut gluon_builder)?;
         button.write(&mut gluon_builder)?;
         pressed.write(&mut gluon_builder)?;
         timestamp.write(&mut gluon_builder)?;
@@ -142,6 +226,49 @@ impl MouseHandler {
     }
     ///delta is +Y == Up +X == Right
     pub fn scroll_smooth(
+        &self,
+        delta: stardust_xr_protocol::types::proxies::Vec2F,
+        source: impl Into<ScrollSource>,
+        timestamp: impl Into<Option<stardust_xr_protocol::types::Timestamp>>,
+    ) -> gluon::OnewayFuture {
+        use gluon::ToObjectOrRef as _;
+        let delta: stardust_xr_protocol::types::proxied::Vec2F = delta.into();
+        let source: ScrollSource = source.into();
+        let timestamp: Option<stardust_xr_protocol::types::Timestamp> = timestamp.into();
+        tracing::trace!(
+            interface = "MouseHandler", method = "scroll_smooth", ? delta, ? source, ?
+            timestamp, "→"
+        );
+        let mut gluon_builder = gluon::DataBuilder::new();
+        let (gluon_ret_handler, mut gluon_recv) = gluon::ReturnHandler::new();
+        let gluon_ret = self.obj.device().register_object(gluon_ret_handler);
+        let gluon_ret: Option<gluon::ObjectOrRef> = Some(
+            gluon_ret.to_binder_object_or_ref(),
+        );
+        if let Err(err) = gluon_ret.write(&mut gluon_builder) {
+            return err.into();
+        }
+        if let Err(err) = delta.write(&mut gluon_builder) {
+            return err.into();
+        }
+        if let Err(err) = source.write(&mut gluon_builder) {
+            return err.into();
+        }
+        if let Err(err) = timestamp.write(&mut gluon_builder) {
+            return err.into();
+        }
+        if let Err(err) = self
+            .obj
+            .device()
+            .transact_one_way(&self.obj, 10u32, gluon_builder.to_payload())
+        {
+            return err.into();
+        }
+        gluon_recv.into()
+    }
+    ///delta is +Y == Up +X == Right
+    ///Fire and Forget, events sent to different objects may not be handled in order
+    pub fn scroll_smooth_event(
         &self,
         delta: stardust_xr_protocol::types::proxies::Vec2F,
         source: impl Into<ScrollSource>,
@@ -155,6 +282,8 @@ impl MouseHandler {
             timestamp, "→"
         );
         let mut gluon_builder = gluon::DataBuilder::new();
+        let gluon_ret: Option<gluon::ObjectOrRef> = None;
+        gluon_ret.write(&mut gluon_builder)?;
         delta.write(&mut gluon_builder)?;
         source.write(&mut gluon_builder)?;
         timestamp.write(&mut gluon_builder)?;
@@ -169,6 +298,49 @@ impl MouseHandler {
         delta: stardust_xr_protocol::types::proxies::Vec2F,
         source: impl Into<ScrollSource>,
         timestamp: impl Into<Option<stardust_xr_protocol::types::Timestamp>>,
+    ) -> gluon::OnewayFuture {
+        use gluon::ToObjectOrRef as _;
+        let delta: stardust_xr_protocol::types::proxied::Vec2F = delta.into();
+        let source: ScrollSource = source.into();
+        let timestamp: Option<stardust_xr_protocol::types::Timestamp> = timestamp.into();
+        tracing::trace!(
+            interface = "MouseHandler", method = "scroll_discrete", ? delta, ? source, ?
+            timestamp, "→"
+        );
+        let mut gluon_builder = gluon::DataBuilder::new();
+        let (gluon_ret_handler, mut gluon_recv) = gluon::ReturnHandler::new();
+        let gluon_ret = self.obj.device().register_object(gluon_ret_handler);
+        let gluon_ret: Option<gluon::ObjectOrRef> = Some(
+            gluon_ret.to_binder_object_or_ref(),
+        );
+        if let Err(err) = gluon_ret.write(&mut gluon_builder) {
+            return err.into();
+        }
+        if let Err(err) = delta.write(&mut gluon_builder) {
+            return err.into();
+        }
+        if let Err(err) = source.write(&mut gluon_builder) {
+            return err.into();
+        }
+        if let Err(err) = timestamp.write(&mut gluon_builder) {
+            return err.into();
+        }
+        if let Err(err) = self
+            .obj
+            .device()
+            .transact_one_way(&self.obj, 11u32, gluon_builder.to_payload())
+        {
+            return err.into();
+        }
+        gluon_recv.into()
+    }
+    ///delta is +Y == Up +X == Right
+    ///Fire and Forget, events sent to different objects may not be handled in order
+    pub fn scroll_discrete_event(
+        &self,
+        delta: stardust_xr_protocol::types::proxies::Vec2F,
+        source: impl Into<ScrollSource>,
+        timestamp: impl Into<Option<stardust_xr_protocol::types::Timestamp>>,
     ) -> Result<(), gluon::SendError> {
         let delta: stardust_xr_protocol::types::proxied::Vec2F = delta.into();
         let source: ScrollSource = source.into();
@@ -178,6 +350,8 @@ impl MouseHandler {
             timestamp, "→"
         );
         let mut gluon_builder = gluon::DataBuilder::new();
+        let gluon_ret: Option<gluon::ObjectOrRef> = None;
+        gluon_ret.write(&mut gluon_builder)?;
         delta.write(&mut gluon_builder)?;
         source.write(&mut gluon_builder)?;
         timestamp.write(&mut gluon_builder)?;
@@ -268,6 +442,9 @@ pub trait MouseHandlerHandler: gluon::Handler + Send + Sync + 'static {
         async move {
             match transaction_code {
                 8u32 => {
+                    let gluon_ret: Option<gluon::ObjectOrRef> = gluon::Convertable::read(
+                        &mut gluon_data,
+                    )?;
                     let __wire_param_delta: stardust_xr_protocol::types::proxied::Vec2F = gluon::Convertable::read(
                         &mut gluon_data,
                     )?;
@@ -289,8 +466,19 @@ pub trait MouseHandlerHandler: gluon::Handler + Send + Sync + 'static {
                             ),
                         )
                         .await;
+                    if let Some(obj) = gluon_ret {
+                        obj.device()
+                            .transact_one_way(
+                                &obj,
+                                0,
+                                gluon::DataBuilder::new().to_payload(),
+                            )?;
+                    }
                 }
                 9u32 => {
+                    let gluon_ret: Option<gluon::ObjectOrRef> = gluon::Convertable::read(
+                        &mut gluon_data,
+                    )?;
                     let param_button = gluon::Convertable::read(&mut gluon_data)?;
                     let param_pressed = gluon::Convertable::read(&mut gluon_data)?;
                     let param_timestamp = gluon::Convertable::read(&mut gluon_data)?;
@@ -307,8 +495,19 @@ pub trait MouseHandlerHandler: gluon::Handler + Send + Sync + 'static {
                             ),
                         )
                         .await;
+                    if let Some(obj) = gluon_ret {
+                        obj.device()
+                            .transact_one_way(
+                                &obj,
+                                0,
+                                gluon::DataBuilder::new().to_payload(),
+                            )?;
+                    }
                 }
                 10u32 => {
+                    let gluon_ret: Option<gluon::ObjectOrRef> = gluon::Convertable::read(
+                        &mut gluon_data,
+                    )?;
                     let __wire_param_delta: stardust_xr_protocol::types::proxied::Vec2F = gluon::Convertable::read(
                         &mut gluon_data,
                     )?;
@@ -332,8 +531,19 @@ pub trait MouseHandlerHandler: gluon::Handler + Send + Sync + 'static {
                             ),
                         )
                         .await;
+                    if let Some(obj) = gluon_ret {
+                        obj.device()
+                            .transact_one_way(
+                                &obj,
+                                0,
+                                gluon::DataBuilder::new().to_payload(),
+                            )?;
+                    }
                 }
                 11u32 => {
+                    let gluon_ret: Option<gluon::ObjectOrRef> = gluon::Convertable::read(
+                        &mut gluon_data,
+                    )?;
                     let __wire_param_delta: stardust_xr_protocol::types::proxied::Vec2F = gluon::Convertable::read(
                         &mut gluon_data,
                     )?;
@@ -357,6 +567,14 @@ pub trait MouseHandlerHandler: gluon::Handler + Send + Sync + 'static {
                             ),
                         )
                         .await;
+                    if let Some(obj) = gluon_ret {
+                        obj.device()
+                            .transact_one_way(
+                                &obj,
+                                0,
+                                gluon::DataBuilder::new().to_payload(),
+                            )?;
+                    }
                 }
                 _ => {}
             }

@@ -34,9 +34,33 @@ impl gluon::Interface for Derezzable {
     const ID: &'static str = "org.stardustxr.Derezzable.Derezzable";
 }
 impl Derezzable {
-    pub fn derez(&self) -> Result<(), gluon::SendError> {
+    pub fn derez(&self) -> gluon::OnewayFuture {
+        use gluon::ToObjectOrRef as _;
         tracing::trace!(interface = "Derezzable", method = "derez", "→");
         let mut gluon_builder = gluon::DataBuilder::new();
+        let (gluon_ret_handler, mut gluon_recv) = gluon::ReturnHandler::new();
+        let gluon_ret = self.obj.device().register_object(gluon_ret_handler);
+        let gluon_ret: Option<gluon::ObjectOrRef> = Some(
+            gluon_ret.to_binder_object_or_ref(),
+        );
+        if let Err(err) = gluon_ret.write(&mut gluon_builder) {
+            return err.into();
+        }
+        if let Err(err) = self
+            .obj
+            .device()
+            .transact_one_way(&self.obj, 8u32, gluon_builder.to_payload())
+        {
+            return err.into();
+        }
+        gluon_recv.into()
+    }
+    ///Fire and Forget, events sent to different objects may not be handled in order
+    pub fn derez_event(&self) -> Result<(), gluon::SendError> {
+        tracing::trace!(interface = "Derezzable", method = "derez", "→");
+        let mut gluon_builder = gluon::DataBuilder::new();
+        let gluon_ret: Option<gluon::ObjectOrRef> = None;
+        gluon_ret.write(&mut gluon_builder)?;
         self.obj.device().transact_one_way(&self.obj, 8u32, gluon_builder.to_payload())?;
         Ok(())
     }
@@ -92,6 +116,9 @@ pub trait DerezzableHandler: gluon::Handler + Send + Sync + 'static {
         async move {
             match transaction_code {
                 8u32 => {
+                    let gluon_ret: Option<gluon::ObjectOrRef> = gluon::Convertable::read(
+                        &mut gluon_data,
+                    )?;
                     tracing::trace!(
                         interface = "Derezzable", method = "derez", "dispatching"
                     );
@@ -104,6 +131,14 @@ pub trait DerezzableHandler: gluon::Handler + Send + Sync + 'static {
                             ),
                         )
                         .await;
+                    if let Some(obj) = gluon_ret {
+                        obj.device()
+                            .transact_one_way(
+                                &obj,
+                                0,
+                                gluon::DataBuilder::new().to_payload(),
+                            )?;
+                    }
                 }
                 _ => {}
             }

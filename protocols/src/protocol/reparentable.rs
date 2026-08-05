@@ -359,11 +359,38 @@ impl gluon::Interface for ReparentKeepalive {
 }
 impl ReparentKeepalive {
     ///The reparent this object was associated with was stolen, the ReparentHandle becomes invalid
-    pub fn reparent_stolen(&self) -> Result<(), gluon::SendError> {
+    pub fn reparent_stolen(&self) -> gluon::OnewayFuture {
+        use gluon::ToObjectOrRef as _;
         tracing::trace!(
             interface = "ReparentKeepalive", method = "reparent_stolen", "→"
         );
         let mut gluon_builder = gluon::DataBuilder::new();
+        let (gluon_ret_handler, mut gluon_recv) = gluon::ReturnHandler::new();
+        let gluon_ret = self.obj.device().register_object(gluon_ret_handler);
+        let gluon_ret: Option<gluon::ObjectOrRef> = Some(
+            gluon_ret.to_binder_object_or_ref(),
+        );
+        if let Err(err) = gluon_ret.write(&mut gluon_builder) {
+            return err.into();
+        }
+        if let Err(err) = self
+            .obj
+            .device()
+            .transact_one_way(&self.obj, 8u32, gluon_builder.to_payload())
+        {
+            return err.into();
+        }
+        gluon_recv.into()
+    }
+    ///The reparent this object was associated with was stolen, the ReparentHandle becomes invalid
+    ///Fire and Forget, events sent to different objects may not be handled in order
+    pub fn reparent_stolen_event(&self) -> Result<(), gluon::SendError> {
+        tracing::trace!(
+            interface = "ReparentKeepalive", method = "reparent_stolen", "→"
+        );
+        let mut gluon_builder = gluon::DataBuilder::new();
+        let gluon_ret: Option<gluon::ObjectOrRef> = None;
+        gluon_ret.write(&mut gluon_builder)?;
         self.obj.device().transact_one_way(&self.obj, 8u32, gluon_builder.to_payload())?;
         Ok(())
     }
@@ -425,6 +452,9 @@ pub trait ReparentKeepaliveHandler: gluon::Handler + Send + Sync + 'static {
         async move {
             match transaction_code {
                 8u32 => {
+                    let gluon_ret: Option<gluon::ObjectOrRef> = gluon::Convertable::read(
+                        &mut gluon_data,
+                    )?;
                     tracing::trace!(
                         interface = "ReparentKeepalive", method = "reparent_stolen",
                         "dispatching"
@@ -438,6 +468,14 @@ pub trait ReparentKeepaliveHandler: gluon::Handler + Send + Sync + 'static {
                             ),
                         )
                         .await;
+                    if let Some(obj) = gluon_ret {
+                        obj.device()
+                            .transact_one_way(
+                                &obj,
+                                0,
+                                gluon::DataBuilder::new().to_payload(),
+                            )?;
+                    }
                 }
                 _ => {}
             }
@@ -475,6 +513,39 @@ impl ReparentHandle {
     pub fn reset_transform(
         &self,
         relative_to: impl Into<stardust_xr_protocol::spatial::SpatialRef>,
+    ) -> gluon::OnewayFuture {
+        use gluon::ToObjectOrRef as _;
+        let relative_to: stardust_xr_protocol::spatial::SpatialRef = relative_to.into();
+        tracing::trace!(
+            interface = "ReparentHandle", method = "reset_transform", ? relative_to,
+            "→"
+        );
+        let mut gluon_builder = gluon::DataBuilder::new();
+        let (gluon_ret_handler, mut gluon_recv) = gluon::ReturnHandler::new();
+        let gluon_ret = self.obj.device().register_object(gluon_ret_handler);
+        let gluon_ret: Option<gluon::ObjectOrRef> = Some(
+            gluon_ret.to_binder_object_or_ref(),
+        );
+        if let Err(err) = gluon_ret.write(&mut gluon_builder) {
+            return err.into();
+        }
+        if let Err(err) = relative_to.write(&mut gluon_builder) {
+            return err.into();
+        }
+        if let Err(err) = self
+            .obj
+            .device()
+            .transact_one_way(&self.obj, 8u32, gluon_builder.to_payload())
+        {
+            return err.into();
+        }
+        gluon_recv.into()
+    }
+    ///Set transform relative to the given SpatialRef to IDENTITY
+    ///Fire and Forget, events sent to different objects may not be handled in order
+    pub fn reset_transform_event(
+        &self,
+        relative_to: impl Into<stardust_xr_protocol::spatial::SpatialRef>,
     ) -> Result<(), gluon::SendError> {
         let relative_to: stardust_xr_protocol::spatial::SpatialRef = relative_to.into();
         tracing::trace!(
@@ -482,6 +553,8 @@ impl ReparentHandle {
             "→"
         );
         let mut gluon_builder = gluon::DataBuilder::new();
+        let gluon_ret: Option<gluon::ObjectOrRef> = None;
+        gluon_ret.write(&mut gluon_builder)?;
         relative_to.write(&mut gluon_builder)?;
         self.obj.device().transact_one_way(&self.obj, 8u32, gluon_builder.to_payload())?;
         Ok(())
@@ -543,6 +616,9 @@ pub trait ReparentHandleHandler: gluon::Handler + Send + Sync + 'static {
         async move {
             match transaction_code {
                 8u32 => {
+                    let gluon_ret: Option<gluon::ObjectOrRef> = gluon::Convertable::read(
+                        &mut gluon_data,
+                    )?;
                     let param_relative_to = gluon::Convertable::read(&mut gluon_data)?;
                     tracing::trace!(
                         interface = "ReparentHandle", method = "reset_transform", ?
@@ -557,6 +633,14 @@ pub trait ReparentHandleHandler: gluon::Handler + Send + Sync + 'static {
                             ),
                         )
                         .await;
+                    if let Some(obj) = gluon_ret {
+                        obj.device()
+                            .transact_one_way(
+                                &obj,
+                                0,
+                                gluon::DataBuilder::new().to_payload(),
+                            )?;
+                    }
                 }
                 _ => {}
             }

@@ -137,6 +137,42 @@ impl KeyboardHandler {
         &self,
         event: impl Into<KeyEvent>,
         timestamp: impl Into<Option<stardust_xr_protocol::types::Timestamp>>,
+    ) -> gluon::OnewayFuture {
+        use gluon::ToObjectOrRef as _;
+        let event: KeyEvent = event.into();
+        let timestamp: Option<stardust_xr_protocol::types::Timestamp> = timestamp.into();
+        tracing::trace!(
+            interface = "KeyboardHandler", method = "key", ? event, ? timestamp, "→"
+        );
+        let mut gluon_builder = gluon::DataBuilder::new();
+        let (gluon_ret_handler, mut gluon_recv) = gluon::ReturnHandler::new();
+        let gluon_ret = self.obj.device().register_object(gluon_ret_handler);
+        let gluon_ret: Option<gluon::ObjectOrRef> = Some(
+            gluon_ret.to_binder_object_or_ref(),
+        );
+        if let Err(err) = gluon_ret.write(&mut gluon_builder) {
+            return err.into();
+        }
+        if let Err(err) = event.write(&mut gluon_builder) {
+            return err.into();
+        }
+        if let Err(err) = timestamp.write(&mut gluon_builder) {
+            return err.into();
+        }
+        if let Err(err) = self
+            .obj
+            .device()
+            .transact_one_way(&self.obj, 8u32, gluon_builder.to_payload())
+        {
+            return err.into();
+        }
+        gluon_recv.into()
+    }
+    ///Fire and Forget, events sent to different objects may not be handled in order
+    pub fn key_event(
+        &self,
+        event: impl Into<KeyEvent>,
+        timestamp: impl Into<Option<stardust_xr_protocol::types::Timestamp>>,
     ) -> Result<(), gluon::SendError> {
         let event: KeyEvent = event.into();
         let timestamp: Option<stardust_xr_protocol::types::Timestamp> = timestamp.into();
@@ -144,6 +180,8 @@ impl KeyboardHandler {
             interface = "KeyboardHandler", method = "key", ? event, ? timestamp, "→"
         );
         let mut gluon_builder = gluon::DataBuilder::new();
+        let gluon_ret: Option<gluon::ObjectOrRef> = None;
+        gluon_ret.write(&mut gluon_builder)?;
         event.write(&mut gluon_builder)?;
         timestamp.write(&mut gluon_builder)?;
         self.obj.device().transact_one_way(&self.obj, 8u32, gluon_builder.to_payload())?;
@@ -206,6 +244,9 @@ pub trait KeyboardHandlerHandler: gluon::Handler + Send + Sync + 'static {
         async move {
             match transaction_code {
                 8u32 => {
+                    let gluon_ret: Option<gluon::ObjectOrRef> = gluon::Convertable::read(
+                        &mut gluon_data,
+                    )?;
                     let param_event = gluon::Convertable::read(&mut gluon_data)?;
                     let param_timestamp = gluon::Convertable::read(&mut gluon_data)?;
                     tracing::trace!(
@@ -221,6 +262,14 @@ pub trait KeyboardHandlerHandler: gluon::Handler + Send + Sync + 'static {
                             ),
                         )
                         .await;
+                    if let Some(obj) = gluon_ret {
+                        obj.device()
+                            .transact_one_way(
+                                &obj,
+                                0,
+                                gluon::DataBuilder::new().to_payload(),
+                            )?;
+                    }
                 }
                 _ => {}
             }
