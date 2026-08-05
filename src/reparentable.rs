@@ -8,8 +8,7 @@ use stardust_xr_fusion::{
 	spatial::{PartialTransform, Spatial, SpatialRef},
 };
 pub use stardust_xr_molecules_protocols::reparentable::{
-	ReparentHandle, ReparentKeepalive,
-	ReparentKeepaliveHandler, Reparentable as ReparentableProxy,
+	ReparentHandle, ReparentKeepalive, ReparentKeepaliveHandler, Reparentable as ReparentableProxy,
 	ReparentableLocked as ReparentableLockedProxy,
 };
 use stardust_xr_molecules_protocols::reparentable::{
@@ -18,15 +17,16 @@ use stardust_xr_molecules_protocols::reparentable::{
 use std::{
 	any::Any,
 	sync::{
-		Arc, Mutex,
+		Arc,
 		atomic::{AtomicBool, AtomicU64, Ordering},
 	},
 };
+use tokio::sync::Mutex;
 
 enum ReparentState {
 	Idle,
 	NonLocked(u64, ReparentKeepalive),
-    // we want to keep this handle alive, even if we don't use it directly
+	// we want to keep this handle alive, even if we don't use it directly
 	Locked(u64, #[allow(dead_code)] ReparentKeepalive),
 }
 
@@ -57,21 +57,24 @@ impl ReparentHandleHandler for ReparentHandleInner {
 }
 impl Drop for ReparentHandleInner {
 	fn drop(&mut self) {
-		let mut guard = self.state.reparent_state.lock().unwrap();
-		let still_current = match &*guard {
-			ReparentState::NonLocked(current, _) | ReparentState::Locked(current, _) => {
-				*current == self.id
+		let state = self.state.clone();
+		let id = self.id;
+		tokio::spawn(async move {
+			let mut guard = state.reparent_state.lock().await;
+			let still_current = match &*guard {
+				ReparentState::NonLocked(current, _) | ReparentState::Locked(current, _) => {
+					*current == id
+				}
+				ReparentState::Idle => false,
+			};
+			if still_current {
+				*guard = ReparentState::Idle;
+				state.reparented.store(false, Ordering::Relaxed);
+				let _ = state
+					.spatial
+					.set_parent_in_place(state.initial_parent.clone());
 			}
-			ReparentState::Idle => false,
-		};
-		if still_current {
-			*guard = ReparentState::Idle;
-			self.state.reparented.store(false, Ordering::Relaxed);
-			let _ = self
-				.state
-				.spatial
-				.set_parent_in_place(self.state.initial_parent.clone());
-		}
+		});
 	}
 }
 
@@ -95,13 +98,16 @@ impl ReparentableInner {
 		keepalive: ReparentKeepalive,
 		locking: bool,
 	) -> Option<ReparentHandle> {
-		let mut guard = self.state.reparent_state.lock().unwrap();
+		let mut guard = self.state.reparent_state.lock().await;
 		match &*guard {
 			ReparentState::Idle | ReparentState::NonLocked(_, _) => {
 				if let ReparentState::NonLocked(_, old) = &*guard {
 					let _ = old.reparent_stolen();
 				}
-				let _ = self.state.spatial.set_parent_in_place(new_parent);
+				if let Err(err) = self.state.spatial.set_parent_in_place(new_parent).await {
+					tracing::error!("failed to send reparent parenting oneway: {err}");
+					return None;
+				}
 				self.state.reparented.store(true, Ordering::Relaxed);
 				let handle_obj = self
 					.dev
@@ -191,10 +197,7 @@ impl Reparentable {
 			.add_interface(&reparentable_obj, ReparentableProxy::ID)
 			.await?;
 		let locked_guard = queryable
-			.add_interface(
-				&reparentable_locked_obj,
-				ReparentableLockedProxy::ID,
-			)
+			.add_interface(&reparentable_locked_obj, ReparentableLockedProxy::ID)
 			.await?;
 
 		Ok(Reparentable {
@@ -214,7 +217,18 @@ impl Reparentable {
 	}
 
 	pub fn unparent(&self) {
-		let mut guard = self.state.reparent_state.lock().unwrap();
+		let state = self.state.clone();
+		tokio::spawn(async move {
+			let mut guard = state.reparent_state.lock().await;
+			*guard = ReparentState::Idle;
+			state.reparented.store(false, Ordering::Relaxed);
+			let _ = state
+				.spatial
+				.set_parent_in_place(state.initial_parent.clone());
+		});
+	}
+	pub async fn unparent_waiting(&self) {
+		let mut guard = self.state.reparent_state.lock().await;
 		*guard = ReparentState::Idle;
 		self.state.reparented.store(false, Ordering::Relaxed);
 		let _ = self
