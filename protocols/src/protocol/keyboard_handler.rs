@@ -133,7 +133,7 @@ impl gluon::Interface for KeyboardHandler {
     const ID: &'static str = "org.stardustxr.KeyboardHandler.KeyboardHandler";
 }
 impl KeyboardHandler {
-    pub fn key(
+    pub fn key_waiting(
         &self,
         event: impl Into<KeyEvent>,
         timestamp: impl Into<Option<stardust_xr_protocol::types::Timestamp>>,
@@ -169,7 +169,7 @@ impl KeyboardHandler {
         gluon_recv.into()
     }
     ///Fire and Forget, events sent to different objects may not be handled in order
-    pub fn key_event(
+    pub fn key(
         &self,
         event: impl Into<KeyEvent>,
         timestamp: impl Into<Option<stardust_xr_protocol::types::Timestamp>>,

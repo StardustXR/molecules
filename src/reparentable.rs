@@ -104,7 +104,7 @@ impl ReparentableInner {
 				if let ReparentState::NonLocked(_, old) = &*guard {
 					let _ = old.reparent_stolen();
 				}
-				if let Err(err) = self.state.spatial.set_parent_in_place(new_parent).await {
+				if let Err(err) = self.state.spatial.set_parent_in_place_waiting(new_parent).await {
 					tracing::error!("failed to send reparent parenting oneway: {err}");
 					return None;
 				}

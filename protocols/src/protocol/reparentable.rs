@@ -359,7 +359,7 @@ impl gluon::Interface for ReparentKeepalive {
 }
 impl ReparentKeepalive {
     ///The reparent this object was associated with was stolen, the ReparentHandle becomes invalid
-    pub fn reparent_stolen(&self) -> gluon::OnewayFuture {
+    pub fn reparent_stolen_waiting(&self) -> gluon::OnewayFuture {
         use gluon::ToObjectOrRef as _;
         tracing::trace!(
             interface = "ReparentKeepalive", method = "reparent_stolen", "→"
@@ -384,7 +384,7 @@ impl ReparentKeepalive {
     }
     ///The reparent this object was associated with was stolen, the ReparentHandle becomes invalid
     ///Fire and Forget, events sent to different objects may not be handled in order
-    pub fn reparent_stolen_event(&self) -> Result<(), gluon::SendError> {
+    pub fn reparent_stolen(&self) -> Result<(), gluon::SendError> {
         tracing::trace!(
             interface = "ReparentKeepalive", method = "reparent_stolen", "→"
         );
@@ -510,7 +510,7 @@ impl gluon::Interface for ReparentHandle {
 }
 impl ReparentHandle {
     ///Set transform relative to the given SpatialRef to IDENTITY
-    pub fn reset_transform(
+    pub fn reset_transform_waiting(
         &self,
         relative_to: impl Into<stardust_xr_protocol::spatial::SpatialRef>,
     ) -> gluon::OnewayFuture {
@@ -543,7 +543,7 @@ impl ReparentHandle {
     }
     ///Set transform relative to the given SpatialRef to IDENTITY
     ///Fire and Forget, events sent to different objects may not be handled in order
-    pub fn reset_transform_event(
+    pub fn reset_transform(
         &self,
         relative_to: impl Into<stardust_xr_protocol::spatial::SpatialRef>,
     ) -> Result<(), gluon::SendError> {

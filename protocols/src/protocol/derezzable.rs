@@ -34,7 +34,7 @@ impl gluon::Interface for Derezzable {
     const ID: &'static str = "org.stardustxr.Derezzable.Derezzable";
 }
 impl Derezzable {
-    pub fn derez(&self) -> gluon::OnewayFuture {
+    pub fn derez_waiting(&self) -> gluon::OnewayFuture {
         use gluon::ToObjectOrRef as _;
         tracing::trace!(interface = "Derezzable", method = "derez", "→");
         let mut gluon_builder = gluon::DataBuilder::new();
@@ -56,7 +56,7 @@ impl Derezzable {
         gluon_recv.into()
     }
     ///Fire and Forget, events sent to different objects may not be handled in order
-    pub fn derez_event(&self) -> Result<(), gluon::SendError> {
+    pub fn derez(&self) -> Result<(), gluon::SendError> {
         tracing::trace!(interface = "Derezzable", method = "derez", "→");
         let mut gluon_builder = gluon::DataBuilder::new();
         let gluon_ret: Option<gluon::ObjectOrRef> = None;

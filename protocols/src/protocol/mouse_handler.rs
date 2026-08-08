@@ -103,7 +103,7 @@ impl gluon::Interface for MouseHandler {
 }
 impl MouseHandler {
     ///delta is +Y == Up +X == Right
-    pub fn motion(
+    pub fn motion_waiting(
         &self,
         delta: stardust_xr_protocol::types::proxies::Vec2F,
         timestamp: impl Into<Option<stardust_xr_protocol::types::Timestamp>>,
@@ -140,7 +140,7 @@ impl MouseHandler {
     }
     ///delta is +Y == Up +X == Right
     ///Fire and Forget, events sent to different objects may not be handled in order
-    pub fn motion_event(
+    pub fn motion(
         &self,
         delta: stardust_xr_protocol::types::proxies::Vec2F,
         timestamp: impl Into<Option<stardust_xr_protocol::types::Timestamp>>,
@@ -159,7 +159,7 @@ impl MouseHandler {
         Ok(())
     }
     ///button code from `input_event_codes.h`
-    pub fn button(
+    pub fn button_waiting(
         &self,
         button: impl Into<u32>,
         pressed: impl Into<bool>,
@@ -202,7 +202,7 @@ impl MouseHandler {
     }
     ///button code from `input_event_codes.h`
     ///Fire and Forget, events sent to different objects may not be handled in order
-    pub fn button_event(
+    pub fn button(
         &self,
         button: impl Into<u32>,
         pressed: impl Into<bool>,
@@ -225,7 +225,7 @@ impl MouseHandler {
         Ok(())
     }
     ///delta is +Y == Up +X == Right
-    pub fn scroll_smooth(
+    pub fn scroll_smooth_waiting(
         &self,
         delta: stardust_xr_protocol::types::proxies::Vec2F,
         source: impl Into<ScrollSource>,
@@ -268,7 +268,7 @@ impl MouseHandler {
     }
     ///delta is +Y == Up +X == Right
     ///Fire and Forget, events sent to different objects may not be handled in order
-    pub fn scroll_smooth_event(
+    pub fn scroll_smooth(
         &self,
         delta: stardust_xr_protocol::types::proxies::Vec2F,
         source: impl Into<ScrollSource>,
@@ -293,7 +293,7 @@ impl MouseHandler {
         Ok(())
     }
     ///delta is +Y == Up +X == Right
-    pub fn scroll_discrete(
+    pub fn scroll_discrete_waiting(
         &self,
         delta: stardust_xr_protocol::types::proxies::Vec2F,
         source: impl Into<ScrollSource>,
@@ -336,7 +336,7 @@ impl MouseHandler {
     }
     ///delta is +Y == Up +X == Right
     ///Fire and Forget, events sent to different objects may not be handled in order
-    pub fn scroll_discrete_event(
+    pub fn scroll_discrete(
         &self,
         delta: stardust_xr_protocol::types::proxies::Vec2F,
         source: impl Into<ScrollSource>,
