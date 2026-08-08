@@ -13,6 +13,7 @@ pub mod mouse_handler;
 pub mod multi;
 pub mod reparentable;
 pub mod touch_plane;
+mod drop_handlers;
 
 pub use derezzable::Derezzable;
 pub use exposure::Exposure;

@@ -1,6 +1,7 @@
-use gluon::{Context, Interface, Object};
+use gluon::{Context, Interface, Liveness, Object};
 use pion_binder::PionBinderDevice;
 use stardust_xr_fusion::Result;
+use stardust_xr_fusion::spatial::Transform;
 use stardust_xr_fusion::{
 	client::{Client, ClientHandler},
 	fields::Field,
@@ -14,6 +15,7 @@ pub use stardust_xr_molecules_protocols::reparentable::{
 use stardust_xr_molecules_protocols::reparentable::{
 	ReparentHandleHandler, ReparentableHandler, ReparentableLockedHandler,
 };
+use std::ops::DerefMut;
 use std::{
 	any::Any,
 	sync::{
@@ -23,11 +25,16 @@ use std::{
 };
 use tokio::sync::Mutex;
 
+use crate::drop_handlers::AbortOnDrop;
+
 enum ReparentState {
 	Idle,
 	NonLocked(u64, ReparentKeepalive),
 	// we want to keep this handle alive, even if we don't use it directly
-	Locked(u64, #[allow(dead_code)] ReparentKeepalive),
+	Locked {
+		id: u64,
+		initial_transform: Transform,
+	},
 }
 
 struct SharedState {
@@ -36,10 +43,29 @@ struct SharedState {
 	reparent_state: Mutex<ReparentState>,
 	reparented: AtomicBool,
 }
+impl SharedState {
+	async fn abort_reparent(&self) {
+		_ = self
+			.spatial
+			.set_parent_in_place(self.initial_parent.clone());
+		if let ReparentState::Locked {
+			id: _,
+			initial_transform,
+		} = std::mem::replace(
+			self.reparent_state.lock().await.deref_mut(),
+			ReparentState::Idle,
+		) {
+			_ = self.spatial.set_local_transform(initial_transform);
+		}
+		self.reparented.store(false, Ordering::Relaxed);
+	}
+}
 
 #[derive(gluon::Handler)]
 struct ReparentHandleInner {
 	state: Arc<SharedState>,
+	keepalive: ReparentKeepalive,
+	_keepalive_abort_task: Option<AbortOnDrop>,
 	id: u64,
 }
 impl std::fmt::Debug for ReparentHandleInner {
@@ -62,9 +88,8 @@ impl Drop for ReparentHandleInner {
 		tokio::spawn(async move {
 			let mut guard = state.reparent_state.lock().await;
 			let still_current = match &*guard {
-				ReparentState::NonLocked(current, _) | ReparentState::Locked(current, _) => {
-					*current == id
-				}
+				ReparentState::NonLocked(current, _)
+				| ReparentState::Locked { id: current, .. } => *current == id,
 				ReparentState::Idle => false,
 			};
 			if still_current {
@@ -104,27 +129,53 @@ impl ReparentableInner {
 				if let ReparentState::NonLocked(_, old) = &*guard {
 					let _ = old.reparent_stolen();
 				}
-				if let Err(err) = self.state.spatial.set_parent_in_place_waiting(new_parent).await {
+				let initial_transform = self
+					.state
+					.spatial
+					.get_relative_transform(self.state.initial_parent.clone())
+					.await
+					.ok()?
+					.ok()?;
+				if let Err(err) = self
+					.state
+					.spatial
+					.set_parent_in_place_waiting(new_parent)
+					.await
+				{
 					tracing::error!("failed to send reparent parenting oneway: {err}");
 					return None;
 				}
 				self.state.reparented.store(true, Ordering::Relaxed);
+				let task = locking.then(|| {
+					let state = self.state.clone();
+					let keepalive = keepalive.clone();
+					tokio::spawn(async move {
+						keepalive.death_notification().await;
+						state.abort_reparent().await;
+					})
+					.into()
+				});
 				let handle_obj = self
 					.dev
 					.register_object(ReparentHandleInner {
 						state: self.state.clone(),
 						id: HANDLE_ID.fetch_add(1, Ordering::Relaxed),
+						keepalive,
+						_keepalive_abort_task: task,
 					})
 					.to_service();
 				*guard = if locking {
-					ReparentState::Locked(handle_obj.id, keepalive.clone())
+					ReparentState::Locked {
+						id: handle_obj.id,
+						initial_transform,
+					}
 				} else {
-					ReparentState::NonLocked(handle_obj.id, keepalive.clone())
+					ReparentState::NonLocked(handle_obj.id, handle_obj.keepalive.clone())
 				};
 				drop(guard);
 				Some(ReparentHandle::from_handler(&handle_obj))
 			}
-			ReparentState::Locked(_, _) => None,
+			ReparentState::Locked { .. } => None,
 		}
 	}
 }
@@ -234,7 +285,15 @@ impl Reparentable {
 		let _ = self
 			.state
 			.spatial
-			.set_parent_in_place(self.state.initial_parent.clone());
+			.set_parent_in_place_waiting(self.state.initial_parent.clone())
+			.await;
+	}
+	pub fn abort_reparent(&self) {
+		let state = self.state.clone();
+		tokio::spawn(async move { state.abort_reparent().await });
+	}
+	pub async fn abort_reparent_waiting(&self) {
+		self.state.abort_reparent().await
 	}
 }
 
