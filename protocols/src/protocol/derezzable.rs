@@ -10,22 +10,22 @@ pub mod proxies {
 }
 #[derive(Debug, Clone)]
 pub struct Derezzable {
-    obj: gluon::ObjectOrRef,
+    obj: gluon::Ref,
 }
 impl gluon::Convertable for Derezzable {
-    fn write<'a, 'b: 'a>(
-        &'b self,
-        gluon_data: &mut gluon::DataBuilder<'a>,
+    fn write(
+        &self,
+        gluon_data: &mut gluon::DataBuilder,
     ) -> Result<(), gluon::WriteError> {
         self.obj.write(gluon_data)
     }
     fn read(gluon_data: &mut gluon::DataReader) -> Result<Self, gluon::ReadError> {
-        let obj = gluon::ObjectOrRef::read(gluon_data)?;
-        Ok(Derezzable::from_object_or_ref(obj))
+        let obj = gluon::Ref::read(gluon_data)?;
+        Ok(Derezzable::from_ref(obj))
     }
     fn write_owned(
         self,
-        gluon_data: &mut gluon::DataBuilder<'_>,
+        gluon_data: &mut gluon::DataBuilder,
     ) -> Result<(), gluon::WriteError> {
         self.obj.write_owned(gluon_data)
     }
@@ -33,30 +33,32 @@ impl gluon::Convertable for Derezzable {
 impl gluon::Interface for Derezzable {
     const ID: &'static str = "org.stardustxr.Derezzable.Derezzable";
 }
+///Carries the per-interface bound for [`gluon::RefExt`]'s handler constructors: only a handler implementing this interface's handler trait can be passed to them.
+impl<H: DerezzableHandler> gluon::HandledBy<H> for Derezzable {}
+impl gluon::RefExt for Derezzable {
+    fn from_ref(obj: gluon::Ref) -> Derezzable {
+        Derezzable { obj }
+    }
+}
 impl Derezzable {
     pub fn derez(&self) -> Result<(), gluon::SendError> {
         tracing::trace!(interface = "Derezzable", method = "derez", "→");
         let mut gluon_builder = gluon::DataBuilder::new();
-        self.obj.device().transact_one_way(&self.obj, 8u32, gluon_builder.to_payload())?;
+        gluon::transact(&self.obj, 8u32, gluon_builder)?;
         Ok(())
     }
-    pub fn from_handler<H: DerezzableHandler>(
-        obj: &impl gluon::OwnedObjectRef<H>,
-    ) -> Derezzable {
-        Derezzable::from_object_or_ref(gluon::OwnedObjectRef::to_object_or_ref(obj))
-    }
-    ///only use this when you know the binder ref implements this interface, else the consquences are for you to find out
-    pub fn from_object_or_ref(obj: gluon::ObjectOrRef) -> Derezzable {
+    ///only use this when you know the ref leads to something implementing this interface, else the consquences are for you to find out
+    pub fn from_ref(obj: gluon::Ref) -> Derezzable {
         Derezzable { obj }
     }
 }
-impl From<Derezzable> for gluon::ObjectOrRef {
+impl From<Derezzable> for gluon::Ref {
     fn from(value: Derezzable) -> Self {
         value.obj
     }
 }
-impl gluon::ToObjectOrRef for Derezzable {
-    fn to_binder_object_or_ref(&self) -> gluon::ObjectOrRef {
+impl gluon::ToRef for Derezzable {
+    fn to_ref(&self) -> gluon::Ref {
         self.obj.clone()
     }
 }

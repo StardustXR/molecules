@@ -10,28 +10,35 @@ pub mod proxies {
 }
 #[derive(Debug, Clone)]
 pub struct ReparentableLocked {
-    obj: gluon::ObjectOrRef,
+    obj: gluon::Ref,
 }
 impl gluon::Convertable for ReparentableLocked {
-    fn write<'a, 'b: 'a>(
-        &'b self,
-        gluon_data: &mut gluon::DataBuilder<'a>,
+    fn write(
+        &self,
+        gluon_data: &mut gluon::DataBuilder,
     ) -> Result<(), gluon::WriteError> {
         self.obj.write(gluon_data)
     }
     fn read(gluon_data: &mut gluon::DataReader) -> Result<Self, gluon::ReadError> {
-        let obj = gluon::ObjectOrRef::read(gluon_data)?;
-        Ok(ReparentableLocked::from_object_or_ref(obj))
+        let obj = gluon::Ref::read(gluon_data)?;
+        Ok(ReparentableLocked::from_ref(obj))
     }
     fn write_owned(
         self,
-        gluon_data: &mut gluon::DataBuilder<'_>,
+        gluon_data: &mut gluon::DataBuilder,
     ) -> Result<(), gluon::WriteError> {
         self.obj.write_owned(gluon_data)
     }
 }
 impl gluon::Interface for ReparentableLocked {
     const ID: &'static str = "org.stardustxr.Reparentable.ReparentableLocked";
+}
+///Carries the per-interface bound for [`gluon::RefExt`]'s handler constructors: only a handler implementing this interface's handler trait can be passed to them.
+impl<H: ReparentableLockedHandler> gluon::HandledBy<H> for ReparentableLocked {}
+impl gluon::RefExt for ReparentableLocked {
+    fn from_ref(obj: gluon::Ref) -> ReparentableLocked {
+        ReparentableLocked { obj }
+    }
 }
 impl ReparentableLocked {
     ///Reparents this object, locking this Reparentable to make sure others can't steal this reparent, can steal from non-locking reparents
@@ -48,13 +55,13 @@ impl ReparentableLocked {
         );
         let mut gluon_builder = gluon::DataBuilder::new();
         let (gluon_ret_handler, mut gluon_recv) = gluon::ReturnHandler::new();
-        let gluon_ret = self.obj.device().register_object(gluon_ret_handler);
-        gluon_builder.write_binder(&gluon_ret)?;
+        let (gluon_ret_node, gluon_ret) = gluon::Node::new(gluon_ret_handler)?;
+        gluon_builder.write_ref(&gluon_ret)?;
         new_parent.write(&mut gluon_builder)?;
         keepalive.write(&mut gluon_builder)?;
-        self.obj.device().transact_one_way(&self.obj, 8u32, gluon_builder.to_payload())?;
-        let transaction = gluon_recv.recv().await.unwrap();
-        let mut reader = gluon::DataReader::from_payload(transaction.payload);
+        gluon::transact(&self.obj, 8u32, gluon_builder)?;
+        let mut reader = gluon_recv.recv().await.unwrap();
+        drop(gluon_ret_node);
         let __ret_handle = gluon::Convertable::read(&mut reader)?;
         tracing::trace!(
             interface = "ReparentableLocked", method = "reparent_locking", ?
@@ -62,25 +69,18 @@ impl ReparentableLocked {
         );
         Ok(__ret_handle)
     }
-    pub fn from_handler<H: ReparentableLockedHandler>(
-        obj: &impl gluon::OwnedObjectRef<H>,
-    ) -> ReparentableLocked {
-        ReparentableLocked::from_object_or_ref(
-            gluon::OwnedObjectRef::to_object_or_ref(obj),
-        )
-    }
-    ///only use this when you know the binder ref implements this interface, else the consquences are for you to find out
-    pub fn from_object_or_ref(obj: gluon::ObjectOrRef) -> ReparentableLocked {
+    ///only use this when you know the ref leads to something implementing this interface, else the consquences are for you to find out
+    pub fn from_ref(obj: gluon::Ref) -> ReparentableLocked {
         ReparentableLocked { obj }
     }
 }
-impl From<ReparentableLocked> for gluon::ObjectOrRef {
+impl From<ReparentableLocked> for gluon::Ref {
     fn from(value: ReparentableLocked) -> Self {
         value.obj
     }
 }
-impl gluon::ToObjectOrRef for ReparentableLocked {
-    fn to_binder_object_or_ref(&self) -> gluon::ObjectOrRef {
+impl gluon::ToRef for ReparentableLocked {
+    fn to_ref(&self) -> gluon::Ref {
         self.obj.clone()
     }
 }
@@ -135,7 +135,7 @@ pub trait ReparentableLockedHandler: gluon::Handler + Send + Sync + 'static {
         async move {
             match transaction_code {
                 8u32 => {
-                    let return_callback = gluon_data.read_binder()?;
+                    let return_callback = gluon_data.read_ref()?;
                     let param_new_parent = gluon::Convertable::read(&mut gluon_data)?;
                     let param_keepalive = gluon::Convertable::read(&mut gluon_data)?;
                     tracing::trace!(
@@ -176,28 +176,35 @@ pub trait ReparentableLockedHandler: gluon::Handler + Send + Sync + 'static {
 }
 #[derive(Debug, Clone)]
 pub struct Reparentable {
-    obj: gluon::ObjectOrRef,
+    obj: gluon::Ref,
 }
 impl gluon::Convertable for Reparentable {
-    fn write<'a, 'b: 'a>(
-        &'b self,
-        gluon_data: &mut gluon::DataBuilder<'a>,
+    fn write(
+        &self,
+        gluon_data: &mut gluon::DataBuilder,
     ) -> Result<(), gluon::WriteError> {
         self.obj.write(gluon_data)
     }
     fn read(gluon_data: &mut gluon::DataReader) -> Result<Self, gluon::ReadError> {
-        let obj = gluon::ObjectOrRef::read(gluon_data)?;
-        Ok(Reparentable::from_object_or_ref(obj))
+        let obj = gluon::Ref::read(gluon_data)?;
+        Ok(Reparentable::from_ref(obj))
     }
     fn write_owned(
         self,
-        gluon_data: &mut gluon::DataBuilder<'_>,
+        gluon_data: &mut gluon::DataBuilder,
     ) -> Result<(), gluon::WriteError> {
         self.obj.write_owned(gluon_data)
     }
 }
 impl gluon::Interface for Reparentable {
     const ID: &'static str = "org.stardustxr.Reparentable.Reparentable";
+}
+///Carries the per-interface bound for [`gluon::RefExt`]'s handler constructors: only a handler implementing this interface's handler trait can be passed to them.
+impl<H: ReparentableHandler> gluon::HandledBy<H> for Reparentable {}
+impl gluon::RefExt for Reparentable {
+    fn from_ref(obj: gluon::Ref) -> Reparentable {
+        Reparentable { obj }
+    }
 }
 impl Reparentable {
     ///Reparents this object, this is non-locking, others can steal this reparent
@@ -214,36 +221,31 @@ impl Reparentable {
         );
         let mut gluon_builder = gluon::DataBuilder::new();
         let (gluon_ret_handler, mut gluon_recv) = gluon::ReturnHandler::new();
-        let gluon_ret = self.obj.device().register_object(gluon_ret_handler);
-        gluon_builder.write_binder(&gluon_ret)?;
+        let (gluon_ret_node, gluon_ret) = gluon::Node::new(gluon_ret_handler)?;
+        gluon_builder.write_ref(&gluon_ret)?;
         new_parent.write(&mut gluon_builder)?;
         keepalive.write(&mut gluon_builder)?;
-        self.obj.device().transact_one_way(&self.obj, 8u32, gluon_builder.to_payload())?;
-        let transaction = gluon_recv.recv().await.unwrap();
-        let mut reader = gluon::DataReader::from_payload(transaction.payload);
+        gluon::transact(&self.obj, 8u32, gluon_builder)?;
+        let mut reader = gluon_recv.recv().await.unwrap();
+        drop(gluon_ret_node);
         let __ret_handle = gluon::Convertable::read(&mut reader)?;
         tracing::trace!(
             interface = "Reparentable", method = "reparent", ? __ret_handle, "←"
         );
         Ok(__ret_handle)
     }
-    pub fn from_handler<H: ReparentableHandler>(
-        obj: &impl gluon::OwnedObjectRef<H>,
-    ) -> Reparentable {
-        Reparentable::from_object_or_ref(gluon::OwnedObjectRef::to_object_or_ref(obj))
-    }
-    ///only use this when you know the binder ref implements this interface, else the consquences are for you to find out
-    pub fn from_object_or_ref(obj: gluon::ObjectOrRef) -> Reparentable {
+    ///only use this when you know the ref leads to something implementing this interface, else the consquences are for you to find out
+    pub fn from_ref(obj: gluon::Ref) -> Reparentable {
         Reparentable { obj }
     }
 }
-impl From<Reparentable> for gluon::ObjectOrRef {
+impl From<Reparentable> for gluon::Ref {
     fn from(value: Reparentable) -> Self {
         value.obj
     }
 }
-impl gluon::ToObjectOrRef for Reparentable {
-    fn to_binder_object_or_ref(&self) -> gluon::ObjectOrRef {
+impl gluon::ToRef for Reparentable {
+    fn to_ref(&self) -> gluon::Ref {
         self.obj.clone()
     }
 }
@@ -298,7 +300,7 @@ pub trait ReparentableHandler: gluon::Handler + Send + Sync + 'static {
         async move {
             match transaction_code {
                 8u32 => {
-                    let return_callback = gluon_data.read_binder()?;
+                    let return_callback = gluon_data.read_ref()?;
                     let param_new_parent = gluon::Convertable::read(&mut gluon_data)?;
                     let param_keepalive = gluon::Convertable::read(&mut gluon_data)?;
                     tracing::trace!(
@@ -334,28 +336,35 @@ pub trait ReparentableHandler: gluon::Handler + Send + Sync + 'static {
 }
 #[derive(Debug, Clone)]
 pub struct ReparentKeepalive {
-    obj: gluon::ObjectOrRef,
+    obj: gluon::Ref,
 }
 impl gluon::Convertable for ReparentKeepalive {
-    fn write<'a, 'b: 'a>(
-        &'b self,
-        gluon_data: &mut gluon::DataBuilder<'a>,
+    fn write(
+        &self,
+        gluon_data: &mut gluon::DataBuilder,
     ) -> Result<(), gluon::WriteError> {
         self.obj.write(gluon_data)
     }
     fn read(gluon_data: &mut gluon::DataReader) -> Result<Self, gluon::ReadError> {
-        let obj = gluon::ObjectOrRef::read(gluon_data)?;
-        Ok(ReparentKeepalive::from_object_or_ref(obj))
+        let obj = gluon::Ref::read(gluon_data)?;
+        Ok(ReparentKeepalive::from_ref(obj))
     }
     fn write_owned(
         self,
-        gluon_data: &mut gluon::DataBuilder<'_>,
+        gluon_data: &mut gluon::DataBuilder,
     ) -> Result<(), gluon::WriteError> {
         self.obj.write_owned(gluon_data)
     }
 }
 impl gluon::Interface for ReparentKeepalive {
     const ID: &'static str = "org.stardustxr.Reparentable.ReparentKeepalive";
+}
+///Carries the per-interface bound for [`gluon::RefExt`]'s handler constructors: only a handler implementing this interface's handler trait can be passed to them.
+impl<H: ReparentKeepaliveHandler> gluon::HandledBy<H> for ReparentKeepalive {}
+impl gluon::RefExt for ReparentKeepalive {
+    fn from_ref(obj: gluon::Ref) -> ReparentKeepalive {
+        ReparentKeepalive { obj }
+    }
 }
 impl ReparentKeepalive {
     ///The reparent this object was associated with was stolen, the ReparentHandle becomes invalid
@@ -364,28 +373,21 @@ impl ReparentKeepalive {
             interface = "ReparentKeepalive", method = "reparent_stolen", "→"
         );
         let mut gluon_builder = gluon::DataBuilder::new();
-        self.obj.device().transact_one_way(&self.obj, 8u32, gluon_builder.to_payload())?;
+        gluon::transact(&self.obj, 8u32, gluon_builder)?;
         Ok(())
     }
-    pub fn from_handler<H: ReparentKeepaliveHandler>(
-        obj: &impl gluon::OwnedObjectRef<H>,
-    ) -> ReparentKeepalive {
-        ReparentKeepalive::from_object_or_ref(
-            gluon::OwnedObjectRef::to_object_or_ref(obj),
-        )
-    }
-    ///only use this when you know the binder ref implements this interface, else the consquences are for you to find out
-    pub fn from_object_or_ref(obj: gluon::ObjectOrRef) -> ReparentKeepalive {
+    ///only use this when you know the ref leads to something implementing this interface, else the consquences are for you to find out
+    pub fn from_ref(obj: gluon::Ref) -> ReparentKeepalive {
         ReparentKeepalive { obj }
     }
 }
-impl From<ReparentKeepalive> for gluon::ObjectOrRef {
+impl From<ReparentKeepalive> for gluon::Ref {
     fn from(value: ReparentKeepalive) -> Self {
         value.obj
     }
 }
-impl gluon::ToObjectOrRef for ReparentKeepalive {
-    fn to_binder_object_or_ref(&self) -> gluon::ObjectOrRef {
+impl gluon::ToRef for ReparentKeepalive {
+    fn to_ref(&self) -> gluon::Ref {
         self.obj.clone()
     }
 }
@@ -447,28 +449,35 @@ pub trait ReparentKeepaliveHandler: gluon::Handler + Send + Sync + 'static {
 }
 #[derive(Debug, Clone)]
 pub struct ReparentHandle {
-    obj: gluon::ObjectOrRef,
+    obj: gluon::Ref,
 }
 impl gluon::Convertable for ReparentHandle {
-    fn write<'a, 'b: 'a>(
-        &'b self,
-        gluon_data: &mut gluon::DataBuilder<'a>,
+    fn write(
+        &self,
+        gluon_data: &mut gluon::DataBuilder,
     ) -> Result<(), gluon::WriteError> {
         self.obj.write(gluon_data)
     }
     fn read(gluon_data: &mut gluon::DataReader) -> Result<Self, gluon::ReadError> {
-        let obj = gluon::ObjectOrRef::read(gluon_data)?;
-        Ok(ReparentHandle::from_object_or_ref(obj))
+        let obj = gluon::Ref::read(gluon_data)?;
+        Ok(ReparentHandle::from_ref(obj))
     }
     fn write_owned(
         self,
-        gluon_data: &mut gluon::DataBuilder<'_>,
+        gluon_data: &mut gluon::DataBuilder,
     ) -> Result<(), gluon::WriteError> {
         self.obj.write_owned(gluon_data)
     }
 }
 impl gluon::Interface for ReparentHandle {
     const ID: &'static str = "org.stardustxr.Reparentable.ReparentHandle";
+}
+///Carries the per-interface bound for [`gluon::RefExt`]'s handler constructors: only a handler implementing this interface's handler trait can be passed to them.
+impl<H: ReparentHandleHandler> gluon::HandledBy<H> for ReparentHandle {}
+impl gluon::RefExt for ReparentHandle {
+    fn from_ref(obj: gluon::Ref) -> ReparentHandle {
+        ReparentHandle { obj }
+    }
 }
 impl ReparentHandle {
     ///Set transform relative to the given SpatialRef to IDENTITY
@@ -483,26 +492,21 @@ impl ReparentHandle {
         );
         let mut gluon_builder = gluon::DataBuilder::new();
         relative_to.write(&mut gluon_builder)?;
-        self.obj.device().transact_one_way(&self.obj, 8u32, gluon_builder.to_payload())?;
+        gluon::transact(&self.obj, 8u32, gluon_builder)?;
         Ok(())
     }
-    pub fn from_handler<H: ReparentHandleHandler>(
-        obj: &impl gluon::OwnedObjectRef<H>,
-    ) -> ReparentHandle {
-        ReparentHandle::from_object_or_ref(gluon::OwnedObjectRef::to_object_or_ref(obj))
-    }
-    ///only use this when you know the binder ref implements this interface, else the consquences are for you to find out
-    pub fn from_object_or_ref(obj: gluon::ObjectOrRef) -> ReparentHandle {
+    ///only use this when you know the ref leads to something implementing this interface, else the consquences are for you to find out
+    pub fn from_ref(obj: gluon::Ref) -> ReparentHandle {
         ReparentHandle { obj }
     }
 }
-impl From<ReparentHandle> for gluon::ObjectOrRef {
+impl From<ReparentHandle> for gluon::Ref {
     fn from(value: ReparentHandle) -> Self {
         value.obj
     }
 }
-impl gluon::ToObjectOrRef for ReparentHandle {
-    fn to_binder_object_or_ref(&self) -> gluon::ObjectOrRef {
+impl gluon::ToRef for ReparentHandle {
+    fn to_ref(&self) -> gluon::Ref {
         self.obj.clone()
     }
 }

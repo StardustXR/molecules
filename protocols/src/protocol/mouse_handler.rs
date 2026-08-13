@@ -24,9 +24,9 @@ pub enum ScrollSource {
     WheelTilt,
 }
 impl gluon::Convertable for ScrollSource {
-    fn write<'a, 'b: 'a>(
-        &'b self,
-        gluon_data: &mut gluon::DataBuilder<'a>,
+    fn write(
+        &self,
+        gluon_data: &mut gluon::DataBuilder,
     ) -> Result<(), gluon::WriteError> {
         match self {
             ScrollSource::Wheel => {
@@ -57,7 +57,7 @@ impl gluon::Convertable for ScrollSource {
     }
     fn write_owned(
         self,
-        gluon_data: &mut gluon::DataBuilder<'_>,
+        gluon_data: &mut gluon::DataBuilder,
     ) -> Result<(), gluon::WriteError> {
         match self {
             ScrollSource::Wheel => {
@@ -78,28 +78,35 @@ impl gluon::Convertable for ScrollSource {
 }
 #[derive(Debug, Clone)]
 pub struct MouseHandler {
-    obj: gluon::ObjectOrRef,
+    obj: gluon::Ref,
 }
 impl gluon::Convertable for MouseHandler {
-    fn write<'a, 'b: 'a>(
-        &'b self,
-        gluon_data: &mut gluon::DataBuilder<'a>,
+    fn write(
+        &self,
+        gluon_data: &mut gluon::DataBuilder,
     ) -> Result<(), gluon::WriteError> {
         self.obj.write(gluon_data)
     }
     fn read(gluon_data: &mut gluon::DataReader) -> Result<Self, gluon::ReadError> {
-        let obj = gluon::ObjectOrRef::read(gluon_data)?;
-        Ok(MouseHandler::from_object_or_ref(obj))
+        let obj = gluon::Ref::read(gluon_data)?;
+        Ok(MouseHandler::from_ref(obj))
     }
     fn write_owned(
         self,
-        gluon_data: &mut gluon::DataBuilder<'_>,
+        gluon_data: &mut gluon::DataBuilder,
     ) -> Result<(), gluon::WriteError> {
         self.obj.write_owned(gluon_data)
     }
 }
 impl gluon::Interface for MouseHandler {
     const ID: &'static str = "org.stardustxr.MouseHandler.MouseHandler";
+}
+///Carries the per-interface bound for [`gluon::RefExt`]'s handler constructors: only a handler implementing this interface's handler trait can be passed to them.
+impl<H: MouseHandlerHandler> gluon::HandledBy<H> for MouseHandler {}
+impl gluon::RefExt for MouseHandler {
+    fn from_ref(obj: gluon::Ref) -> MouseHandler {
+        MouseHandler { obj }
+    }
 }
 impl MouseHandler {
     ///delta is +Y == Up +X == Right
@@ -116,7 +123,7 @@ impl MouseHandler {
         let mut gluon_builder = gluon::DataBuilder::new();
         delta.write(&mut gluon_builder)?;
         timestamp.write(&mut gluon_builder)?;
-        self.obj.device().transact_one_way(&self.obj, 8u32, gluon_builder.to_payload())?;
+        gluon::transact(&self.obj, 8u32, gluon_builder)?;
         Ok(())
     }
     ///button code from `input_event_codes.h`
@@ -137,7 +144,7 @@ impl MouseHandler {
         button.write(&mut gluon_builder)?;
         pressed.write(&mut gluon_builder)?;
         timestamp.write(&mut gluon_builder)?;
-        self.obj.device().transact_one_way(&self.obj, 9u32, gluon_builder.to_payload())?;
+        gluon::transact(&self.obj, 9u32, gluon_builder)?;
         Ok(())
     }
     ///delta is +Y == Up +X == Right
@@ -158,9 +165,7 @@ impl MouseHandler {
         delta.write(&mut gluon_builder)?;
         source.write(&mut gluon_builder)?;
         timestamp.write(&mut gluon_builder)?;
-        self.obj
-            .device()
-            .transact_one_way(&self.obj, 10u32, gluon_builder.to_payload())?;
+        gluon::transact(&self.obj, 10u32, gluon_builder)?;
         Ok(())
     }
     ///delta is +Y == Up +X == Right
@@ -181,28 +186,21 @@ impl MouseHandler {
         delta.write(&mut gluon_builder)?;
         source.write(&mut gluon_builder)?;
         timestamp.write(&mut gluon_builder)?;
-        self.obj
-            .device()
-            .transact_one_way(&self.obj, 11u32, gluon_builder.to_payload())?;
+        gluon::transact(&self.obj, 11u32, gluon_builder)?;
         Ok(())
     }
-    pub fn from_handler<H: MouseHandlerHandler>(
-        obj: &impl gluon::OwnedObjectRef<H>,
-    ) -> MouseHandler {
-        MouseHandler::from_object_or_ref(gluon::OwnedObjectRef::to_object_or_ref(obj))
-    }
-    ///only use this when you know the binder ref implements this interface, else the consquences are for you to find out
-    pub fn from_object_or_ref(obj: gluon::ObjectOrRef) -> MouseHandler {
+    ///only use this when you know the ref leads to something implementing this interface, else the consquences are for you to find out
+    pub fn from_ref(obj: gluon::Ref) -> MouseHandler {
         MouseHandler { obj }
     }
 }
-impl From<MouseHandler> for gluon::ObjectOrRef {
+impl From<MouseHandler> for gluon::Ref {
     fn from(value: MouseHandler) -> Self {
         value.obj
     }
 }
-impl gluon::ToObjectOrRef for MouseHandler {
-    fn to_binder_object_or_ref(&self) -> gluon::ObjectOrRef {
+impl gluon::ToRef for MouseHandler {
+    fn to_ref(&self) -> gluon::Ref {
         self.obj.clone()
     }
 }

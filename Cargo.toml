@@ -9,6 +9,14 @@ license = "MIT"
 repository = "https://github.com/StardustXR/molecules/"
 homepage = "https://stardustxr.org"
 
+[patch."https://github.com/technobaboo/gluon"]
+gluon.path = "../gluon/wire"
+gluon-codegen.path = "../gluon/codegen-rust"
+
+[patch."https://github.com/StardustXR/core.git"]
+stardust-xr-protocol.path = "../core/protocol"
+stardust-xr-fusion.path = "../core/fusion"
+
 [workspace]
 members = ["protocols"]
 
@@ -40,6 +48,3 @@ git = "https://github.com/technobaboo/gluon"
 tokio = { version = "1.38.0", features = ["full"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 tracing-tracy = "0.11.4"
-
-[dependencies.pion-binder]
-git = "https://github.com/technobaboo/pion"

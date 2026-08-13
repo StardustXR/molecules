@@ -31,9 +31,9 @@ pub struct KeyEvent {
     pub keymap: stardust_xr_protocol::keymap::Keymap,
 }
 impl gluon::Convertable for KeyEvent {
-    fn write<'a, 'b: 'a>(
-        &'b self,
-        gluon_data: &mut gluon::DataBuilder<'a>,
+    fn write(
+        &self,
+        gluon_data: &mut gluon::DataBuilder,
     ) -> Result<(), gluon::WriteError> {
         self.keycode.write(gluon_data)?;
         self.pressed.write(gluon_data)?;
@@ -55,7 +55,7 @@ impl gluon::Convertable for KeyEvent {
     }
     fn write_owned(
         self,
-        gluon_data: &mut gluon::DataBuilder<'_>,
+        gluon_data: &mut gluon::DataBuilder,
     ) -> Result<(), gluon::WriteError> {
         self.keycode.write_owned(gluon_data)?;
         self.pressed.write_owned(gluon_data)?;
@@ -74,9 +74,9 @@ pub struct ModifierState {
     pub layout_group: u32,
 }
 impl gluon::Convertable for ModifierState {
-    fn write<'a, 'b: 'a>(
-        &'b self,
-        gluon_data: &mut gluon::DataBuilder<'a>,
+    fn write(
+        &self,
+        gluon_data: &mut gluon::DataBuilder,
     ) -> Result<(), gluon::WriteError> {
         self.depressed.write(gluon_data)?;
         self.latched.write(gluon_data)?;
@@ -98,7 +98,7 @@ impl gluon::Convertable for ModifierState {
     }
     fn write_owned(
         self,
-        gluon_data: &mut gluon::DataBuilder<'_>,
+        gluon_data: &mut gluon::DataBuilder,
     ) -> Result<(), gluon::WriteError> {
         self.depressed.write_owned(gluon_data)?;
         self.latched.write_owned(gluon_data)?;
@@ -109,28 +109,35 @@ impl gluon::Convertable for ModifierState {
 }
 #[derive(Debug, Clone)]
 pub struct KeyboardHandler {
-    obj: gluon::ObjectOrRef,
+    obj: gluon::Ref,
 }
 impl gluon::Convertable for KeyboardHandler {
-    fn write<'a, 'b: 'a>(
-        &'b self,
-        gluon_data: &mut gluon::DataBuilder<'a>,
+    fn write(
+        &self,
+        gluon_data: &mut gluon::DataBuilder,
     ) -> Result<(), gluon::WriteError> {
         self.obj.write(gluon_data)
     }
     fn read(gluon_data: &mut gluon::DataReader) -> Result<Self, gluon::ReadError> {
-        let obj = gluon::ObjectOrRef::read(gluon_data)?;
-        Ok(KeyboardHandler::from_object_or_ref(obj))
+        let obj = gluon::Ref::read(gluon_data)?;
+        Ok(KeyboardHandler::from_ref(obj))
     }
     fn write_owned(
         self,
-        gluon_data: &mut gluon::DataBuilder<'_>,
+        gluon_data: &mut gluon::DataBuilder,
     ) -> Result<(), gluon::WriteError> {
         self.obj.write_owned(gluon_data)
     }
 }
 impl gluon::Interface for KeyboardHandler {
     const ID: &'static str = "org.stardustxr.KeyboardHandler.KeyboardHandler";
+}
+///Carries the per-interface bound for [`gluon::RefExt`]'s handler constructors: only a handler implementing this interface's handler trait can be passed to them.
+impl<H: KeyboardHandlerHandler> gluon::HandledBy<H> for KeyboardHandler {}
+impl gluon::RefExt for KeyboardHandler {
+    fn from_ref(obj: gluon::Ref) -> KeyboardHandler {
+        KeyboardHandler { obj }
+    }
 }
 impl KeyboardHandler {
     pub fn key(
@@ -146,26 +153,21 @@ impl KeyboardHandler {
         let mut gluon_builder = gluon::DataBuilder::new();
         event.write(&mut gluon_builder)?;
         timestamp.write(&mut gluon_builder)?;
-        self.obj.device().transact_one_way(&self.obj, 8u32, gluon_builder.to_payload())?;
+        gluon::transact(&self.obj, 8u32, gluon_builder)?;
         Ok(())
     }
-    pub fn from_handler<H: KeyboardHandlerHandler>(
-        obj: &impl gluon::OwnedObjectRef<H>,
-    ) -> KeyboardHandler {
-        KeyboardHandler::from_object_or_ref(gluon::OwnedObjectRef::to_object_or_ref(obj))
-    }
-    ///only use this when you know the binder ref implements this interface, else the consquences are for you to find out
-    pub fn from_object_or_ref(obj: gluon::ObjectOrRef) -> KeyboardHandler {
+    ///only use this when you know the ref leads to something implementing this interface, else the consquences are for you to find out
+    pub fn from_ref(obj: gluon::Ref) -> KeyboardHandler {
         KeyboardHandler { obj }
     }
 }
-impl From<KeyboardHandler> for gluon::ObjectOrRef {
+impl From<KeyboardHandler> for gluon::Ref {
     fn from(value: KeyboardHandler) -> Self {
         value.obj
     }
 }
-impl gluon::ToObjectOrRef for KeyboardHandler {
-    fn to_binder_object_or_ref(&self) -> gluon::ObjectOrRef {
+impl gluon::ToRef for KeyboardHandler {
+    fn to_ref(&self) -> gluon::Ref {
         self.obj.clone()
     }
 }
