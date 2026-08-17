@@ -9,13 +9,13 @@ license = "MIT"
 repository = "https://github.com/StardustXR/molecules/"
 homepage = "https://stardustxr.org"
 
-[patch."https://github.com/technobaboo/gluon"]
-gluon.path = "../gluon/wire"
-gluon-codegen.path = "../gluon/codegen-rust"
+# [patch."https://github.com/technobaboo/gluon"]
+# gluon.path = "../gluon/wire"
+# gluon-codegen.path = "../gluon/codegen-rust"
 
-[patch."https://github.com/StardustXR/core.git"]
-stardust-xr-protocol.path = "../core/protocol"
-stardust-xr-fusion.path = "../core/fusion"
+# [patch."https://github.com/StardustXR/core.git"]
+# stardust-xr-protocol.path = "../core/protocol"
+# stardust-xr-fusion.path = "../core/fusion"
 
 [workspace]
 members = ["protocols"]
@@ -36,13 +36,14 @@ futures = { version = "0.3.32", default-features = false }
 [dependencies.stardust-xr-fusion]
 version = "0.51.0"
 git = "https://github.com/StardustXR/core.git"
-branch = "binder"
+branch = "refactor/strongipc"
 
 [dependencies.stardust-xr-molecules-protocols]
 path = "protocols"
 
 [dependencies.gluon]
 git = "https://github.com/technobaboo/gluon"
+branch = "refactor/strongipc"
 
 [dev-dependencies]
 tokio = { version = "1.38.0", features = ["full"] }

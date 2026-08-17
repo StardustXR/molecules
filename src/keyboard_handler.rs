@@ -1,4 +1,4 @@
-use gluon::{Context, Object};
+use gluon::{Context, Handler, Interface, Node, RefExt};
 use stardust_xr_fusion::{
 	Result,
 	client::{Client, ClientHandler},
@@ -12,7 +12,7 @@ pub mod protocol {
 	pub use stardust_xr_molecules_protocols::keyboard_handler::*;
 }
 use stardust_xr_molecules_protocols::keyboard_handler::{
-	EXTERNAL_PROTOCOL, KeyEvent, KeyboardHandlerHandler,
+	KeyEvent, KeyboardHandler as KeyboardHandlerProxy, KeyboardHandlerHandler,
 };
 #[derive(gluon::Handler)]
 struct KeyboardHandlerInner {
@@ -31,7 +31,8 @@ impl KeyboardHandlerHandler for KeyboardHandlerInner {
 
 #[derive(Debug)]
 pub struct KeyboardHandler {
-	_obj: Object<KeyboardHandlerInner>,
+	_obj: Node<KeyboardHandlerInner>,
+	_ref: KeyboardHandlerProxy,
 	_queryable: QueryableObject,
 	_guard: QueryableInterfaceGuard,
 }
@@ -45,15 +46,16 @@ impl KeyboardHandler {
 		let handler = KeyboardHandlerInner {
 			on_key: Box::new(on_key),
 		};
-		let obj = client.pion_device().register_object(handler);
+		let (_obj, _ref) = KeyboardHandlerProxy::new_node(handler)?;
 
 		let queryable = QueryableObject::new(client, spatial, field).await?;
 		let guard = queryable
-			.add_interface(&obj, EXTERNAL_PROTOCOL.protocol_name)
+			.add_interface(&_ref, KeyboardHandlerProxy::ID)
 			.await?;
 
 		Ok(KeyboardHandler {
-			_obj: obj,
+			_obj,
+			_ref,
 			_queryable: queryable,
 			_guard: guard,
 		})

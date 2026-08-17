@@ -8,17 +8,21 @@ default = []
 serde = ["dep:serde"]
 
 [dependencies]
-gluon = { git = "https://github.com/technobaboo/gluon" }
 serde = { version = "1.0.228", optional = true }
 tracing = "0.1.44"
 
-[build-dependencies]
-gluon-codegen = { git = "https://github.com/technobaboo/gluon" }
-
-[build-dependencies.stardust-xr-protocol]
-git = "https://github.com/StardustXR/core.git"
-branch = "binder"
-
 [dependencies.stardust-xr-protocol]
 git = "https://github.com/StardustXR/core.git"
-branch = "binder"
+branch = "refactor/strongipc"
+
+[dependencies.gluon]
+git = "https://github.com/technobaboo/gluon"
+branch = "refactor/strongipc"
+
+
+[build-dependencies.gluon-codegen]
+git = "https://github.com/technobaboo/gluon"
+branch = "refactor/strongipc"
+[build-dependencies.stardust-xr-protocol]
+git = "https://github.com/StardustXR/core.git"
+branch = "refactor/strongipc"
