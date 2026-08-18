@@ -1,4 +1,4 @@
-use gluon::{Context, Handler, Interface, Node, RefExt};
+use gluon::{Context, Interface, Node, RefExt};
 use stardust_xr_fusion::{
 	Result,
 	client::{Client, ClientHandler},
@@ -31,7 +31,7 @@ impl KeyboardHandlerHandler for KeyboardHandlerInner {
 
 #[derive(Debug)]
 pub struct KeyboardHandler {
-	_obj: Node<KeyboardHandlerInner>,
+	_node: Node<KeyboardHandlerInner>,
 	_ref: KeyboardHandlerProxy,
 	_queryable: QueryableObject,
 	_guard: QueryableInterfaceGuard,
@@ -46,7 +46,7 @@ impl KeyboardHandler {
 		let handler = KeyboardHandlerInner {
 			on_key: Box::new(on_key),
 		};
-		let (_obj, _ref) = KeyboardHandlerProxy::new_node(handler)?;
+		let (_node, _ref) = KeyboardHandlerProxy::new_node(handler)?;
 
 		let queryable = QueryableObject::new(client, spatial, field).await?;
 		let guard = queryable
@@ -54,7 +54,7 @@ impl KeyboardHandler {
 			.await?;
 
 		Ok(KeyboardHandler {
-			_obj,
+			_node,
 			_ref,
 			_queryable: queryable,
 			_guard: guard,

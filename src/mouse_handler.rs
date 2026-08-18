@@ -1,4 +1,4 @@
-use gluon::{Context, Object};
+use gluon::{Context, Interface, Node, RefExt};
 use stardust_xr_fusion::{
 	Result,
 	client::{Client, ClientHandler},
@@ -11,7 +11,9 @@ pub use stardust_xr_molecules_protocols::mouse_handler::ScrollSource;
 pub mod protocol {
 	pub use stardust_xr_molecules_protocols::mouse_handler::*;
 }
-use stardust_xr_molecules_protocols::mouse_handler::{EXTERNAL_PROTOCOL, MouseHandlerHandler};
+use stardust_xr_molecules_protocols::mouse_handler::{
+	MouseHandler as MouseHandlerProxy, MouseHandlerHandler,
+};
 use std::any::Any;
 
 #[derive(gluon::Handler)]
@@ -55,7 +57,7 @@ impl MouseHandlerHandler for MouseHandlerInner {
 
 #[derive(Debug)]
 pub struct MouseHandler {
-	_obj: Object<MouseHandlerInner>,
+	_node: Node<MouseHandlerInner>,
 	_queryable: QueryableObject,
 	_guard: Box<dyn Any + Send + Sync>,
 }
@@ -77,15 +79,15 @@ impl MouseHandler {
 			on_scroll_smooth: Box::new(on_scroll_smooth),
 			on_scroll_discrete: Box::new(on_scroll_discrete),
 		};
-		let obj = client.pion_device().register_object(handler);
+		let (node, handler) = MouseHandlerProxy::new_node(handler)?;
 
 		let queryable = QueryableObject::new(client, spatial, field).await?;
 		let guard = queryable
-			.add_interface(&obj, EXTERNAL_PROTOCOL.protocol_name)
+			.add_interface(&handler, MouseHandlerProxy::ID)
 			.await?;
 
 		Ok(MouseHandler {
-			_obj: obj,
+			_node: node,
 			_queryable: queryable,
 			_guard: Box::new(guard) as Box<dyn Any + Send + Sync>,
 		})

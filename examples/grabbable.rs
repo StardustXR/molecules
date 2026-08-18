@@ -18,7 +18,7 @@ async fn main() {
 	tracing_subscriber::fmt()
 		.with_env_filter(EnvFilter::from_default_env())
 		.init();
-	let (client, root) = Client::auto_connect(&[&project_local_resources!("res")])
+	let (client, root) = Client::connect(&[&project_local_resources!("res")])
 		.await
 		.unwrap();
 	let (_root_spatial, root_ref) = Spatial::new(&client, &root, Transform::IDENTITY)

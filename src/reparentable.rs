@@ -1,5 +1,4 @@
-use gluon::{Context, Interface, Object};
-use pion_binder::PionBinderDevice;
+use gluon::{Context, Interface, Node, RefExt};
 use stardust_xr_fusion::Result;
 use stardust_xr_fusion::{
 	client::{Client, ClientHandler},
@@ -8,8 +7,7 @@ use stardust_xr_fusion::{
 	spatial::{PartialTransform, Spatial, SpatialRef},
 };
 pub use stardust_xr_molecules_protocols::reparentable::{
-	ReparentHandle, ReparentKeepalive,
-	ReparentKeepaliveHandler, Reparentable as ReparentableProxy,
+	ReparentHandle, ReparentKeepalive, ReparentKeepaliveHandler, Reparentable as ReparentableProxy,
 	ReparentableLocked as ReparentableLockedProxy,
 };
 use stardust_xr_molecules_protocols::reparentable::{
@@ -26,7 +24,7 @@ use std::{
 enum ReparentState {
 	Idle,
 	NonLocked(u64, ReparentKeepalive),
-    // we want to keep this handle alive, even if we don't use it directly
+	// we want to keep this handle alive, even if we don't use it directly
 	Locked(u64, #[allow(dead_code)] ReparentKeepalive),
 }
 
@@ -78,7 +76,6 @@ impl Drop for ReparentHandleInner {
 #[derive(gluon::Handler)]
 struct ReparentableInner {
 	state: Arc<SharedState>,
-	dev: PionBinderDevice,
 }
 impl std::fmt::Debug for ReparentableInner {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -103,20 +100,19 @@ impl ReparentableInner {
 				}
 				let _ = self.state.spatial.set_parent_in_place(new_parent);
 				self.state.reparented.store(true, Ordering::Relaxed);
-				let handle_obj = self
-					.dev
-					.register_object(ReparentHandleInner {
-						state: self.state.clone(),
-						id: HANDLE_ID.fetch_add(1, Ordering::Relaxed),
-					})
-					.to_service();
+				let id = HANDLE_ID.fetch_add(1, Ordering::Relaxed);
+				let handle = ReparentHandle::new_service(ReparentHandleInner {
+					state: self.state.clone(),
+					id,
+				})
+				.ok()?;
 				*guard = if locking {
-					ReparentState::Locked(handle_obj.id, keepalive.clone())
+					ReparentState::Locked(id, keepalive.clone())
 				} else {
-					ReparentState::NonLocked(handle_obj.id, keepalive.clone())
+					ReparentState::NonLocked(id, keepalive.clone())
 				};
 				drop(guard);
-				Some(ReparentHandle::from_handler(&handle_obj))
+				Some(handle)
 			}
 			ReparentState::Locked(_, _) => None,
 		}
@@ -156,8 +152,8 @@ impl ReparentableLockedHandler for ReparentableLockedInner {
 
 pub struct Reparentable {
 	state: Arc<SharedState>,
-	_obj: Object<ReparentableInner>,
-	_locked_obj: Object<ReparentableLockedInner>,
+	_node: Node<ReparentableInner>,
+	_locked_node: Node<ReparentableLockedInner>,
 	_queryable: QueryableObject,
 	_guards: Vec<Box<dyn Any + Send + Sync>>,
 }
@@ -178,29 +174,25 @@ impl Reparentable {
 
 		let reparentable_inner = ReparentableInner {
 			state: state.clone(),
-			dev: client.pion_device().clone(),
 		};
-		let reparentable_obj = client.pion_device().register_object(reparentable_inner);
+		let (reparentable_node, reparentable) = ReparentableProxy::new_node(reparentable_inner)?;
 
-		let reparentable_locked_obj = client
-			.pion_device()
-			.register_object(ReparentableLockedInner(Arc::clone(&reparentable_obj)));
+		let (reparentable_locked_node, reparentable_locked) = ReparentableLockedProxy::new_node(
+			ReparentableLockedInner(reparentable_node.handler().clone()),
+		)?;
 
 		let queryable = QueryableObject::new(client, spatial, field).await?;
 		let guard = queryable
-			.add_interface(&reparentable_obj, ReparentableProxy::ID)
+			.add_interface(&reparentable, ReparentableProxy::ID)
 			.await?;
 		let locked_guard = queryable
-			.add_interface(
-				&reparentable_locked_obj,
-				ReparentableLockedProxy::ID,
-			)
+			.add_interface(&reparentable_locked, ReparentableLockedProxy::ID)
 			.await?;
 
 		Ok(Reparentable {
 			state,
-			_obj: reparentable_obj,
-			_locked_obj: reparentable_locked_obj,
+			_node: reparentable_node,
+			_locked_node: reparentable_locked_node,
 			_queryable: queryable,
 			_guards: vec![
 				Box::new(guard) as Box<dyn Any + Send + Sync>,
@@ -273,7 +265,7 @@ async fn reparentable_query() {
 
 	tracing_subscriber::fmt().pretty().with_file(false).init();
 
-	let (client, root) = Client::auto_connect(&[&project_local_resources!("res")])
+	let (client, root) = Client::connect(&[&project_local_resources!("res")])
 		.await
 		.expect("Unable to connect to server");
 
@@ -290,11 +282,12 @@ async fn reparentable_query() {
 	tracing::info!("dummy reparentable object registered at root");
 
 	// consumer: a points query with a single point at root, looking for Reparentable objects
-	let handler = client.pion_device().register_object(Logger);
+	let (handler_node, handler) =
+		PointsQueryHandler::new_node(Logger).expect("failed to create node");
 	let _query = client
 		.spatial_query_interface()
 		.points_query(PointsQuery {
-			handler: PointsQueryHandler::from_handler(&handler),
+			handler,
 			interfaces: vec![InterfaceDependency {
 				id: ReparentableProxy::ID.into(),
 				optional: false,
@@ -318,4 +311,5 @@ async fn reparentable_query() {
 			Err(RecvError::Lagged(_)) => continue,
 		}
 	}
+    drop(handler_node);
 }

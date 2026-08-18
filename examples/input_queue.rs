@@ -10,7 +10,7 @@ use tracing::warn;
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
 	tracing_subscriber::fmt::init();
-	let (client, root) = Client::auto_connect(&[]).await.unwrap();
+	let (client, root) = Client::connect(&[]).await.unwrap();
 
 	let (root_spatial, root_ref) = Spatial::new(&client, &root, Transform::IDENTITY)
 		.await

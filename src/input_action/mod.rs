@@ -7,7 +7,7 @@ mod multi_action;
 pub use multi_action::*;
 
 use glam::Vec3;
-use gluon::{Context, Handler, Object};
+use gluon::{Context, Handler, Node, RefExt};
 use rustc_hash::{FxHashMap, FxHashSet};
 use stardust_xr_fusion::{
 	Result,
@@ -77,7 +77,7 @@ impl Hash for InputSnapshot {
 	}
 }
 
-pub struct InputQueue(Object<InputQueueInner>);
+pub struct InputQueue(Node<InputQueueInner>, InputHandlerProxy);
 
 struct InputQueueState {
 	current: FxHashMap<InputMethod, Arc<InputSnapshot>>,
@@ -130,16 +130,16 @@ impl InputQueue {
 				dirty: false,
 			}),
 		};
-		let queue_obj = client.pion_device().register_object(queue);
+		let (queue_node, queue) = InputHandlerProxy::new_node(queue)?;
 
 		let queryable = QueryableObject::new(client, query_spatial, field).await?;
 		let guard = queryable
-			.add_interface(&queue_obj, InputHandlerProxy::QUERY_INTERFACE)
+			.add_interface(&queue, InputHandlerProxy::QUERY_INTERFACE)
 			.await?;
-		let _ = queue_obj._queryable.set(queryable);
-		let _ = queue_obj._interface_guard.set(guard);
+		let _ = queue_node._queryable.set(queryable);
+		let _ = queue_node._interface_guard.set(guard);
 
-		Ok(InputQueue(queue_obj))
+		Ok(InputQueue(queue_node, queue))
 	}
 
 	/// Returns `true` if any input arrived or left since the last call. Resets the dirty flag.
@@ -167,7 +167,7 @@ impl InputQueue {
 
 	pub fn start_capture(&self, snap: &InputSnapshot) {
 		let method = snap.method.clone();
-		let proxy = InputHandlerProxy::from_handler(&self.0);
+		let proxy = self.1.clone();
 		let capture_return_task =
 			tokio::spawn(async move { method.request_capture(proxy).await.ok().flatten() });
 		self.0
