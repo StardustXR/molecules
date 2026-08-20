@@ -334,7 +334,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -517,7 +517,7 @@ dependencies = [
 [[package]]
 name = "gluon"
 version = "0.1.0"
-source = "git+https://github.com/technobaboo/gluon?branch=refactor%2Fstrongipc#2a49b9b8591eab2aa812b6c08ae367078c7b2542"
+source = "git+https://github.com/technobaboo/gluon?branch=refactor%2Fstrongipc#1d10a6049c7865fd286b3cd9d8e830639a5ee5a4"
 dependencies = [
  "bitflags",
  "gluon-derive",
@@ -530,7 +530,7 @@ dependencies = [
 [[package]]
 name = "gluon-codegen"
 version = "0.1.0"
-source = "git+https://github.com/technobaboo/gluon?branch=refactor%2Fstrongipc#2a49b9b8591eab2aa812b6c08ae367078c7b2542"
+source = "git+https://github.com/technobaboo/gluon?branch=refactor%2Fstrongipc#1d10a6049c7865fd286b3cd9d8e830639a5ee5a4"
 dependencies = [
  "convert_case",
  "gluon",
@@ -544,7 +544,7 @@ dependencies = [
 [[package]]
 name = "gluon-derive"
 version = "0.1.0"
-source = "git+https://github.com/technobaboo/gluon?branch=refactor%2Fstrongipc#2a49b9b8591eab2aa812b6c08ae367078c7b2542"
+source = "git+https://github.com/technobaboo/gluon?branch=refactor%2Fstrongipc#1d10a6049c7865fd286b3cd9d8e830639a5ee5a4"
 dependencies = [
  "quote",
  "syn",
@@ -553,7 +553,7 @@ dependencies = [
 [[package]]
 name = "gluon-parser"
 version = "0.1.0"
-source = "git+https://github.com/technobaboo/gluon?branch=refactor%2Fstrongipc#2a49b9b8591eab2aa812b6c08ae367078c7b2542"
+source = "git+https://github.com/technobaboo/gluon?branch=refactor%2Fstrongipc#1d10a6049c7865fd286b3cd9d8e830639a5ee5a4"
 dependencies = [
  "ansi_term",
  "chumsky",
@@ -961,7 +961,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -1216,7 +1216,7 @@ dependencies = [
  "getrandom",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
