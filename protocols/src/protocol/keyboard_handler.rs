@@ -134,6 +134,14 @@ impl gluon::Interface for KeyboardHandler {
 }
 ///Carries the per-interface bound for [`gluon::RefExt`]'s handler constructors: only a handler implementing this interface's handler trait can be passed to them.
 impl<H: KeyboardHandlerHandler> gluon::HandledBy<H> for KeyboardHandler {}
+///A proxy this process made, carrying the handler behind it — see [`gluon::LocalRef`]. Handed back by [`gluon::RefExt::new_node`] and [`gluon::RefExt::new_service`].
+pub type KeyboardHandlerLocal<H> = gluon::LocalRef<KeyboardHandler, H>;
+///Drops the handler share and keeps the proxy, so a [`gluon::LocalRef`] goes anywhere this proxy does — including the `impl Into<Self>` parameters generated for typed refs.
+impl<H: KeyboardHandlerHandler> From<KeyboardHandlerLocal<H>> for KeyboardHandler {
+    fn from(value: KeyboardHandlerLocal<H>) -> KeyboardHandler {
+        value.into_proxy()
+    }
+}
 impl gluon::RefExt for KeyboardHandler {
     fn from_ref(obj: gluon::Ref) -> KeyboardHandler {
         KeyboardHandler { obj }

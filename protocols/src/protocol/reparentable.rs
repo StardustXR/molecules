@@ -35,6 +35,15 @@ impl gluon::Interface for ReparentableLocked {
 }
 ///Carries the per-interface bound for [`gluon::RefExt`]'s handler constructors: only a handler implementing this interface's handler trait can be passed to them.
 impl<H: ReparentableLockedHandler> gluon::HandledBy<H> for ReparentableLocked {}
+///A proxy this process made, carrying the handler behind it — see [`gluon::LocalRef`]. Handed back by [`gluon::RefExt::new_node`] and [`gluon::RefExt::new_service`].
+pub type ReparentableLockedLocal<H> = gluon::LocalRef<ReparentableLocked, H>;
+///Drops the handler share and keeps the proxy, so a [`gluon::LocalRef`] goes anywhere this proxy does — including the `impl Into<Self>` parameters generated for typed refs.
+impl<H: ReparentableLockedHandler> From<ReparentableLockedLocal<H>>
+for ReparentableLocked {
+    fn from(value: ReparentableLockedLocal<H>) -> ReparentableLocked {
+        value.into_proxy()
+    }
+}
 impl gluon::RefExt for ReparentableLocked {
     fn from_ref(obj: gluon::Ref) -> ReparentableLocked {
         ReparentableLocked { obj }
@@ -201,6 +210,14 @@ impl gluon::Interface for Reparentable {
 }
 ///Carries the per-interface bound for [`gluon::RefExt`]'s handler constructors: only a handler implementing this interface's handler trait can be passed to them.
 impl<H: ReparentableHandler> gluon::HandledBy<H> for Reparentable {}
+///A proxy this process made, carrying the handler behind it — see [`gluon::LocalRef`]. Handed back by [`gluon::RefExt::new_node`] and [`gluon::RefExt::new_service`].
+pub type ReparentableLocal<H> = gluon::LocalRef<Reparentable, H>;
+///Drops the handler share and keeps the proxy, so a [`gluon::LocalRef`] goes anywhere this proxy does — including the `impl Into<Self>` parameters generated for typed refs.
+impl<H: ReparentableHandler> From<ReparentableLocal<H>> for Reparentable {
+    fn from(value: ReparentableLocal<H>) -> Reparentable {
+        value.into_proxy()
+    }
+}
 impl gluon::RefExt for Reparentable {
     fn from_ref(obj: gluon::Ref) -> Reparentable {
         Reparentable { obj }
@@ -361,6 +378,14 @@ impl gluon::Interface for ReparentKeepalive {
 }
 ///Carries the per-interface bound for [`gluon::RefExt`]'s handler constructors: only a handler implementing this interface's handler trait can be passed to them.
 impl<H: ReparentKeepaliveHandler> gluon::HandledBy<H> for ReparentKeepalive {}
+///A proxy this process made, carrying the handler behind it — see [`gluon::LocalRef`]. Handed back by [`gluon::RefExt::new_node`] and [`gluon::RefExt::new_service`].
+pub type ReparentKeepaliveLocal<H> = gluon::LocalRef<ReparentKeepalive, H>;
+///Drops the handler share and keeps the proxy, so a [`gluon::LocalRef`] goes anywhere this proxy does — including the `impl Into<Self>` parameters generated for typed refs.
+impl<H: ReparentKeepaliveHandler> From<ReparentKeepaliveLocal<H>> for ReparentKeepalive {
+    fn from(value: ReparentKeepaliveLocal<H>) -> ReparentKeepalive {
+        value.into_proxy()
+    }
+}
 impl gluon::RefExt for ReparentKeepalive {
     fn from_ref(obj: gluon::Ref) -> ReparentKeepalive {
         ReparentKeepalive { obj }
@@ -474,6 +499,14 @@ impl gluon::Interface for ReparentHandle {
 }
 ///Carries the per-interface bound for [`gluon::RefExt`]'s handler constructors: only a handler implementing this interface's handler trait can be passed to them.
 impl<H: ReparentHandleHandler> gluon::HandledBy<H> for ReparentHandle {}
+///A proxy this process made, carrying the handler behind it — see [`gluon::LocalRef`]. Handed back by [`gluon::RefExt::new_node`] and [`gluon::RefExt::new_service`].
+pub type ReparentHandleLocal<H> = gluon::LocalRef<ReparentHandle, H>;
+///Drops the handler share and keeps the proxy, so a [`gluon::LocalRef`] goes anywhere this proxy does — including the `impl Into<Self>` parameters generated for typed refs.
+impl<H: ReparentHandleHandler> From<ReparentHandleLocal<H>> for ReparentHandle {
+    fn from(value: ReparentHandleLocal<H>) -> ReparentHandle {
+        value.into_proxy()
+    }
+}
 impl gluon::RefExt for ReparentHandle {
     fn from_ref(obj: gluon::Ref) -> ReparentHandle {
         ReparentHandle { obj }

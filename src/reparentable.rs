@@ -11,7 +11,7 @@ pub use stardust_xr_molecules_protocols::reparentable::{
 	ReparentableLocked as ReparentableLockedProxy,
 };
 use stardust_xr_molecules_protocols::reparentable::{
-	ReparentHandleHandler, ReparentableHandler, ReparentableLockedHandler,
+	ReparentHandleHandler, ReparentHandleLocal, ReparentableHandler, ReparentableLockedHandler,
 };
 use std::{
 	any::Any,
@@ -91,7 +91,7 @@ impl ReparentableInner {
 		new_parent: SpatialRef,
 		keepalive: ReparentKeepalive,
 		locking: bool,
-	) -> Option<ReparentHandle> {
+	) -> Option<ReparentHandleLocal<ReparentHandleInner>> {
 		let mut guard = self.state.reparent_state.lock().unwrap();
 		match &*guard {
 			ReparentState::Idle | ReparentState::NonLocked(_, _) => {
@@ -125,7 +125,11 @@ impl ReparentableHandler for ReparentableInner {
 		new_parent: SpatialRef,
 		keepalive: ReparentKeepalive,
 	) -> Option<ReparentHandle> {
-		self.do_reparent(new_parent, keepalive, false).await
+		Some(
+			self.do_reparent(new_parent, keepalive, false)
+				.await?
+				.into_proxy(),
+		)
 	}
 }
 
@@ -146,7 +150,12 @@ impl ReparentableLockedHandler for ReparentableLockedInner {
 		new_parent: SpatialRef,
 		keepalive: ReparentKeepalive,
 	) -> Option<ReparentHandle> {
-		self.0.do_reparent(new_parent, keepalive, true).await
+		Some(
+			self.0
+				.do_reparent(new_parent, keepalive, false)
+				.await?
+				.into_proxy(),
+		)
 	}
 }
 
@@ -223,7 +232,7 @@ async fn reparentable_query() {
 		client::Client,
 		fields::{Field, FieldExt, FieldRef, FieldSample, Shape},
 		project_local_resources,
-		query::{InterfaceDependency, QueriedInterface, QueryableObjectRef},
+		query::{InterfaceDependency, QueriedInterface, QueryableId},
 		spatial::{Spatial, SpatialExt, SpatialRef, Transform},
 		spatial_query::{Point, PointsQuery, PointsQueryHandler, PointsQueryHandlerHandler},
 	};
@@ -235,31 +244,25 @@ async fn reparentable_query() {
 		async fn entered(
 			&self,
 			_ctx: gluon::Context,
-			obj: QueryableObjectRef,
+			id: QueryableId,
 			_field: FieldRef,
 			_spatial: SpatialRef,
 			interfaces: Vec<QueriedInterface>,
 			_spatial_info: FieldSample,
 		) {
-			tracing::info!(?obj, ?interfaces, "ENTERED");
+			tracing::info!(?id, ?interfaces, "ENTERED");
 		}
 		async fn interfaces_changed(
 			&self,
 			_ctx: gluon::Context,
-			obj: QueryableObjectRef,
+			id: QueryableId,
 			interfaces: Vec<QueriedInterface>,
 		) {
-			tracing::info!(?obj, ?interfaces, "INTERFACES CHANGED");
+			tracing::info!(?id, ?interfaces, "INTERFACES CHANGED");
 		}
-		async fn moved(
-			&self,
-			_ctx: gluon::Context,
-			_obj: QueryableObjectRef,
-			_spatial_info: FieldSample,
-		) {
-		}
-		async fn left(&self, _ctx: gluon::Context, obj: QueryableObjectRef) {
-			tracing::info!(?obj, "LEFT");
+		async fn moved(&self, _ctx: gluon::Context, _id: QueryableId, _spatial_info: FieldSample) {}
+		async fn left(&self, _ctx: gluon::Context, id: QueryableId) {
+			tracing::info!(?id, "LEFT");
 		}
 	}
 
@@ -287,7 +290,7 @@ async fn reparentable_query() {
 	let _query = client
 		.spatial_query_interface()
 		.points_query(PointsQuery {
-			handler,
+			handler: handler.into_proxy(),
 			interfaces: vec![InterfaceDependency {
 				id: ReparentableProxy::ID.into(),
 				optional: false,
@@ -311,5 +314,5 @@ async fn reparentable_query() {
 			Err(RecvError::Lagged(_)) => continue,
 		}
 	}
-    drop(handler_node);
+	drop(handler_node);
 }

@@ -13,7 +13,7 @@ use stardust_xr_fusion::{
 	Result,
 	client::{Client, ClientHandler},
 	fields::{Field, FieldRef},
-	query::{QueryableExt, QueryableInterfaceGuard, QueryableObject},
+	query::{QueryableExt, QueryableInterface, QueryableObject},
 	spatial::{Spatial, SpatialRef},
 	suis::{
 		DatamapData, InputDataType, InputHandler as InputHandlerProxy, InputHandlerHandler,
@@ -91,7 +91,7 @@ struct InputQueueInner {
 	field: FieldRef,
 	reference_space: SpatialRef,
 	_queryable: OnceLock<QueryableObject>,
-	_interface_guard: OnceLock<QueryableInterfaceGuard>,
+	_interface: OnceLock<QueryableInterface>,
 	state: Mutex<InputQueueState>,
 }
 impl Debug for InputQueueInner {
@@ -122,7 +122,7 @@ impl InputQueue {
 			field: field.field_ref().await?,
 			reference_space,
 			_queryable: OnceLock::new(),
-			_interface_guard: OnceLock::new(),
+			_interface: OnceLock::new(),
 			state: Mutex::new(InputQueueState {
 				current: FxHashMap::default(),
 				capture_requests: FxHashMap::default(),
@@ -133,13 +133,13 @@ impl InputQueue {
 		let (queue_node, queue) = InputHandlerProxy::new_node(queue)?;
 
 		let queryable = QueryableObject::new(client, query_spatial, field).await?;
-		let guard = queryable
+		let interface = queryable
 			.add_interface(&queue, InputHandlerProxy::QUERY_INTERFACE)
-			.await?;
+			.await??;
 		let _ = queue_node._queryable.set(queryable);
-		let _ = queue_node._interface_guard.set(guard);
+		let _ = queue_node._interface.set(interface);
 
-		Ok(InputQueue(queue_node, queue))
+		Ok(InputQueue(queue_node, queue.into_proxy()))
 	}
 
 	/// Returns `true` if any input arrived or left since the last call. Resets the dirty flag.

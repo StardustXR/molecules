@@ -3,7 +3,7 @@ use stardust_xr_fusion::{
 	Result,
 	client::{Client, ClientHandler},
 	fields::Field,
-	query::{QueryableExt as _, QueryableInterfaceGuard, QueryableObject},
+	query::{QueryableExt as _, QueryableInterface, QueryableObject},
 	spatial::Spatial,
 	types::Timestamp,
 };
@@ -34,7 +34,7 @@ pub struct KeyboardHandler {
 	_node: Node<KeyboardHandlerInner>,
 	_ref: KeyboardHandlerProxy,
 	_queryable: QueryableObject,
-	_guard: QueryableInterfaceGuard,
+	_guard: QueryableInterface,
 }
 impl KeyboardHandler {
 	pub async fn new<H: ClientHandler>(
@@ -49,15 +49,15 @@ impl KeyboardHandler {
 		let (_node, _ref) = KeyboardHandlerProxy::new_node(handler)?;
 
 		let queryable = QueryableObject::new(client, spatial, field).await?;
-		let guard = queryable
+		let interface = queryable
 			.add_interface(&_ref, KeyboardHandlerProxy::ID)
-			.await?;
+			.await??;
 
 		Ok(KeyboardHandler {
 			_node,
-			_ref,
+			_ref: _ref.into_proxy(),
 			_queryable: queryable,
-			_guard: guard,
+			_guard: interface,
 		})
 	}
 }

@@ -103,6 +103,14 @@ impl gluon::Interface for MouseHandler {
 }
 ///Carries the per-interface bound for [`gluon::RefExt`]'s handler constructors: only a handler implementing this interface's handler trait can be passed to them.
 impl<H: MouseHandlerHandler> gluon::HandledBy<H> for MouseHandler {}
+///A proxy this process made, carrying the handler behind it — see [`gluon::LocalRef`]. Handed back by [`gluon::RefExt::new_node`] and [`gluon::RefExt::new_service`].
+pub type MouseHandlerLocal<H> = gluon::LocalRef<MouseHandler, H>;
+///Drops the handler share and keeps the proxy, so a [`gluon::LocalRef`] goes anywhere this proxy does — including the `impl Into<Self>` parameters generated for typed refs.
+impl<H: MouseHandlerHandler> From<MouseHandlerLocal<H>> for MouseHandler {
+    fn from(value: MouseHandlerLocal<H>) -> MouseHandler {
+        value.into_proxy()
+    }
+}
 impl gluon::RefExt for MouseHandler {
     fn from_ref(obj: gluon::Ref) -> MouseHandler {
         MouseHandler { obj }
