@@ -517,7 +517,7 @@ dependencies = [
 [[package]]
 name = "gluon"
 version = "0.1.0"
-source = "git+https://github.com/technobaboo/gluon?branch=refactor%2Fstrongipc#44b59852e66e65eea6945d7f82a85d8db39600e5"
+source = "git+https://github.com/technobaboo/gluon?branch=refactor%2Fstrongipc#96dbeed55a456d140dde11c57b16e0625bd350ba"
 dependencies = [
  "bitflags",
  "gluon-derive",
@@ -530,7 +530,7 @@ dependencies = [
 [[package]]
 name = "gluon-codegen"
 version = "0.1.0"
-source = "git+https://github.com/technobaboo/gluon?branch=refactor%2Fstrongipc#44b59852e66e65eea6945d7f82a85d8db39600e5"
+source = "git+https://github.com/technobaboo/gluon?branch=refactor%2Fstrongipc#96dbeed55a456d140dde11c57b16e0625bd350ba"
 dependencies = [
  "convert_case",
  "gluon",
@@ -544,7 +544,7 @@ dependencies = [
 [[package]]
 name = "gluon-derive"
 version = "0.1.0"
-source = "git+https://github.com/technobaboo/gluon?branch=refactor%2Fstrongipc#44b59852e66e65eea6945d7f82a85d8db39600e5"
+source = "git+https://github.com/technobaboo/gluon?branch=refactor%2Fstrongipc#96dbeed55a456d140dde11c57b16e0625bd350ba"
 dependencies = [
  "quote",
  "syn",
@@ -553,7 +553,7 @@ dependencies = [
 [[package]]
 name = "gluon-parser"
 version = "0.1.0"
-source = "git+https://github.com/technobaboo/gluon?branch=refactor%2Fstrongipc#44b59852e66e65eea6945d7f82a85d8db39600e5"
+source = "git+https://github.com/technobaboo/gluon?branch=refactor%2Fstrongipc#96dbeed55a456d140dde11c57b16e0625bd350ba"
 dependencies = [
  "ansi_term",
  "chumsky",
@@ -1117,7 +1117,7 @@ dependencies = [
 [[package]]
 name = "stardust-xr-fusion"
 version = "0.51.1"
-source = "git+https://github.com/StardustXR/core.git?branch=refactor%2Fstrongipc#a0b089e6473172789130ae8124d251c385465225"
+source = "git+https://github.com/StardustXR/core.git?branch=refactor%2Fstrongipc#68ea50297537707e8367c7d23ac7524355bd82a5"
 dependencies = [
  "glam 0.30.7",
  "gluon",
@@ -1166,7 +1166,7 @@ dependencies = [
 [[package]]
 name = "stardust-xr-protocol"
 version = "0.51.1"
-source = "git+https://github.com/StardustXR/core.git?branch=refactor%2Fstrongipc#a0b089e6473172789130ae8124d251c385465225"
+source = "git+https://github.com/StardustXR/core.git?branch=refactor%2Fstrongipc#68ea50297537707e8367c7d23ac7524355bd82a5"
 dependencies = [
  "fnv",
  "glam 0.29.3",
@@ -1186,7 +1186,7 @@ dependencies = [
 [[package]]
 name = "strong-ipc"
 version = "0.1.0"
-source = "git+https://github.com/technobaboo/strong-ipc#8e49d35b1625e35db0769635a2d14bf1a6e9741a"
+source = "git+https://github.com/technobaboo/strong-ipc#4dddd5ede29f02352bc101645c55708862b1d9f4"
 dependencies = [
  "dashmap",
  "rustix",
