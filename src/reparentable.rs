@@ -4,7 +4,7 @@ use stardust_xr_fusion::{
 	client::{Client, ClientHandler},
 	fields::Field,
 	query::{QueryableExt, QueryableObject},
-	spatial::{PartialTransform, Spatial, SpatialRef},
+	spatial::{Spatial, SpatialRef, Transform},
 };
 pub use stardust_xr_molecules_protocols::reparentable::{
 	ReparentHandle, ReparentKeepalive, ReparentKeepaliveHandler, Reparentable as ReparentableProxy,
@@ -17,22 +17,72 @@ use std::{
 	any::Any,
 	sync::{
 		Arc, Mutex,
-		atomic::{AtomicBool, AtomicU64, Ordering},
+		atomic::{AtomicU64, Ordering},
 	},
 };
 
-enum ReparentState {
-	Idle,
-	NonLocked(u64, ReparentKeepalive),
-	// we want to keep this handle alive, even if we don't use it directly
-	Locked(u64, #[allow(dead_code)] ReparentKeepalive),
+/// A live reparent. `locked` grants are not stealable.
+struct Grant {
+	id: u64,
+	locked: bool,
+	keepalive: ReparentKeepalive,
 }
 
 struct SharedState {
 	spatial: Spatial,
 	initial_parent: SpatialRef,
-	reparent_state: Mutex<ReparentState>,
-	reparented: AtomicBool,
+	grant: Mutex<Option<Grant>>,
+}
+impl SharedState {
+	/// Grants a reparent to `new_parent`, stealing an existing non-locked grant.
+	/// Returns `None` if the current grant is locked.
+	fn begin_grant(
+		&self,
+		new_parent: SpatialRef,
+		keepalive: ReparentKeepalive,
+		locked: bool,
+	) -> Option<u64> {
+		let mut guard = self.grant.lock().unwrap();
+		if let Some(current) = &*guard {
+			if current.locked {
+				return None;
+			}
+			let _ = current.keepalive.reparent_stolen();
+		}
+		let id = HANDLE_ID.fetch_add(1, Ordering::Relaxed);
+		let _ = self.spatial.set_parent_in_place(new_parent);
+		*guard = Some(Grant {
+			id,
+			locked,
+			keepalive,
+		});
+		Some(id)
+	}
+
+	/// Ends the current grant and returns the spatial to its initial parent.
+	/// `expect_id` limits this to that specific grant; `notify` tells the holder it lost it.
+	fn end_grant(&self, expect_id: Option<u64>, notify: bool) {
+		let mut guard = self.grant.lock().unwrap();
+		let Some(current) = &*guard else {
+			return;
+		};
+		if let Some(id) = expect_id
+			&& current.id != id
+		{
+			return;
+		}
+		if notify {
+			let _ = current.keepalive.reparent_stolen();
+		}
+		let _ = self
+			.spatial
+			.set_parent_in_place(self.initial_parent.clone());
+		*guard = None;
+	}
+
+	fn reparented(&self) -> bool {
+		self.grant.lock().unwrap().is_some()
+	}
 }
 
 #[derive(gluon::Handler)]
@@ -50,26 +100,12 @@ impl ReparentHandleHandler for ReparentHandleInner {
 		let _ = self
 			.state
 			.spatial
-			.set_relative_transform(relative_to, PartialTransform::NONE);
+			.set_relative_transform(relative_to, Transform::IDENTITY);
 	}
 }
 impl Drop for ReparentHandleInner {
 	fn drop(&mut self) {
-		let mut guard = self.state.reparent_state.lock().unwrap();
-		let still_current = match &*guard {
-			ReparentState::NonLocked(current, _) | ReparentState::Locked(current, _) => {
-				*current == self.id
-			}
-			ReparentState::Idle => false,
-		};
-		if still_current {
-			*guard = ReparentState::Idle;
-			self.state.reparented.store(false, Ordering::Relaxed);
-			let _ = self
-				.state
-				.spatial
-				.set_parent_in_place(self.state.initial_parent.clone());
-		}
+		self.state.end_grant(Some(self.id), false);
 	}
 }
 
@@ -92,29 +128,17 @@ impl ReparentableInner {
 		keepalive: ReparentKeepalive,
 		locking: bool,
 	) -> Option<ReparentHandleLocal<ReparentHandleInner>> {
-		let mut guard = self.state.reparent_state.lock().unwrap();
-		match &*guard {
-			ReparentState::Idle | ReparentState::NonLocked(_, _) => {
-				if let ReparentState::NonLocked(_, old) = &*guard {
-					let _ = old.reparent_stolen();
-				}
-				let _ = self.state.spatial.set_parent_in_place(new_parent);
-				self.state.reparented.store(true, Ordering::Relaxed);
-				let id = HANDLE_ID.fetch_add(1, Ordering::Relaxed);
-				let handle = ReparentHandle::new_service(ReparentHandleInner {
-					state: self.state.clone(),
-					id,
-				})
-				.ok()?;
-				*guard = if locking {
-					ReparentState::Locked(id, keepalive.clone())
-				} else {
-					ReparentState::NonLocked(id, keepalive.clone())
-				};
-				drop(guard);
-				Some(handle)
+		let id = self.state.begin_grant(new_parent, keepalive, locking)?;
+		let handle = ReparentHandle::new_service(ReparentHandleInner {
+			state: self.state.clone(),
+			id,
+		});
+		match handle {
+			Ok(handle) => Some(handle),
+			Err(_) => {
+				self.state.end_grant(Some(id), false);
+				None
 			}
-			ReparentState::Locked(_, _) => None,
 		}
 	}
 }
@@ -152,7 +176,7 @@ impl ReparentableLockedHandler for ReparentableLockedInner {
 	) -> Option<ReparentHandle> {
 		Some(
 			self.0
-				.do_reparent(new_parent, keepalive, false)
+				.do_reparent(new_parent, keepalive, true)
 				.await?
 				.into_proxy(),
 		)
@@ -177,8 +201,7 @@ impl Reparentable {
 		let state = Arc::new(SharedState {
 			spatial: spatial.clone(),
 			initial_parent: initial_parent.clone(),
-			reparent_state: Mutex::new(ReparentState::Idle),
-			reparented: AtomicBool::new(false),
+			grant: Mutex::new(None),
 		});
 
 		let reparentable_inner = ReparentableInner {
@@ -211,17 +234,11 @@ impl Reparentable {
 	}
 
 	pub fn reparented(&self) -> bool {
-		self.state.reparented.load(Ordering::Relaxed)
+		self.state.reparented()
 	}
 
 	pub fn unparent(&self) {
-		let mut guard = self.state.reparent_state.lock().unwrap();
-		*guard = ReparentState::Idle;
-		self.state.reparented.store(false, Ordering::Relaxed);
-		let _ = self
-			.state
-			.spatial
-			.set_parent_in_place(self.state.initial_parent.clone());
+		self.state.end_grant(None, true);
 	}
 }
 
