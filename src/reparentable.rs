@@ -1,5 +1,7 @@
+use glam::Vec3;
 use gluon::{Context, Interface, Node, RefExt};
 use stardust_xr_fusion::Result;
+use stardust_xr_fusion::spatial::PartialTransform;
 use stardust_xr_fusion::{
 	client::{Client, ClientHandler},
 	fields::Field,
@@ -28,6 +30,7 @@ use std::{
 struct Grant {
 	id: u64,
 	locked: bool,
+	previous_transform: Option<Transform>,
 	keepalive: ReparentKeepalive,
 }
 
@@ -39,12 +42,24 @@ struct SharedState {
 impl SharedState {
 	/// Grants a reparent to `new_parent`, stealing an existing non-locked grant.
 	/// Returns `None` if the current grant is locked.
-	fn begin_grant(
+	async fn begin_grant(
 		&self,
 		new_parent: SpatialRef,
 		keepalive: ReparentKeepalive,
 		locked: bool,
 	) -> Option<u64> {
+		let previous_transform = self
+			.spatial
+			.get_relative_transform(self.initial_parent.clone())
+			.await
+			.ok()
+			.map(|v| {
+				v.inspect_err(|err| {
+					tracing::error!("failed to get prev transform for reparentable: {err}")
+				})
+				.ok()
+			})
+			.flatten();
 		let mut guard = self.grant.lock().unwrap();
 		if let Some(current) = &*guard {
 			if current.locked {
@@ -58,13 +73,24 @@ impl SharedState {
 			id,
 			locked,
 			keepalive,
+			previous_transform,
 		});
 		Some(id)
 	}
 
 	/// Ends the current grant and returns the spatial to its initial parent.
 	/// `expect_id` limits this to that specific grant; `notify` tells the holder it lost it.
-	fn end_grant(&self, expect_id: Option<u64>, notify: bool) {
+	async fn end_grant(&self, expect_id: Option<u64>, notify: bool) {
+		let transform = self
+			.spatial
+			.get_relative_transform(self.initial_parent.clone())
+			.await
+			.ok()
+			.map(|v| {
+				v.inspect_err(|err| tracing::error!("failed to get transform in end_grant: {err}"))
+					.ok()
+			})
+			.flatten();
 		let mut guard = self.grant.lock().unwrap();
 		let Some(current) = &*guard else {
 			return;
@@ -77,9 +103,19 @@ impl SharedState {
 		if notify {
 			let _ = current.keepalive.reparent_stolen();
 		}
+		let prev_transform = current.previous_transform;
+		if transform.is_none_or(|v| Vec3::from(v.scale).try_normalize().is_none())
+			&& let Some(prev) = prev_transform
+		{
+			let _ = self.spatial.set_relative_transform(
+				self.initial_parent.clone(),
+				PartialTransform::from_scale(prev.scale),
+			);
+		}
 		let _ = self
 			.spatial
 			.set_parent_in_place(self.initial_parent.clone());
+
 		*guard = None;
 	}
 
@@ -108,7 +144,9 @@ impl ReparentHandleHandler for ReparentHandleInner {
 }
 impl Drop for ReparentHandleInner {
 	fn drop(&mut self) {
-		self.state.end_grant(Some(self.id), false);
+		let state = self.state.clone();
+		let id = self.id;
+		tokio::spawn(async move { state.end_grant(Some(id), false).await });
 	}
 }
 
@@ -131,7 +169,10 @@ impl ReparentableInner {
 		keepalive: ReparentKeepalive,
 		locking: bool,
 	) -> Option<ReparentHandleLocal<ReparentHandleInner>> {
-		let id = self.state.begin_grant(new_parent, keepalive, locking)?;
+		let id = self
+			.state
+			.begin_grant(new_parent, keepalive, locking)
+			.await?;
 		let handle = ReparentHandle::new_service(ReparentHandleInner {
 			state: self.state.clone(),
 			id,
@@ -139,7 +180,7 @@ impl ReparentableInner {
 		match handle {
 			Ok(handle) => Some(handle),
 			Err(_) => {
-				self.state.end_grant(Some(id), false);
+				self.state.end_grant(Some(id), false).await;
 				None
 			}
 		}
@@ -241,7 +282,11 @@ impl Reparentable {
 	}
 
 	pub fn unparent(&self) {
-		self.state.end_grant(None, true);
+		let state = self.state.clone();
+		tokio::spawn(async move { state.end_grant(None, true).await });
+	}
+	pub async fn unparent_waiting(&self) {
+		self.state.end_grant(None, true).await;
 	}
 }
 
