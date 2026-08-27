@@ -9,6 +9,9 @@ use stardust_xr_fusion::{
 use stardust_xr_molecules_protocols::derezzable::{
 	Derezzable as DerezzableProxy, DerezzableHandler,
 };
+pub mod protocol {
+	pub use stardust_xr_molecules_protocols::derezzable::*;
+}
 use std::any::Any;
 use tokio::sync::mpsc;
 

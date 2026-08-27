@@ -6,6 +6,9 @@ use stardust_xr_fusion::{
 	query::{QueryableExt, QueryableObject},
 	spatial::{Spatial, SpatialRef, Transform},
 };
+pub mod protocol {
+	pub use stardust_xr_molecules_protocols::reparentable::*;
+}
 pub use stardust_xr_molecules_protocols::reparentable::{
 	ReparentHandle, ReparentKeepalive, ReparentKeepaliveHandler, Reparentable as ReparentableProxy,
 	ReparentableLocked as ReparentableLockedProxy,
