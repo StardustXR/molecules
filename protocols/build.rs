@@ -8,13 +8,14 @@ fn main() {
 			("keyboard_handler", Path::new("./gluon/org.stardustxr.KeyboardHandler.gluon")),
 			("mouse_handler", Path::new("./gluon/org.stardustxr.MouseHandler.gluon")),
 			(
-				"reparentable",
-				Path::new("./gluon/org.stardustxr.Reparentable.gluon"),
-			),
-			(
 				"derezzable",
 				Path::new("./gluon/org.stardustxr.Derezzable.gluon"),
 			),
+			(
+				"container",
+				Path::new("./gluon/org.stardustxr.Container.gluon"),
+			),
+
 		],
 		&[
 			&ModuleExternalProtocol {

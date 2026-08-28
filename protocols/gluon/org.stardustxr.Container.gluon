@@ -1,0 +1,10 @@
+/// Interface to mark anything that can surround objects so they move with it.
+/// Things that can be contained should use PointsQuery to search these out
+/// and reparent to the one they think is best.
+/// e.g. sample the field against several key points and pick the one that
+/// is negative (meaning the containable is inside it) and the distance
+/// closest to zero (meaning you can have containers inside containers
+/// and parent to the one that wraps the object the closest).
+/// Security is maintained by the inability to see the relative position of
+/// any containable object directly or have direct influence over it.
+interface Container {}

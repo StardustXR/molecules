@@ -11,12 +11,10 @@ pub mod keyboard_handler;
 pub mod lines;
 pub mod mouse_handler;
 pub mod multi;
-pub mod reparentable;
 pub mod touch_plane;
 
 pub use derezzable::Derezzable;
 pub use exposure::Exposure;
-pub use reparentable::Reparentable;
 
 use stardust_xr_fusion::{
 	client::FrameInfo,
