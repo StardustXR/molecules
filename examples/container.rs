@@ -8,7 +8,7 @@ use stardust_xr_fusion::{
 	query::{QueryableExt, QueryableObject},
 	spatial::{Spatial, SpatialExt, SpatialRef, Transform},
 	suis::InputDataType,
-	types::{Color, rgba_linear},
+	types::{Color, Vec3F, rgba_linear},
 };
 use stardust_xr_molecules::{
 	FrameSensitive, UIElement,
@@ -21,8 +21,6 @@ use stardust_xr_molecules_protocols::container;
 use std::sync::Arc;
 use tracing_subscriber::EnvFilter;
 
-const SHIMMER_RADIUS: f32 = 0.1;
-
 struct GrabBox {
 	grabbable: Grabbable,
 	content: Spatial,
@@ -30,6 +28,8 @@ struct GrabBox {
 	lines: Lines,
 	outline: Vec<Line>,
 	idle: Vec<Line>,
+	flash: Color,
+	shimmer_radius: f32,
 }
 impl GrabBox {
 	async fn new<H: ClientHandler>(
@@ -58,7 +58,7 @@ impl GrabBox {
 
 		let outline: Vec<Line> = shape(Shape::Box { size: size.into() })
 			.into_iter()
-			.map(|l| l.simple_subdivide(16).color(color).thickness(0.002))
+			.map(|l| l.simple_subdivide(16).color(color).thickness(0.005))
 			.collect();
 		let idle: Vec<Line> = outline
 			.iter()
@@ -81,6 +81,8 @@ impl GrabBox {
 			lines,
 			outline,
 			idle,
+			flash: rgba_linear!(color.c.r * 2.0, color.c.g * 2.0, color.c.b * 2.0, color.a),
+			shimmer_radius: size.into_iter().reduce(f32::max).unwrap() * 1.5,
 		})
 	}
 
@@ -98,22 +100,56 @@ impl GrabBox {
 		grab.hovering().current().iter().fold(
 			self.idle.clone(),
 			|lines: Vec<Line>, snap: &Arc<InputSnapshot>| {
-				let strength = grab_strength(snap) / (snap.semantic.order + 1) as f32;
-				let points = shimmer_points(snap);
+				let strength = (0.3 + 0.7 * grab_strength(snap)) / (snap.semantic.order + 1) as f32;
+				let shimmered = shimmer_input(&lines, snap, self.flash, self.shimmer_radius);
 				lines
 					.into_iter()
-					.map(|l| {
-						l.shimmer(
-							&points,
-							SHIMMER_RADIUS,
-							0.0,
-							rgba_linear!(2.0 * strength, 2.0 * strength, 2.0 * strength, 1.0),
-							1.0 + 4.0 * strength,
-						)
-					})
+					.zip(shimmered)
+					.map(|(l, s)| l.lerp(&s, strength).unwrap_or(s))
 					.collect()
 			},
 		)
+	}
+}
+
+fn shimmer_input(lines: &[Line], snap: &InputSnapshot, flash: Color, radius: f32) -> Vec<Line> {
+	let shimmer = |l: &Line, points: &[Vec3F]| l.clone().shimmer(points, radius, 0.0, flash, 0.5);
+
+	match snap.input() {
+		// a ray aimed at something never actually reaches its outline, so slide the
+		// falloff out to however close it gets
+		InputDataType::Pointer { data } => {
+			let closest = lines
+				.iter()
+				.map(|l| l.ray_distance(data.pose.position, data.direction()))
+				.fold(f32::INFINITY, f32::min);
+			lines
+				.iter()
+				.map(|l| {
+					l.clone().shimmer_ray(
+						data.pose.position,
+						data.direction(),
+						closest + radius,
+						closest,
+						flash,
+						0.5,
+					)
+				})
+				.collect()
+		}
+		InputDataType::Hand { data } => lines
+			.iter()
+			.map(|l| {
+				shimmer(
+					l,
+					&[data.thumb.tip.pose.position, data.index.tip.pose.position],
+				)
+			})
+			.collect(),
+		InputDataType::Tip { data } => lines
+			.iter()
+			.map(|l| shimmer(l, &[data.pose.position]))
+			.collect(),
 	}
 }
 
@@ -121,21 +157,6 @@ fn grab_strength(snap: &InputSnapshot) -> f32 {
 	match snap.input() {
 		InputDataType::Hand { .. } => snap.datamap_f32("pinch_strength"),
 		_ => snap.datamap_f32("grab"),
-	}
-}
-
-fn shimmer_points(snap: &InputSnapshot) -> Vec<[f32; 3]> {
-	match snap.input() {
-		InputDataType::Pointer { data } => {
-			let origin = Vec3::from(data.pose.position);
-			let direction = Vec3::from(data.direction());
-			vec![(origin + direction * data.deepest_point).into()]
-		}
-		InputDataType::Hand { data } => vec![
-			Vec3::from(data.thumb.tip.pose.position).into(),
-			Vec3::from(data.index.tip.pose.position).into(),
-		],
-		InputDataType::Tip { data } => vec![Vec3::from(data.pose.position).into()],
 	}
 }
 
