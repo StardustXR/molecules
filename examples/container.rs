@@ -1,4 +1,4 @@
-use glam::{Vec3, vec3};
+use glam::{Quat, Vec3, vec3};
 use gluon::{Interface, RefExt};
 use stardust_xr_fusion::{
 	Result,
@@ -18,6 +18,7 @@ use stardust_xr_molecules::{
 	lines::{LineExt, shape},
 };
 use stardust_xr_molecules_protocols::container;
+use std::sync::Arc;
 use tracing_subscriber::EnvFilter;
 
 const SHIMMER_RADIUS: f32 = 0.1;
@@ -34,17 +35,17 @@ impl GrabBox {
 	async fn new<H: ClientHandler>(
 		client: &Client<H>,
 		parent: SpatialRef,
-		transform: Transform,
+		position: Vec3,
 		size: [f32; 3],
 		color: Color,
 	) -> Result<Self> {
 		let (content, _) = Spatial::new(client, &parent, Transform::IDENTITY).await?;
 		let (field, _) = Field::new(client, &content, Shape::Box { size: size.into() }).await?;
 
-		let grabbable = Grabbable::new(
+		let mut grabbable = Grabbable::new(
 			client,
 			parent,
-			transform,
+			Transform::from_translation(position),
 			field.clone(),
 			GrabbableSettings {
 				pointer_mode: PointerMode::Move,
@@ -52,6 +53,7 @@ impl GrabBox {
 			},
 		)
 		.await?;
+		grabbable.set_pose(position, Quat::IDENTITY);
 		content.set_parent(grabbable.content_parent().spatial_ref().await?)?;
 
 		let outline: Vec<Line> = shape(Shape::Box { size: size.into() })
@@ -88,25 +90,37 @@ impl GrabBox {
 	}
 
 	fn visual(&self) -> Vec<Line> {
-		let Some(actor) = self.grabbable.grab_action().actor() else {
-			return self.idle.clone();
-		};
-		let strength = 1.0 / (actor.semantic.order + 1) as f32;
-		let points = shimmer_points(actor);
+		let grab = self.grabbable.grab_action();
+		if grab.actor_acting() {
+			return self.outline.clone();
+		}
 
-		self.outline
-			.iter()
-			.cloned()
-			.map(|l| {
-				l.shimmer(
-					&points,
-					SHIMMER_RADIUS,
-					0.0,
-					rgba_linear!(2.0 * strength, 2.0 * strength, 2.0 * strength, 1.0),
-					1.0 + 4.0 * strength,
-				)
-			})
-			.collect()
+		grab.hovering().current().iter().fold(
+			self.idle.clone(),
+			|lines: Vec<Line>, snap: &Arc<InputSnapshot>| {
+				let strength = grab_strength(snap) / (snap.semantic.order + 1) as f32;
+				let points = shimmer_points(snap);
+				lines
+					.into_iter()
+					.map(|l| {
+						l.shimmer(
+							&points,
+							SHIMMER_RADIUS,
+							0.0,
+							rgba_linear!(2.0 * strength, 2.0 * strength, 2.0 * strength, 1.0),
+							1.0 + 4.0 * strength,
+						)
+					})
+					.collect()
+			},
+		)
+	}
+}
+
+fn grab_strength(snap: &InputSnapshot) -> f32 {
+	match snap.input() {
+		InputDataType::Hand { .. } => snap.datamap_f32("pinch_strength"),
+		_ => snap.datamap_f32("grab"),
 	}
 }
 
@@ -138,7 +152,7 @@ async fn main() {
 	let mut container_box = GrabBox::new(
 		&client,
 		root_ref.clone(),
-		Transform::from_translation(vec3(0.0, 0.0, -0.5)),
+		vec3(0.0, 0.0, -0.5),
 		[0.3; 3],
 		rgba_linear!(0.0, 0.75, 1.0, 1.0),
 	)
@@ -164,7 +178,7 @@ async fn main() {
 	let mut containable_box = GrabBox::new(
 		&client,
 		containable_root_ref,
-		Transform::from_translation(vec3(0.0, 0.25, -0.5)),
+		vec3(0.0, 0.25, -0.5),
 		[0.05; 3],
 		rgba_linear!(1.0, 0.5, 0.0, 1.0),
 	)
