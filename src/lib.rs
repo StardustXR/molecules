@@ -2,6 +2,7 @@
 
 pub mod accent_color;
 pub mod button;
+pub mod container;
 pub mod derezzable;
 pub mod exposure;
 pub mod grabbable;
