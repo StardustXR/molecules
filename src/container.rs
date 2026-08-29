@@ -71,7 +71,6 @@ impl ContainableInner {
 		let mut current_container = self.current_container.lock().await;
 		let target_spatial = (self.evaluator)(&containers);
 		if target_spatial.as_ref() != current_container.as_ref() {
-			dbg!(&target_spatial);
 			let new_spatial = target_spatial
 				.clone()
 				.unwrap_or_else(|| self.original_parent.clone());
