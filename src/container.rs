@@ -11,6 +11,7 @@ use stardust_xr_fusion::{
 	},
 };
 use stardust_xr_molecules_protocols::container::{self, ContainerHandler};
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::Mutex;
 
 #[derive(gluon::Handler)]
@@ -31,6 +32,7 @@ impl Containable {
 			spatial: containable_spatial,
 			evaluator: Box::new(evaluator),
 			current_container: Mutex::new(None),
+			auto_reparent: AtomicBool::new(true),
 			containers: Mutex::new(FxHashMap::default()),
 		})?;
 		let query = client
@@ -51,6 +53,15 @@ impl Containable {
 
 		Ok(Containable(containable, query))
 	}
+
+	/// when off, entering and leaving containers just gets tracked and you pick the
+	/// moment to act on it with [`Containable::reparent`]
+	pub fn set_auto_reparent(&self, auto: bool) {
+		self.0.auto_reparent.store(auto, Ordering::Relaxed);
+	}
+	pub async fn reparent(&self) {
+		self.0.reparent().await;
+	}
 }
 
 type Containers = FxHashMap<QueryableId, (FieldSample, SpatialRef)>;
@@ -61,10 +72,17 @@ struct ContainableInner {
 	spatial: Spatial,
 	evaluator: Box<dyn Fn(&Containers) -> Option<SpatialRef> + Send + Sync>,
 	current_container: Mutex<Option<SpatialRef>>,
+	auto_reparent: AtomicBool,
 	containers: Mutex<FxHashMap<QueryableId, (FieldSample, SpatialRef)>>,
 }
 impl ContainableInner {
 	async fn attempt_reparent(&self) {
+		if self.auto_reparent.load(Ordering::Relaxed) {
+			self.reparent().await;
+		}
+	}
+
+	async fn reparent(&self) {
 		let containers = self.containers.lock().await;
 		let mut current_container = self.current_container.lock().await;
 		let target_spatial = (self.evaluator)(&containers);
