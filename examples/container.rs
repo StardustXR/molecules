@@ -205,7 +205,7 @@ async fn main() {
 	)
 	.await
 	.unwrap();
-	let _containable = Containable::new(
+	let containable = Containable::new(
 		&client,
 		containable_root,
 		root_ref.clone(),
@@ -226,6 +226,8 @@ async fn main() {
 	.await
 	.unwrap();
 
+	containable.set_auto_reparent(false);
+
 	let mut frame_receiver = client.frame_receiver();
 	loop {
 		let info = frame_receiver.recv().await.unwrap();
@@ -234,5 +236,8 @@ async fn main() {
 		container_box.grabbable.frame(&info);
 		containable_box.update();
 		containable_box.grabbable.frame(&info);
+		if containable_box.grabbable.grab_action().actor_stopped() {
+			containable.reparent().await;
+		}
 	}
 }
