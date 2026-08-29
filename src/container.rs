@@ -1,5 +1,3 @@
-use std::thread::current;
-
 use gluon::{Interface, Node, RefExt};
 use rustc_hash::FxHashMap;
 use stardust_xr_fusion::{
