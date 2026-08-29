@@ -19,12 +19,49 @@ fn lcm(a: usize, b: usize) -> usize {
 	a * b / gcd(a, b)
 }
 
+fn ray_distance(origin: Vec3, direction: Vec3, point: Vec3) -> f32 {
+	let v = point - origin;
+	(v - direction * v.dot(direction).max(0.0)).length()
+}
+
+fn shimmer_by(
+	mut line: Line,
+	max_distance: f32,
+	min_distance: f32,
+	to_color: Color,
+	thickness_multiplier: f32,
+	distance: impl Fn(Vec3) -> f32,
+) -> Line {
+	for point in &mut line.points {
+		let mapped = distance(point.point.into())
+			.remap(max_distance, min_distance, 0.0, 1.0)
+			.clamp(0.0, 1.0);
+
+		point.color.lerp_bounded_to(to_color, mapped);
+		point.thickness *= mapped.remap(0.0, 1.0, 1.0, thickness_multiplier);
+	}
+	line
+}
+
 pub trait LineExt: Sized {
 	fn thickness(self, thickness: f32) -> Self;
 	fn color(self, color: Color) -> Self;
 	fn shimmer<P: Into<Vec3F> + Copy>(
 		self,
 		points: &[P],
+		max_distance: f32,
+		min_distance: f32,
+		to_color: Color,
+		thickness_multiplier: f32,
+	) -> Self;
+	/// closest the ray gets to any point of this line, so you can normalize a
+	/// [`LineExt::shimmer_ray`] to whatever you're actually pointing at
+	fn ray_distance<P: Into<Vec3F>>(&self, origin: P, direction: P) -> f32;
+	/// shimmer along a ray instead of around points, for pointer-ish input
+	fn shimmer_ray<P: Into<Vec3F>>(
+		self,
+		origin: P,
+		direction: P,
 		max_distance: f32,
 		min_distance: f32,
 		to_color: Color,
@@ -67,30 +104,59 @@ impl LineExt for Line {
 	}
 
 	fn shimmer<P: Into<Vec3F> + Copy>(
-		mut self,
+		self,
 		points: &[P],
 		max_distance: f32,
 		min_distance: f32,
 		to_color: Color,
 		thickness_multiplier: f32,
 	) -> Self {
-		for point in &mut self.points {
-			let Some(shimmer_distance) = points
-				.iter()
-				.map(|p| Vec3::from(Into::<Vec3F>::into(*p)).distance(point.point.into()))
-				.reduce(|a, b| a.min(b))
-			else {
-				return self;
-			};
-
-			let mapped = shimmer_distance
-				.remap(max_distance, min_distance, 0.0, 1.0)
-				.clamp(0.0, 1.0);
-
-			point.color.lerp_bounded_to(to_color, mapped);
-			point.thickness *= mapped.remap(0.0, 1.0, 1.0, thickness_multiplier);
+		if points.is_empty() {
+			return self;
 		}
-		self
+		shimmer_by(
+			self,
+			max_distance,
+			min_distance,
+			to_color,
+			thickness_multiplier,
+			|p| {
+				points
+					.iter()
+					.map(|s| Vec3::from(Into::<Vec3F>::into(*s)).distance(p))
+					.fold(f32::INFINITY, f32::min)
+			},
+		)
+	}
+
+	fn ray_distance<P: Into<Vec3F>>(&self, origin: P, direction: P) -> f32 {
+		let origin = Vec3::from(origin.into());
+		let direction = Vec3::from(direction.into()).normalize_or_zero();
+		self.points
+			.iter()
+			.map(|p| ray_distance(origin, direction, p.point.into()))
+			.fold(f32::INFINITY, f32::min)
+	}
+
+	fn shimmer_ray<P: Into<Vec3F>>(
+		self,
+		origin: P,
+		direction: P,
+		max_distance: f32,
+		min_distance: f32,
+		to_color: Color,
+		thickness_multiplier: f32,
+	) -> Self {
+		let origin = Vec3::from(origin.into());
+		let direction = Vec3::from(direction.into()).normalize_or_zero();
+		shimmer_by(
+			self,
+			max_distance,
+			min_distance,
+			to_color,
+			thickness_multiplier,
+			|p| ray_distance(origin, direction, p),
+		)
 	}
 
 	fn trace(self, t: f32) -> Self {
