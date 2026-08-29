@@ -5,8 +5,14 @@ use gluon_codegen::{Derives, ModuleExternalProtocol};
 fn main() {
 	gluon_codegen::helpers::gen_multiple_modules(
 		&[
-			("keyboard_handler", Path::new("./gluon/org.stardustxr.KeyboardHandler.gluon")),
-			("mouse_handler", Path::new("./gluon/org.stardustxr.MouseHandler.gluon")),
+			(
+				"keyboard_handler",
+				Path::new("./gluon/org.stardustxr.KeyboardHandler.gluon"),
+			),
+			(
+				"mouse_handler",
+				Path::new("./gluon/org.stardustxr.MouseHandler.gluon"),
+			),
 			(
 				"derezzable",
 				Path::new("./gluon/org.stardustxr.Derezzable.gluon"),
