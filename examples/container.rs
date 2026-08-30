@@ -1,5 +1,4 @@
 use glam::{Quat, Vec3, vec3};
-use gluon::{Interface, RefExt};
 use stardust_xr_fusion::{
 	Result,
 	client::{Client, ClientHandler},
@@ -17,7 +16,6 @@ use stardust_xr_molecules::{
 	input_action::InputSnapshot,
 	lines::{LineExt, shape},
 };
-use stardust_xr_molecules_protocols::container;
 use std::sync::Arc;
 use tracing_subscriber::EnvFilter;
 
@@ -179,7 +177,6 @@ async fn main() {
 	)
 	.await
 	.unwrap();
-	let (_container_node, container_ref) = container::Container::new_node(Container).unwrap();
 	let container_queryable = QueryableObject::new(
 		&client,
 		container_box.content.clone(),
@@ -187,10 +184,7 @@ async fn main() {
 	)
 	.await
 	.unwrap();
-	let _container_guard = container_queryable
-		.add_interface(&container_ref, container::Container::ID)
-		.await
-		.unwrap();
+	let _container = Container::new(&container_queryable).await.unwrap();
 
 	let (containable_root, containable_root_ref) =
 		Spatial::new(&client, &root_ref, Transform::IDENTITY)

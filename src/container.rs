@@ -4,25 +4,32 @@ use stardust_xr_fusion::{
 	Result,
 	client::{Client, ClientHandler},
 	fields::{FieldRef, FieldSample},
-	query::{InterfaceDependency, QueriedInterface, QueryableId, QueryableObject},
+	query::{
+		InterfaceDependency, QueriedInterface, QueryableId, QueryableInterface, QueryableObject,
+	},
 	spatial::{Spatial, SpatialRef},
 	spatial_query::{
 		Point, PointsQuery, PointsQueryHandle, PointsQueryHandler, PointsQueryHandlerHandler,
 	},
 };
-use stardust_xr_molecules_protocols::container::{self, ContainerHandler, ContainerLocal};
-use std::sync::atomic::{AtomicBool, Ordering};
+use stardust_xr_molecules_protocols::container::{self, ContainerHandler};
+use std::sync::{
+	OnceLock,
+	atomic::{AtomicBool, Ordering},
+};
 use tokio::sync::Mutex;
 
 #[derive(gluon::Handler)]
-pub struct Container;
+pub struct Container(OnceLock<QueryableInterface>);
 impl ContainerHandler for Container {}
 impl Container {
 	pub async fn new(queryable: &QueryableObject) -> Result<Node<Self>> {
-		let (node, interface) = container::Container::new_node(Container)?;
-		queryable
-			.add_interface(&interface, container::Container::ID)
-			.await??;
+		let (node, interface) = container::Container::new_node(Container(OnceLock::default()))?;
+		let _ = node.handler().0.set(
+			queryable
+				.add_interface(&interface, container::Container::ID)
+				.await??,
+		);
 		Ok(node)
 	}
 }
