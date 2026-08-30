@@ -27,6 +27,7 @@ impl Container {
 	}
 }
 
+#[allow(unused)]
 pub struct Containable(Node<ContainableInner>, PointsQueryHandle);
 impl Containable {
 	pub async fn new<H: ClientHandler>(
