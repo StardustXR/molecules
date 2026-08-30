@@ -10,13 +10,18 @@ use stardust_xr_fusion::{
 		Point, PointsQuery, PointsQueryHandle, PointsQueryHandler, PointsQueryHandlerHandler,
 	},
 };
-use stardust_xr_molecules_protocols::container::{self, ContainerHandler};
+use stardust_xr_molecules_protocols::container::{self, ContainerHandler, ContainerLocal};
 use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::Mutex;
 
 #[derive(gluon::Handler)]
 pub struct Container;
 impl ContainerHandler for Container {}
+impl Container {
+	pub fn new() -> Result<(Node<Self>, ContainerLocal<Self>)> {
+		Ok(container::Container::new_node(Container)?)
+	}
+}
 
 pub struct Containable(Node<ContainableInner>, PointsQueryHandle);
 impl Containable {
