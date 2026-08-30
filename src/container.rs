@@ -4,7 +4,7 @@ use stardust_xr_fusion::{
 	Result,
 	client::{Client, ClientHandler},
 	fields::{FieldRef, FieldSample},
-	query::{InterfaceDependency, QueriedInterface, QueryableId},
+	query::{InterfaceDependency, QueriedInterface, QueryableId, QueryableObject},
 	spatial::{Spatial, SpatialRef},
 	spatial_query::{
 		Point, PointsQuery, PointsQueryHandle, PointsQueryHandler, PointsQueryHandlerHandler,
@@ -18,8 +18,12 @@ use tokio::sync::Mutex;
 pub struct Container;
 impl ContainerHandler for Container {}
 impl Container {
-	pub fn new() -> Result<(Node<Self>, ContainerLocal<Self>)> {
-		Ok(container::Container::new_node(Container)?)
+	pub async fn new(queryable: &QueryableObject) -> Result<Node<Self>> {
+		let (node, interface) = container::Container::new_node(Container)?;
+		queryable
+			.add_interface(&interface, container::Container::ID)
+			.await??;
+		Ok(node)
 	}
 }
 
