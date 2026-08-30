@@ -1,0 +1,9 @@
+import "org.stardustxr.Spatial" as spatial
+
+/// Interface for moving other objects
+interface Transformable {
+	/// Transform this object by this partial transform relative to the provided spatialref (adds to the existing transform)
+	offset_relative_transform(reference: Ref<spatial::SpatialRef>, offset_transform: spatial::PartialTransform)
+	/// Transform this object by this partial transform relative to the provided spatialref
+	set_relative_transform(reference: Ref<spatial::SpatialRef>, transform: spatial::PartialTransform)
+}

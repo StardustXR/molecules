@@ -21,7 +21,10 @@ fn main() {
 				"container",
 				Path::new("./gluon/org.stardustxr.Container.gluon"),
 			),
-
+			(
+				"transformable",
+				Path::new("./gluon/org.stardustxr.Transformable.gluon"),
+			),
 		],
 		&[
 			&ModuleExternalProtocol {
