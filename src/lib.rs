@@ -13,6 +13,7 @@ pub mod lines;
 pub mod mouse_handler;
 pub mod multi;
 pub mod touch_plane;
+pub mod transformable;
 
 pub use derezzable::Derezzable;
 pub use exposure::Exposure;

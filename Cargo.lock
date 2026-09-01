@@ -1117,7 +1117,7 @@ dependencies = [
 [[package]]
 name = "stardust-xr-fusion"
 version = "0.51.1"
-source = "git+https://github.com/StardustXR/core.git?branch=refactor%2Fstrongipc#9dd6f716ff1b89e7c9a6d2f14cd20dcd493d33d7"
+source = "git+https://github.com/StardustXR/core.git?branch=refactor%2Fstrongipc#6b931289868572924a3e8aa33ba59113346a8521"
 dependencies = [
  "glam 0.30.7",
  "gluon",
@@ -1166,7 +1166,7 @@ dependencies = [
 [[package]]
 name = "stardust-xr-protocol"
 version = "0.51.1"
-source = "git+https://github.com/StardustXR/core.git?branch=refactor%2Fstrongipc#9dd6f716ff1b89e7c9a6d2f14cd20dcd493d33d7"
+source = "git+https://github.com/StardustXR/core.git?branch=refactor%2Fstrongipc#6b931289868572924a3e8aa33ba59113346a8521"
 dependencies = [
  "fnv",
  "glam 0.29.3",
@@ -1186,7 +1186,7 @@ dependencies = [
 [[package]]
 name = "strong-ipc"
 version = "0.1.0"
-source = "git+https://github.com/technobaboo/strong-ipc#4dddd5ede29f02352bc101645c55708862b1d9f4"
+source = "git+https://github.com/technobaboo/strong-ipc#42af1b22dc3944c64721b98d8afbd1f0ba3abb69"
 dependencies = [
  "dashmap",
  "rustix",

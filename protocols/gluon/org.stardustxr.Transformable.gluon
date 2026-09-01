@@ -1,9 +1,42 @@
 import "org.stardustxr.Spatial" as spatial
+import "org.stardustxr.Types" as types
 
 /// Interface for moving other objects
 interface Transformable {
 	/// Transform this object by this partial transform relative to the provided spatialref (adds to the existing transform)
 	offset_relative_transform(reference: Ref<spatial::SpatialRef>, offset_transform: spatial::PartialTransform)
-	/// Transform this object by this partial transform relative to the provided spatialref
+	/// Set the transform this object relative to the provided spatialref
 	set_relative_transform(reference: Ref<spatial::SpatialRef>, transform: spatial::PartialTransform)
+}
+
+/// Interface for moving other objects
+interface Translatable {
+	/// Move this object by this offset relative to the provided spatialref (adds to the existing transform)
+	offset_relative_translation(reference: Ref<spatial::SpatialRef>, offset: types::Vec3f)
+	/// Set the translation of this object relative to the provided spatialref
+	set_relative_translation(reference: Ref<spatial::SpatialRef>, translation: types::Vec3f)
+}
+
+/// Interface for moving other objects
+interface Rotatable {
+	/// Rotate this object by this offset relative to the provided spatialref (adds to the existing transform)
+	offset_relative_rotation(reference: Ref<spatial::SpatialRef>, offset: types::Quatf)
+	/// Set the rotation of this object relative to the provided spatialref
+	set_relative_rotation(reference: Ref<spatial::SpatialRef>, rotation: types::Quatf)
+}
+
+/// Interface for moving other objects
+interface Scalable {
+	/// Scale this object by this offset relative to the provided spatialref (adds to the existing transform)
+	offset_relative_scale(reference: Ref<spatial::SpatialRef>, offset: types::Vec3f)
+	/// Set the scale of this object relative to the provided spatialref
+	set_relative_scale(reference: Ref<spatial::SpatialRef>, scale: types::Vec3f)
+}
+
+/// Interface for moving other objects
+interface Poseable {
+	/// Offset the pose of this object by this offset relative to the provided spatialref (adds to the existing transform)
+	offset_relative_pse(reference: Ref<spatial::SpatialRef>, offset: types::Posef)
+	/// Set the pose of this object relative to the provided spatialref
+	set_relative_scale(reference: Ref<spatial::SpatialRef>, pose: types::Posef)
 }
