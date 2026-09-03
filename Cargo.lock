@@ -1135,7 +1135,7 @@ name = "stardust-xr-molecules"
 version = "0.51.0"
 dependencies = [
  "futures",
- "glam 0.29.3",
+ "glam 0.30.7",
  "gluon",
  "lazy_static",
  "lerp",
