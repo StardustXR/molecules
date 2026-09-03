@@ -186,6 +186,12 @@ impl InputQueue {
 			.capture_requests
 			.remove(&snap.method);
 	}
+	pub async fn request_capture(
+		&self,
+		method: &InputMethod,
+	) -> std::result::Result<Option<InputMethodCapture>, gluon::SendError> {
+		method.request_capture(self.1.clone()).await
+	}
 }
 
 impl InputHandlerHandler for InputQueueInner {
