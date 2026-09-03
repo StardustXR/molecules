@@ -43,9 +43,14 @@ const COHERENCE: f32 = 0.8;
 const TRANSVERSE: f32 = 0.6;
 const QUAKE_SEED: u32 = 0x1eaf_c0de;
 
-const RING_INTERVAL: f32 = 0.1;
+const RING_COUNT: usize = 10;
+const RING_INTERVAL: f32 = DURATION / RING_COUNT as f32;
 const RING_SEGMENTS: usize = 64;
 const RING_THICKNESS: f32 = 0.012;
+
+/// the source stops emitting after the last ring, so the quake is over once that one
+/// has run out to the rim
+const QUAKE_END: f32 = (RING_COUNT - 1) as f32 * RING_INTERVAL + RADIUS / SPEED;
 
 const SETTLE_FRAMES: usize = 3;
 
@@ -85,34 +90,28 @@ fn ground_motion(t: f32, seed: u32) -> f32 {
 /// a ring per wavefront, riding out at the same speed the motion does so you can watch
 /// each object start moving as one crosses it
 fn rings(t: f32) -> Vec<Line> {
-	let mut emit = 0.0;
-	let mut rings = Vec::new();
-	while emit < DURATION {
-		let radius = (t - emit) * SPEED;
-		emit += RING_INTERVAL;
-		if radius <= 0.0 || radius >= RADIUS {
-			continue;
-		}
-		let p = radius / RADIUS;
-		let strength = envelope((emit - RING_INTERVAL).max(ATTACK));
-		rings.push(
-			circle(RING_SEGMENTS, 0.0, radius)
-				.color(ring_color(p, strength))
-				.thickness(RING_THICKNESS * (1.0 - p) + 0.002),
-		);
-	}
-	rings
+	(0..RING_COUNT)
+		.filter_map(|i| {
+			let radius = (t - i as f32 * RING_INTERVAL) * SPEED;
+			(radius > 0.0 && radius < RADIUS).then(|| {
+				let p = radius / RADIUS;
+				circle(RING_SEGMENTS, 0.0, radius)
+					.color(ring_color(p))
+					.thickness(RING_THICKNESS * (1.0 - p) + 0.002)
+			})
+		})
+		.collect()
 }
 
 /// white at the front, cooling through orange to red as it spreads out and thins
-fn ring_color(p: f32, strength: f32) -> Color {
+fn ring_color(p: f32) -> Color {
 	let (g, b) = if p < 0.5 {
 		let k = p * 2.0;
 		(1.0 - 0.5 * k, 1.0 - k)
 	} else {
 		(0.5 * (1.0 - (p - 0.5) * 2.0), 0.0)
 	};
-	rgba_linear!(1.0, g, b, (1.0 - p).powi(2) * strength)
+	rgba_linear!(1.0, g, b, (1.0 - p).powi(2))
 }
 
 fn phase(seed: u32, k: usize) -> f32 {
@@ -286,7 +285,7 @@ async fn main() {
 		frame_receiver.recv().await.unwrap();
 
 		let t = start.elapsed().as_secs_f32();
-		if t >= DURATION + RADIUS / SPEED {
+		if t >= QUAKE_END {
 			break;
 		}
 		let _ = ring_lines.set_lines(rings(t));
