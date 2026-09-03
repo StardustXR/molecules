@@ -30,8 +30,11 @@ impl gluon::Convertable for Derezzable {
         self.obj.write_owned(gluon_data)
     }
 }
-impl gluon::Interface for Derezzable {
+impl Derezzable {
     const ID: &'static str = "org.stardustxr.Derezzable.Derezzable";
+}
+impl gluon::Interface for Derezzable {
+    const ID: &'static str = Self::ID;
 }
 ///Carries the per-interface bound for [`gluon::RefExt`]'s handler constructors: only a handler implementing this interface's handler trait can be passed to them.
 impl<H: DerezzableHandler> gluon::HandledBy<H> for Derezzable {}
@@ -114,6 +117,22 @@ pub trait DerezzableHandler: gluon::Handler + Send + Sync + 'static {
             }
             Ok(())
         }
+    }
+    fn to_node(
+        self,
+    ) -> Result<(gluon::Node<Self>, gluon::LocalRef<Derezzable, Self>), gluon::NodeError>
+    where
+        Self: Sized,
+    {
+        use gluon::RefExt;
+        Derezzable::new_node(self)
+    }
+    fn to_service(self) -> Result<gluon::LocalRef<Derezzable, Self>, gluon::NodeError>
+    where
+        Self: Sized,
+    {
+        use gluon::RefExt;
+        Derezzable::new_service(self)
     }
 }
 pub mod proxied {

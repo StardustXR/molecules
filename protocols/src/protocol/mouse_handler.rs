@@ -98,8 +98,11 @@ impl gluon::Convertable for MouseHandler {
         self.obj.write_owned(gluon_data)
     }
 }
-impl gluon::Interface for MouseHandler {
+impl MouseHandler {
     const ID: &'static str = "org.stardustxr.MouseHandler.MouseHandler";
+}
+impl gluon::Interface for MouseHandler {
+    const ID: &'static str = Self::ID;
 }
 ///Carries the per-interface bound for [`gluon::RefExt`]'s handler constructors: only a handler implementing this interface's handler trait can be passed to them.
 impl<H: MouseHandlerHandler> gluon::HandledBy<H> for MouseHandler {}
@@ -363,6 +366,25 @@ pub trait MouseHandlerHandler: gluon::Handler + Send + Sync + 'static {
             }
             Ok(())
         }
+    }
+    fn to_node(
+        self,
+    ) -> Result<
+        (gluon::Node<Self>, gluon::LocalRef<MouseHandler, Self>),
+        gluon::NodeError,
+    >
+    where
+        Self: Sized,
+    {
+        use gluon::RefExt;
+        MouseHandler::new_node(self)
+    }
+    fn to_service(self) -> Result<gluon::LocalRef<MouseHandler, Self>, gluon::NodeError>
+    where
+        Self: Sized,
+    {
+        use gluon::RefExt;
+        MouseHandler::new_service(self)
     }
 }
 pub mod proxied {

@@ -30,8 +30,11 @@ impl gluon::Convertable for Transformable {
         self.obj.write_owned(gluon_data)
     }
 }
-impl gluon::Interface for Transformable {
+impl Transformable {
     const ID: &'static str = "org.stardustxr.Transformable.Transformable";
+}
+impl gluon::Interface for Transformable {
+    const ID: &'static str = Self::ID;
 }
 ///Carries the per-interface bound for [`gluon::RefExt`]'s handler constructors: only a handler implementing this interface's handler trait can be passed to them.
 impl<H: TransformableHandler> gluon::HandledBy<H> for Transformable {}
@@ -187,6 +190,25 @@ pub trait TransformableHandler: gluon::Handler + Send + Sync + 'static {
             Ok(())
         }
     }
+    fn to_node(
+        self,
+    ) -> Result<
+        (gluon::Node<Self>, gluon::LocalRef<Transformable, Self>),
+        gluon::NodeError,
+    >
+    where
+        Self: Sized,
+    {
+        use gluon::RefExt;
+        Transformable::new_node(self)
+    }
+    fn to_service(self) -> Result<gluon::LocalRef<Transformable, Self>, gluon::NodeError>
+    where
+        Self: Sized,
+    {
+        use gluon::RefExt;
+        Transformable::new_service(self)
+    }
 }
 #[derive(Debug, Clone)]
 pub struct Translatable {
@@ -210,8 +232,11 @@ impl gluon::Convertable for Translatable {
         self.obj.write_owned(gluon_data)
     }
 }
-impl gluon::Interface for Translatable {
+impl Translatable {
     const ID: &'static str = "org.stardustxr.Transformable.Translatable";
+}
+impl gluon::Interface for Translatable {
+    const ID: &'static str = Self::ID;
 }
 ///Carries the per-interface bound for [`gluon::RefExt`]'s handler constructors: only a handler implementing this interface's handler trait can be passed to them.
 impl<H: TranslatableHandler> gluon::HandledBy<H> for Translatable {}
@@ -377,6 +402,25 @@ pub trait TranslatableHandler: gluon::Handler + Send + Sync + 'static {
             Ok(())
         }
     }
+    fn to_node(
+        self,
+    ) -> Result<
+        (gluon::Node<Self>, gluon::LocalRef<Translatable, Self>),
+        gluon::NodeError,
+    >
+    where
+        Self: Sized,
+    {
+        use gluon::RefExt;
+        Translatable::new_node(self)
+    }
+    fn to_service(self) -> Result<gluon::LocalRef<Translatable, Self>, gluon::NodeError>
+    where
+        Self: Sized,
+    {
+        use gluon::RefExt;
+        Translatable::new_service(self)
+    }
 }
 #[derive(Debug, Clone)]
 pub struct Rotatable {
@@ -400,8 +444,11 @@ impl gluon::Convertable for Rotatable {
         self.obj.write_owned(gluon_data)
     }
 }
-impl gluon::Interface for Rotatable {
+impl Rotatable {
     const ID: &'static str = "org.stardustxr.Transformable.Rotatable";
+}
+impl gluon::Interface for Rotatable {
+    const ID: &'static str = Self::ID;
 }
 ///Carries the per-interface bound for [`gluon::RefExt`]'s handler constructors: only a handler implementing this interface's handler trait can be passed to them.
 impl<H: RotatableHandler> gluon::HandledBy<H> for Rotatable {}
@@ -562,6 +609,22 @@ pub trait RotatableHandler: gluon::Handler + Send + Sync + 'static {
             Ok(())
         }
     }
+    fn to_node(
+        self,
+    ) -> Result<(gluon::Node<Self>, gluon::LocalRef<Rotatable, Self>), gluon::NodeError>
+    where
+        Self: Sized,
+    {
+        use gluon::RefExt;
+        Rotatable::new_node(self)
+    }
+    fn to_service(self) -> Result<gluon::LocalRef<Rotatable, Self>, gluon::NodeError>
+    where
+        Self: Sized,
+    {
+        use gluon::RefExt;
+        Rotatable::new_service(self)
+    }
 }
 #[derive(Debug, Clone)]
 pub struct Scalable {
@@ -585,8 +648,11 @@ impl gluon::Convertable for Scalable {
         self.obj.write_owned(gluon_data)
     }
 }
-impl gluon::Interface for Scalable {
+impl Scalable {
     const ID: &'static str = "org.stardustxr.Transformable.Scalable";
+}
+impl gluon::Interface for Scalable {
+    const ID: &'static str = Self::ID;
 }
 ///Carries the per-interface bound for [`gluon::RefExt`]'s handler constructors: only a handler implementing this interface's handler trait can be passed to them.
 impl<H: ScalableHandler> gluon::HandledBy<H> for Scalable {}
@@ -747,6 +813,22 @@ pub trait ScalableHandler: gluon::Handler + Send + Sync + 'static {
             Ok(())
         }
     }
+    fn to_node(
+        self,
+    ) -> Result<(gluon::Node<Self>, gluon::LocalRef<Scalable, Self>), gluon::NodeError>
+    where
+        Self: Sized,
+    {
+        use gluon::RefExt;
+        Scalable::new_node(self)
+    }
+    fn to_service(self) -> Result<gluon::LocalRef<Scalable, Self>, gluon::NodeError>
+    where
+        Self: Sized,
+    {
+        use gluon::RefExt;
+        Scalable::new_service(self)
+    }
 }
 #[derive(Debug, Clone)]
 pub struct Poseable {
@@ -770,8 +852,11 @@ impl gluon::Convertable for Poseable {
         self.obj.write_owned(gluon_data)
     }
 }
-impl gluon::Interface for Poseable {
+impl Poseable {
     const ID: &'static str = "org.stardustxr.Transformable.Poseable";
+}
+impl gluon::Interface for Poseable {
+    const ID: &'static str = Self::ID;
 }
 ///Carries the per-interface bound for [`gluon::RefExt`]'s handler constructors: only a handler implementing this interface's handler trait can be passed to them.
 impl<H: PoseableHandler> gluon::HandledBy<H> for Poseable {}
@@ -917,6 +1002,22 @@ pub trait PoseableHandler: gluon::Handler + Send + Sync + 'static {
             }
             Ok(())
         }
+    }
+    fn to_node(
+        self,
+    ) -> Result<(gluon::Node<Self>, gluon::LocalRef<Poseable, Self>), gluon::NodeError>
+    where
+        Self: Sized,
+    {
+        use gluon::RefExt;
+        Poseable::new_node(self)
+    }
+    fn to_service(self) -> Result<gluon::LocalRef<Poseable, Self>, gluon::NodeError>
+    where
+        Self: Sized,
+    {
+        use gluon::RefExt;
+        Poseable::new_service(self)
     }
 }
 pub mod proxied {
