@@ -6,20 +6,20 @@ fn main() {
 	gluon_codegen::helpers::gen_multiple_modules(
 		&[
 			(
-				"keyboard_handler",
-				Path::new("./gluon/org.stardustxr.KeyboardHandler.gluon"),
-			),
-			(
-				"mouse_handler",
-				Path::new("./gluon/org.stardustxr.MouseHandler.gluon"),
+				"container",
+				Path::new("./gluon/org.stardustxr.Container.gluon"),
 			),
 			(
 				"derezzable",
 				Path::new("./gluon/org.stardustxr.Derezzable.gluon"),
 			),
 			(
-				"container",
-				Path::new("./gluon/org.stardustxr.Container.gluon"),
+				"keyboard_handler",
+				Path::new("./gluon/org.stardustxr.KeyboardHandler.gluon"),
+			),
+			(
+				"mouse_handler",
+				Path::new("./gluon/org.stardustxr.MouseHandler.gluon"),
 			),
 			(
 				"transformable",
