@@ -1,0 +1,2 @@
+/// A spatial environment, like a homespace
+interface Environment {}

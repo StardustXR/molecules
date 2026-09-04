@@ -14,6 +14,10 @@ fn main() {
 				Path::new("./gluon/org.stardustxr.Derezzable.gluon"),
 			),
 			(
+				"environment",
+				Path::new("./gluon/org.stardustxr.Environment.gluon"),
+			),
+			(
 				"keyboard_handler",
 				Path::new("./gluon/org.stardustxr.KeyboardHandler.gluon"),
 			),
