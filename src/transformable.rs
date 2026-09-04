@@ -1,3 +1,5 @@
+use glam::Vec3;
+
 use std::future::ready;
 
 use gluon::Handler;
@@ -132,10 +134,10 @@ impl TranslatableHandler for TranslatableInner {
 		reference: SpatialRef,
 		offset: Vec3F,
 	) {
-		let Ok(Ok(transform)) = self.0.get_relative_transform(reference.clone()).await else {
+		let Ok(Ok(mut transform)) = self.0.get_relative_transform(reference.clone()).await else {
 			return;
 		};
-		let transform = transform * PartialTransform::from_translation(offset);
+		transform.translation = (Vec3::from(transform.translation) + Vec3::from(offset)).into();
 		_ = self.0.set_relative_transform(reference, transform);
 	}
 
