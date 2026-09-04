@@ -2,39 +2,33 @@
 use gluon::Convertable as _;
 use tracing::Instrument as _;
 pub const EXTERNAL_PROTOCOL: gluon::ExternalProtocol = gluon::ExternalProtocol {
-    protocol_name: "org.stardustxr.Container",
-    types: &[],
+	protocol_name: "org.stardustxr.Container",
+	types: &[],
 };
 pub mod proxies {
-    use super::*;
+	use super::*;
 }
 #[derive(Debug, Clone)]
 pub struct Container {
-    obj: gluon::Ref,
+	obj: gluon::Ref,
 }
 impl gluon::Convertable for Container {
-    fn write(
-        &self,
-        gluon_data: &mut gluon::DataBuilder,
-    ) -> Result<(), gluon::WriteError> {
-        self.obj.write(gluon_data)
-    }
-    fn read(gluon_data: &mut gluon::DataReader) -> Result<Self, gluon::ReadError> {
-        let obj = gluon::Ref::read(gluon_data)?;
-        Ok(Container::from_ref(obj))
-    }
-    fn write_owned(
-        self,
-        gluon_data: &mut gluon::DataBuilder,
-    ) -> Result<(), gluon::WriteError> {
-        self.obj.write_owned(gluon_data)
-    }
+	fn write(&self, gluon_data: &mut gluon::DataBuilder) -> Result<(), gluon::WriteError> {
+		self.obj.write(gluon_data)
+	}
+	fn read(gluon_data: &mut gluon::DataReader) -> Result<Self, gluon::ReadError> {
+		let obj = gluon::Ref::read(gluon_data)?;
+		Ok(Container::from_ref(obj))
+	}
+	fn write_owned(self, gluon_data: &mut gluon::DataBuilder) -> Result<(), gluon::WriteError> {
+		self.obj.write_owned(gluon_data)
+	}
 }
 impl Container {
-    const ID: &'static str = "org.stardustxr.Container.Container";
+	const ID: &'static str = "org.stardustxr.Container.Container";
 }
 impl gluon::Interface for Container {
-    const ID: &'static str = Self::ID;
+	const ID: &'static str = Self::ID;
 }
 ///Carries the per-interface bound for [`gluon::RefExt`]'s handler constructors: only a handler implementing this interface's handler trait can be passed to them.
 impl<H: ContainerHandler> gluon::HandledBy<H> for Container {}
@@ -42,78 +36,78 @@ impl<H: ContainerHandler> gluon::HandledBy<H> for Container {}
 pub type ContainerLocal<H> = gluon::LocalRef<Container, H>;
 ///Drops the handler share and keeps the proxy, so a [`gluon::LocalRef`] goes anywhere this proxy does — including the `impl Into<Self>` parameters generated for typed refs.
 impl<H: ContainerHandler> From<ContainerLocal<H>> for Container {
-    fn from(value: ContainerLocal<H>) -> Container {
-        value.into_proxy()
-    }
+	fn from(value: ContainerLocal<H>) -> Container {
+		value.into_proxy()
+	}
 }
 impl gluon::RefExt for Container {
-    fn from_ref(obj: gluon::Ref) -> Container {
-        Container { obj }
-    }
+	fn from_ref(obj: gluon::Ref) -> Container {
+		Container { obj }
+	}
 }
 impl Container {
-    ///only use this when you know the ref leads to something implementing this interface, else the consquences are for you to find out
-    pub fn from_ref(obj: gluon::Ref) -> Container {
-        Container { obj }
-    }
+	///only use this when you know the ref leads to something implementing this interface, else the consquences are for you to find out
+	pub fn from_ref(obj: gluon::Ref) -> Container {
+		Container { obj }
+	}
 }
 impl From<Container> for gluon::Ref {
-    fn from(value: Container) -> Self {
-        value.obj
-    }
+	fn from(value: Container) -> Self {
+		value.obj
+	}
 }
 impl gluon::ToRef for Container {
-    fn to_ref(&self) -> gluon::Ref {
-        self.obj.clone()
-    }
+	fn to_ref(&self) -> gluon::Ref {
+		self.obj.clone()
+	}
 }
 impl gluon::Liveness for Container {
-    fn death_notifier(&self) -> gluon::DeathNotifier {
-        gluon::Liveness::death_notifier(&self.obj)
-    }
+	fn death_notifier(&self) -> gluon::DeathNotifier {
+		gluon::Liveness::death_notifier(&self.obj)
+	}
 }
 impl std::hash::Hash for Container {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.obj.hash(state);
-    }
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+		self.obj.hash(state);
+	}
 }
 impl PartialEq for Container {
-    fn eq(&self, other: &Self) -> bool {
-        self.obj == other.obj
-    }
+	fn eq(&self, other: &Self) -> bool {
+		self.obj == other.obj
+	}
 }
 impl Eq for Container {}
 pub trait ContainerHandler: gluon::Handler + Send + Sync + 'static {
-    fn dispatch_one_way(
-        &self,
-        transaction_code: u32,
-        mut gluon_data: gluon::DataReader,
-        ctx: gluon::Context,
-    ) -> impl Future<Output = Result<(), gluon::SendError>> + Send + Sync {
-        async move {
-            match transaction_code {
-                _ => {}
-            }
-            Ok(())
-        }
-    }
-    fn to_node(
-        self,
-    ) -> Result<(gluon::Node<Self>, gluon::LocalRef<Container, Self>), gluon::NodeError>
-    where
-        Self: Sized,
-    {
-        use gluon::RefExt;
-        Container::new_node(self)
-    }
-    fn to_service(self) -> Result<gluon::LocalRef<Container, Self>, gluon::NodeError>
-    where
-        Self: Sized,
-    {
-        use gluon::RefExt;
-        Container::new_service(self)
-    }
+	fn dispatch_one_way(
+		&self,
+		transaction_code: u32,
+		mut gluon_data: gluon::DataReader,
+		ctx: gluon::Context,
+	) -> impl Future<Output = Result<(), gluon::SendError>> + Send + Sync {
+		async move {
+			match transaction_code {
+				_ => {}
+			}
+			Ok(())
+		}
+	}
+	fn to_node(
+		self,
+	) -> Result<(gluon::Node<Self>, gluon::LocalRef<Container, Self>), gluon::NodeError>
+	where
+		Self: Sized,
+	{
+		use gluon::RefExt;
+		Container::new_node(self)
+	}
+	fn to_service(self) -> Result<gluon::LocalRef<Container, Self>, gluon::NodeError>
+	where
+		Self: Sized,
+	{
+		use gluon::RefExt;
+		Container::new_service(self)
+	}
 }
 pub mod proxied {
-    use super::*;
+	use super::*;
 }
