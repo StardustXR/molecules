@@ -226,7 +226,7 @@ impl PoseableHandler for PoseableInner {
 		_ = self.0.set_relative_transform(reference, transform);
 	}
 
-	fn set_relative_scale(
+	fn set_relative_pose(
 		&self,
 		_ctx: gluon::Context,
 		reference: SpatialRef,

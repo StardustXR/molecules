@@ -82,12 +82,13 @@ impl Containable {
 }
 
 type Containers = FxHashMap<QueryableId, (FieldSample, SpatialRef)>;
+type Evaluator = Box<dyn Fn(&Containers) -> Option<SpatialRef> + Send + Sync>;
 
 #[derive(gluon::Handler)]
 struct ContainableInner {
 	original_parent: SpatialRef,
 	spatial: Spatial,
-	evaluator: Box<dyn Fn(&Containers) -> Option<SpatialRef> + Send + Sync>,
+	evaluator: Evaluator,
 	current_container: Mutex<Option<SpatialRef>>,
 	auto_reparent: AtomicBool,
 	containers: Mutex<FxHashMap<QueryableId, (FieldSample, SpatialRef)>>,
