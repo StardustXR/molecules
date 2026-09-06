@@ -148,7 +148,18 @@ impl PointsQueryHandlerHandler for ContainableInner {
 	}
 
 	async fn left(&self, _ctx: gluon::Context, id: QueryableId) {
-		self.containers.lock().await.remove(&id);
-		self.attempt_reparent().await;
+		let left = self
+			.containers
+			.lock()
+			.await
+			.remove(&id)
+			.map(|(_, spatial)| spatial);
+		// losing the container we're actually in can't wait on auto_reparent, there's
+		// nothing left to hold onto
+		if left.is_some() && *self.current_container.lock().await == left {
+			self.reparent().await;
+		} else {
+			self.attempt_reparent().await;
+		}
 	}
 }
