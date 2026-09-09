@@ -738,3 +738,25 @@ pub fn arrow(
 		],
 	}
 }
+
+/// Spike showing where a tip input method is: a base of `thickness` sitting `length` behind
+/// the origin, tapering to nothing at the origin itself.
+///
+/// Points along -Z, so it converges on the tip's own origin from behind the way a pen nib does
+pub fn tip(length: f32, thickness: f32, color: Color) -> Line {
+	Line {
+		cyclic: false,
+		points: vec![
+			LinePoint {
+				point: (Vec3::Z * length).into(),
+				thickness,
+				color,
+			},
+			LinePoint {
+				point: Vec3::ZERO.into(),
+				thickness: 0.0,
+				color,
+			},
+		],
+	}
+}
