@@ -31,6 +31,7 @@ impl<T: Debug + Clone + Send + Sync + 'static> SpatialInputBeam<T> {
 		construct: fn(&str, Ref) -> Option<T>,
 		interface: String,
 		max_length: f32,
+		margin: f32,
 	) -> Result<Node<Self>> {
 		let (node, handler) = BeamQueryHandler::new_node(Self {
 			hits: RwLock::default(),
@@ -49,6 +50,7 @@ impl<T: Debug + Clone + Send + Sync + 'static> SpatialInputBeam<T> {
 				origin: [0.0; 3].into(),
 				direction: [0.0, 0.0, -1.0].into(),
 				max_length,
+				margin,
 			})
 			.await??;
 		let _ = node.handle.set(handle);

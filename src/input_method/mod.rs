@@ -365,6 +365,7 @@ impl<S: InputMethodHelper<QueryValue = RayMarchResult>> InputMethod<S> {
 		origin: Vec3F,
 		direction: Vec3F,
 		max_length: f32,
+		margin: f32,
 	) -> Result<(Node<Self>, InputMethodProxy, BeamQueryHandle)> {
 		let cache = QueryCache::default();
 		let (query_node, query) = BeamQueryHandler::new_node(BeamQueryCache(cache.clone()))?;
@@ -377,6 +378,7 @@ impl<S: InputMethodHelper<QueryValue = RayMarchResult>> InputMethod<S> {
 				origin,
 				direction,
 				max_length,
+				margin,
 			})
 			.await??;
 		let (node, proxy) = Self::finish(client, helper, cache, spatial, query_node)?;
