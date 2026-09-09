@@ -15,6 +15,7 @@ pub mod keyboard_handler;
 pub mod lines;
 pub mod mouse_handler;
 pub mod multi;
+pub mod spatial_input_beam;
 pub mod touch_plane;
 pub mod transformable;
 
