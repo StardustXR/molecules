@@ -68,11 +68,17 @@ impl<T: Debug + Clone + Send + Sync + 'static> SpatialInputBeam<T> {
 	}
 
 	/// retarget the beam within its reference spatial
-	pub fn update(&self, origin: impl Into<Vec3F>, direction: impl Into<Vec3F>, max_length: f32) {
+	pub fn update(
+		&self,
+		origin: impl Into<Vec3F>,
+		direction: impl Into<Vec3F>,
+		max_length: f32,
+		margin: f32,
+	) {
 		let Some(handle) = self.handle.get() else {
 			return;
 		};
-		let _ = handle.update(origin.into(), direction.into(), max_length);
+		let _ = handle.update(origin.into(), direction.into(), max_length, margin);
 	}
 }
 impl<T: Debug + Clone + Send + Sync + 'static> BeamQueryHandlerHandler for SpatialInputBeam<T> {
