@@ -4,7 +4,7 @@ version = "0.52.0"
 edition = "2024"
 
 authors = ["Nova King <technobaboo@proton.me>"]
-description = "Widget library for Stardust XR, built on top of Fusion"
+description = "Imperative widget/behavior library for Stardust XR, built on top of Fusion"
 license = "MIT"
 repository = "https://github.com/StardustXR/molecules/"
 homepage = "https://stardustxr.org"

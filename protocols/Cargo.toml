@@ -3,6 +3,12 @@ name = "stardust-xr-molecules-protocols"
 version = "0.52.0"
 edition = "2024"
 
+authors = ["Nova King <technobaboo@proton.me>"]
+description = "Higher level stardust protocols for behavior"
+license = "MIT"
+repository = "https://github.com/StardustXR/molecules/"
+homepage = "https://stardustxr.org"
+
 [features]
 default = []
 serde = ["dep:serde"]
