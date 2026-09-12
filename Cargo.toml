@@ -42,6 +42,7 @@ version = "0.52.0"
 # git = "https://github.com/StardustXR/core.git"
 
 [dependencies.stardust-xr-molecules-protocols]
+version = "0.52.0"
 path = "protocols"
 
 [dev-dependencies]
