@@ -1,9 +1,9 @@
 use std::path::Path;
 
-use gluon_codegen::{Derives, ModuleExternalProtocol};
+use gluon_ipc_codegen::{Derives, ModuleExternalProtocol};
 
 fn main() {
-	gluon_codegen::helpers::gen_multiple_modules(
+	gluon_ipc_codegen::helpers::gen_multiple_modules(
 		&[
 			(
 				"container",

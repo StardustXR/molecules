@@ -4,7 +4,7 @@
 //! space, it just needs to know which handler is under the beam right now. Point one of
 //! these down a spatial and ask it whenever an event comes in.
 
-use gluon::{Context, Handler, Node, Ref, RefExt};
+use gluon_ipc::{Context, Handler, Node, Ref, RefExt};
 use stardust_xr_fusion::{
 	Result,
 	client::{Client, ClientHandler},

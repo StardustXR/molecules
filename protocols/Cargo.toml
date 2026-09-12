@@ -1,6 +1,6 @@
 [package]
 name = "stardust-xr-molecules-protocols"
-version = "0.1.0"
+version = "0.52.0"
 edition = "2024"
 
 [features]
@@ -11,18 +11,18 @@ serde = ["dep:serde"]
 serde = { version = "1.0.228", optional = true }
 tracing = "0.1.44"
 
+[dependencies.gluon-ipc]
+version = "0.1.0"
+# git = "https://github.com/StardustXR/gluon"
+
 [dependencies.stardust-xr-protocol]
-git = "https://github.com/StardustXR/core.git"
-branch = "refactor/strongipc"
-
-[dependencies.gluon]
-git = "https://github.com/technobaboo/gluon"
-branch = "refactor/strongipc"
+version = "0.52.0"
+# git = "https://github.com/StardustXR/core.git"
 
 
-[build-dependencies.gluon-codegen]
-git = "https://github.com/technobaboo/gluon"
-branch = "refactor/strongipc"
+[build-dependencies.gluon-ipc-codegen]
+version = "0.1.0"
+# git = "https://github.com/technobaboo/gluon"
 [build-dependencies.stardust-xr-protocol]
-git = "https://github.com/StardustXR/core.git"
-branch = "refactor/strongipc"
+version = "0.52.0"
+# git = "https://github.com/StardustXR/core.git"

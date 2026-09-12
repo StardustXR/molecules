@@ -1,6 +1,6 @@
 [package]
 name = "stardust-xr-molecules"
-version = "0.51.0"
+version = "0.52.0"
 edition = "2024"
 
 authors = ["Nova King <technobaboo@proton.me>"]
@@ -21,7 +21,7 @@ homepage = "https://stardustxr.org"
 members = ["protocols"]
 
 [dependencies]
-glam = { version = "0.30.0", features = ["mint"] }
+glam = { version = "0.33.7", features = ["mint"] }
 lazy_static = "1.4.0"
 rustc-hash = "2.1.1"
 serde = { version = "1.0.203", features = ["derive"] }
@@ -33,17 +33,16 @@ shiva-color-rs = "0.0.1"
 zbus = { version = "5.11.0", features = ["tokio"] }
 futures = { version = "0.3.32", default-features = false, features = ["alloc", "async-await"] }
 
+[dependencies.gluon-ipc]
+version = "0.1.0"
+# git = "https://github.com/StardustXR/gluon-ipc"
+
 [dependencies.stardust-xr-fusion]
-version = "0.51.0"
-git = "https://github.com/StardustXR/core.git"
-branch = "refactor/strongipc"
+version = "0.52.0"
+# git = "https://github.com/StardustXR/core.git"
 
 [dependencies.stardust-xr-molecules-protocols]
 path = "protocols"
-
-[dependencies.gluon]
-git = "https://github.com/technobaboo/gluon"
-branch = "refactor/strongipc"
 
 [dev-dependencies]
 tokio = { version = "1.38.0", features = ["full"] }

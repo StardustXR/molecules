@@ -1,4 +1,4 @@
-use gluon::Handler;
+use gluon_ipc::Handler;
 use stardust_xr_fusion::Result;
 use stardust_xr_molecules_protocols::environment::EnvironmentHandler;
 

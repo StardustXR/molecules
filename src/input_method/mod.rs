@@ -11,7 +11,7 @@ mod query_cache;
 pub use query_cache::*;
 
 use crate::drop_handlers::AbortOnDrop;
-use gluon::{Context, Handler, Liveness, Node, RefExt};
+use gluon_ipc::{Context, Handler, Liveness, Node, RefExt};
 use stardust_xr_fusion::{
 	Result,
 	client::{Client, ClientHandler, FrameInfo},

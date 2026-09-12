@@ -1,4 +1,4 @@
-use gluon::{Context, Interface, Node, RefExt};
+use gluon_ipc::{Context, Interface, Node, RefExt};
 use stardust_xr_fusion::{
 	Result,
 	client::{Client, ClientHandler},
@@ -15,7 +15,7 @@ pub mod protocol {
 use std::any::Any;
 use tokio::sync::mpsc;
 
-#[derive(Debug, gluon::Handler)]
+#[derive(Debug, gluon_ipc::Handler)]
 struct DerezzableInner(mpsc::Sender<()>);
 impl DerezzableHandler for DerezzableInner {
 	async fn derez(&self, _ctx: Context) {

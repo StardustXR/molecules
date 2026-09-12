@@ -1,4 +1,4 @@
-use gluon::{Context, Handler};
+use gluon_ipc::{Context, Handler};
 use stardust_xr_fusion::{
 	fields::{FieldRef, FieldSample, RayMarchResult},
 	query::{QueriedInterface, QueryableId},

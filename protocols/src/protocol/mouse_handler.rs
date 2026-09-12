@@ -1,12 +1,12 @@
 #![allow(unused, clippy::all, private_bounds, private_interfaces)]
-use gluon::Convertable as _;
+use gluon_ipc::Convertable as _;
 use tracing::Instrument as _;
-pub const EXTERNAL_PROTOCOL: gluon::ExternalProtocol = gluon::ExternalProtocol {
+pub const EXTERNAL_PROTOCOL: gluon_ipc::ExternalProtocol = gluon_ipc::ExternalProtocol {
     protocol_name: "org.stardustxr.MouseHandler",
     types: &[
-        gluon::ExternalGluonType {
+        gluon_ipc::ExternalGluonType {
             name: "ScrollSource",
-            supported_derives: gluon::Derives::from_bits_truncate(895u32),
+            supported_derives: gluon_ipc::Derives::from_bits_truncate(895u32),
             proxy: None,
         },
     ],
@@ -23,11 +23,11 @@ pub enum ScrollSource {
     Continuous,
     WheelTilt,
 }
-impl gluon::Convertable for ScrollSource {
+impl gluon_ipc::Convertable for ScrollSource {
     fn write(
         &self,
-        gluon_data: &mut gluon::DataBuilder,
-    ) -> Result<(), gluon::WriteError> {
+        gluon_data: &mut gluon_ipc::DataBuilder,
+    ) -> Result<(), gluon_ipc::WriteError> {
         match self {
             ScrollSource::Wheel => {
                 gluon_data.write_u16(0u16)?;
@@ -44,21 +44,23 @@ impl gluon::Convertable for ScrollSource {
         };
         Ok(())
     }
-    fn read(gluon_data: &mut gluon::DataReader) -> Result<Self, gluon::ReadError> {
+    fn read(
+        gluon_data: &mut gluon_ipc::DataReader,
+    ) -> Result<Self, gluon_ipc::ReadError> {
         Ok(
             match gluon_data.read_u16()? {
                 0u16 => ScrollSource::Wheel,
                 1u16 => ScrollSource::Finger,
                 2u16 => ScrollSource::Continuous,
                 3u16 => ScrollSource::WheelTilt,
-                v => return Err(gluon::ReadError::UnknownEnumVariant(v)),
+                v => return Err(gluon_ipc::ReadError::UnknownEnumVariant(v)),
             },
         )
     }
     fn write_owned(
         self,
-        gluon_data: &mut gluon::DataBuilder,
-    ) -> Result<(), gluon::WriteError> {
+        gluon_data: &mut gluon_ipc::DataBuilder,
+    ) -> Result<(), gluon_ipc::WriteError> {
         match self {
             ScrollSource::Wheel => {
                 gluon_data.write_u16(0u16)?;
@@ -78,44 +80,46 @@ impl gluon::Convertable for ScrollSource {
 }
 #[derive(Debug, Clone)]
 pub struct MouseHandler {
-    obj: gluon::Ref,
+    obj: gluon_ipc::Ref,
 }
-impl gluon::Convertable for MouseHandler {
+impl gluon_ipc::Convertable for MouseHandler {
     fn write(
         &self,
-        gluon_data: &mut gluon::DataBuilder,
-    ) -> Result<(), gluon::WriteError> {
+        gluon_data: &mut gluon_ipc::DataBuilder,
+    ) -> Result<(), gluon_ipc::WriteError> {
         self.obj.write(gluon_data)
     }
-    fn read(gluon_data: &mut gluon::DataReader) -> Result<Self, gluon::ReadError> {
-        let obj = gluon::Ref::read(gluon_data)?;
+    fn read(
+        gluon_data: &mut gluon_ipc::DataReader,
+    ) -> Result<Self, gluon_ipc::ReadError> {
+        let obj = gluon_ipc::Ref::read(gluon_data)?;
         Ok(MouseHandler::from_ref(obj))
     }
     fn write_owned(
         self,
-        gluon_data: &mut gluon::DataBuilder,
-    ) -> Result<(), gluon::WriteError> {
+        gluon_data: &mut gluon_ipc::DataBuilder,
+    ) -> Result<(), gluon_ipc::WriteError> {
         self.obj.write_owned(gluon_data)
     }
 }
 impl MouseHandler {
     const ID: &'static str = "org.stardustxr.MouseHandler.MouseHandler";
 }
-impl gluon::Interface for MouseHandler {
+impl gluon_ipc::Interface for MouseHandler {
     const ID: &'static str = Self::ID;
 }
-///Carries the per-interface bound for [`gluon::RefExt`]'s handler constructors: only a handler implementing this interface's handler trait can be passed to them.
-impl<H: MouseHandlerHandler> gluon::HandledBy<H> for MouseHandler {}
-///A proxy this process made, carrying the handler behind it — see [`gluon::LocalRef`]. Handed back by [`gluon::RefExt::new_node`] and [`gluon::RefExt::new_service`].
-pub type MouseHandlerLocal<H> = gluon::LocalRef<MouseHandler, H>;
-///Drops the handler share and keeps the proxy, so a [`gluon::LocalRef`] goes anywhere this proxy does — including the `impl Into<Self>` parameters generated for typed refs.
+///Carries the per-interface bound for [`gluon_ipc::RefExt`]'s handler constructors: only a handler implementing this interface's handler trait can be passed to them.
+impl<H: MouseHandlerHandler> gluon_ipc::HandledBy<H> for MouseHandler {}
+///A proxy this process made, carrying the handler behind it — see [`gluon_ipc::LocalRef`]. Handed back by [`gluon_ipc::RefExt::new_node`] and [`gluon_ipc::RefExt::new_service`].
+pub type MouseHandlerLocal<H> = gluon_ipc::LocalRef<MouseHandler, H>;
+///Drops the handler share and keeps the proxy, so a [`gluon_ipc::LocalRef`] goes anywhere this proxy does — including the `impl Into<Self>` parameters generated for typed refs.
 impl<H: MouseHandlerHandler> From<MouseHandlerLocal<H>> for MouseHandler {
     fn from(value: MouseHandlerLocal<H>) -> MouseHandler {
         value.into_proxy()
     }
 }
-impl gluon::RefExt for MouseHandler {
-    fn from_ref(obj: gluon::Ref) -> MouseHandler {
+impl gluon_ipc::RefExt for MouseHandler {
+    fn from_ref(obj: gluon_ipc::Ref) -> MouseHandler {
         MouseHandler { obj }
     }
 }
@@ -125,16 +129,16 @@ impl MouseHandler {
         &self,
         delta: stardust_xr_protocol::types::proxies::Vec2F,
         timestamp: impl Into<Option<stardust_xr_protocol::types::Timestamp>>,
-    ) -> Result<(), gluon::SendError> {
+    ) -> Result<(), gluon_ipc::SendError> {
         let delta: stardust_xr_protocol::types::proxied::Vec2F = delta.into();
         let timestamp: Option<stardust_xr_protocol::types::Timestamp> = timestamp.into();
         tracing::trace!(
             interface = "MouseHandler", method = "motion", ? delta, ? timestamp, "→"
         );
-        let mut gluon_builder = gluon::DataBuilder::new();
+        let mut gluon_builder = gluon_ipc::DataBuilder::new();
         delta.write(&mut gluon_builder)?;
         timestamp.write(&mut gluon_builder)?;
-        gluon::transact(&self.obj, 8u32, gluon_builder)?;
+        gluon_ipc::transact(&self.obj, 8u32, gluon_builder)?;
         Ok(())
     }
     ///button code from `input_event_codes.h`
@@ -143,7 +147,7 @@ impl MouseHandler {
         button: impl Into<u32>,
         pressed: impl Into<bool>,
         timestamp: impl Into<Option<stardust_xr_protocol::types::Timestamp>>,
-    ) -> Result<(), gluon::SendError> {
+    ) -> Result<(), gluon_ipc::SendError> {
         let button: u32 = button.into();
         let pressed: bool = pressed.into();
         let timestamp: Option<stardust_xr_protocol::types::Timestamp> = timestamp.into();
@@ -151,11 +155,11 @@ impl MouseHandler {
             interface = "MouseHandler", method = "button", ? button, ? pressed, ?
             timestamp, "→"
         );
-        let mut gluon_builder = gluon::DataBuilder::new();
+        let mut gluon_builder = gluon_ipc::DataBuilder::new();
         button.write(&mut gluon_builder)?;
         pressed.write(&mut gluon_builder)?;
         timestamp.write(&mut gluon_builder)?;
-        gluon::transact(&self.obj, 9u32, gluon_builder)?;
+        gluon_ipc::transact(&self.obj, 9u32, gluon_builder)?;
         Ok(())
     }
     ///delta is +Y == Up +X == Right
@@ -164,7 +168,7 @@ impl MouseHandler {
         delta: stardust_xr_protocol::types::proxies::Vec2F,
         source: impl Into<ScrollSource>,
         timestamp: impl Into<Option<stardust_xr_protocol::types::Timestamp>>,
-    ) -> Result<(), gluon::SendError> {
+    ) -> Result<(), gluon_ipc::SendError> {
         let delta: stardust_xr_protocol::types::proxied::Vec2F = delta.into();
         let source: ScrollSource = source.into();
         let timestamp: Option<stardust_xr_protocol::types::Timestamp> = timestamp.into();
@@ -172,11 +176,11 @@ impl MouseHandler {
             interface = "MouseHandler", method = "scroll_smooth", ? delta, ? source, ?
             timestamp, "→"
         );
-        let mut gluon_builder = gluon::DataBuilder::new();
+        let mut gluon_builder = gluon_ipc::DataBuilder::new();
         delta.write(&mut gluon_builder)?;
         source.write(&mut gluon_builder)?;
         timestamp.write(&mut gluon_builder)?;
-        gluon::transact(&self.obj, 10u32, gluon_builder)?;
+        gluon_ipc::transact(&self.obj, 10u32, gluon_builder)?;
         Ok(())
     }
     ///delta is +Y == Up +X == Right
@@ -185,7 +189,7 @@ impl MouseHandler {
         delta: stardust_xr_protocol::types::proxies::Vec2F,
         source: impl Into<ScrollSource>,
         timestamp: impl Into<Option<stardust_xr_protocol::types::Timestamp>>,
-    ) -> Result<(), gluon::SendError> {
+    ) -> Result<(), gluon_ipc::SendError> {
         let delta: stardust_xr_protocol::types::proxied::Vec2F = delta.into();
         let source: ScrollSource = source.into();
         let timestamp: Option<stardust_xr_protocol::types::Timestamp> = timestamp.into();
@@ -193,31 +197,31 @@ impl MouseHandler {
             interface = "MouseHandler", method = "scroll_discrete", ? delta, ? source, ?
             timestamp, "→"
         );
-        let mut gluon_builder = gluon::DataBuilder::new();
+        let mut gluon_builder = gluon_ipc::DataBuilder::new();
         delta.write(&mut gluon_builder)?;
         source.write(&mut gluon_builder)?;
         timestamp.write(&mut gluon_builder)?;
-        gluon::transact(&self.obj, 11u32, gluon_builder)?;
+        gluon_ipc::transact(&self.obj, 11u32, gluon_builder)?;
         Ok(())
     }
     ///only use this when you know the ref leads to something implementing this interface, else the consquences are for you to find out
-    pub fn from_ref(obj: gluon::Ref) -> MouseHandler {
+    pub fn from_ref(obj: gluon_ipc::Ref) -> MouseHandler {
         MouseHandler { obj }
     }
 }
-impl From<MouseHandler> for gluon::Ref {
+impl From<MouseHandler> for gluon_ipc::Ref {
     fn from(value: MouseHandler) -> Self {
         value.obj
     }
 }
-impl gluon::ToRef for MouseHandler {
-    fn to_ref(&self) -> gluon::Ref {
+impl gluon_ipc::ToRef for MouseHandler {
+    fn to_ref(&self) -> gluon_ipc::Ref {
         self.obj.clone()
     }
 }
-impl gluon::Liveness for MouseHandler {
-    fn death_notifier(&self) -> gluon::DeathNotifier {
-        gluon::Liveness::death_notifier(&self.obj)
+impl gluon_ipc::Liveness for MouseHandler {
+    fn death_notifier(&self) -> gluon_ipc::DeathNotifier {
+        gluon_ipc::Liveness::death_notifier(&self.obj)
     }
 }
 impl std::hash::Hash for MouseHandler {
@@ -231,18 +235,18 @@ impl PartialEq for MouseHandler {
     }
 }
 impl Eq for MouseHandler {}
-pub trait MouseHandlerHandler: gluon::Handler + Send + Sync + 'static {
+pub trait MouseHandlerHandler: gluon_ipc::Handler + Send + Sync + 'static {
     ///delta is +Y == Up +X == Right
     fn motion(
         &self,
-        _ctx: gluon::Context,
+        _ctx: gluon_ipc::Context,
         delta: stardust_xr_protocol::types::proxies::Vec2F,
         timestamp: Option<stardust_xr_protocol::types::Timestamp>,
     ) -> impl Future<Output = ()> + Send + Sync;
     ///button code from `input_event_codes.h`
     fn button(
         &self,
-        _ctx: gluon::Context,
+        _ctx: gluon_ipc::Context,
         button: u32,
         pressed: bool,
         timestamp: Option<stardust_xr_protocol::types::Timestamp>,
@@ -250,7 +254,7 @@ pub trait MouseHandlerHandler: gluon::Handler + Send + Sync + 'static {
     ///delta is +Y == Up +X == Right
     fn scroll_smooth(
         &self,
-        _ctx: gluon::Context,
+        _ctx: gluon_ipc::Context,
         delta: stardust_xr_protocol::types::proxies::Vec2F,
         source: ScrollSource,
         timestamp: Option<stardust_xr_protocol::types::Timestamp>,
@@ -258,7 +262,7 @@ pub trait MouseHandlerHandler: gluon::Handler + Send + Sync + 'static {
     ///delta is +Y == Up +X == Right
     fn scroll_discrete(
         &self,
-        _ctx: gluon::Context,
+        _ctx: gluon_ipc::Context,
         delta: stardust_xr_protocol::types::proxies::Vec2F,
         source: ScrollSource,
         timestamp: Option<stardust_xr_protocol::types::Timestamp>,
@@ -266,16 +270,16 @@ pub trait MouseHandlerHandler: gluon::Handler + Send + Sync + 'static {
     fn dispatch_one_way(
         &self,
         transaction_code: u32,
-        mut gluon_data: gluon::DataReader,
-        ctx: gluon::Context,
-    ) -> impl Future<Output = Result<(), gluon::SendError>> + Send + Sync {
+        mut gluon_data: gluon_ipc::DataReader,
+        ctx: gluon_ipc::Context,
+    ) -> impl Future<Output = Result<(), gluon_ipc::SendError>> + Send + Sync {
         async move {
             match transaction_code {
                 8u32 => {
-                    let __wire_param_delta: stardust_xr_protocol::types::proxied::Vec2F = gluon::Convertable::read(
+                    let __wire_param_delta: stardust_xr_protocol::types::proxied::Vec2F = gluon_ipc::Convertable::read(
                         &mut gluon_data,
                     )?;
-                    let param_timestamp = gluon::Convertable::read(&mut gluon_data)?;
+                    let param_timestamp = gluon_ipc::Convertable::read(&mut gluon_data)?;
                     tracing::trace!(
                         interface = "MouseHandler", method = "motion", param_delta = ?
                         __wire_param_delta, ? param_timestamp, "dispatching"
@@ -295,9 +299,9 @@ pub trait MouseHandlerHandler: gluon::Handler + Send + Sync + 'static {
                         .await;
                 }
                 9u32 => {
-                    let param_button = gluon::Convertable::read(&mut gluon_data)?;
-                    let param_pressed = gluon::Convertable::read(&mut gluon_data)?;
-                    let param_timestamp = gluon::Convertable::read(&mut gluon_data)?;
+                    let param_button = gluon_ipc::Convertable::read(&mut gluon_data)?;
+                    let param_pressed = gluon_ipc::Convertable::read(&mut gluon_data)?;
+                    let param_timestamp = gluon_ipc::Convertable::read(&mut gluon_data)?;
                     tracing::trace!(
                         interface = "MouseHandler", method = "button", ? param_button, ?
                         param_pressed, ? param_timestamp, "dispatching"
@@ -313,11 +317,11 @@ pub trait MouseHandlerHandler: gluon::Handler + Send + Sync + 'static {
                         .await;
                 }
                 10u32 => {
-                    let __wire_param_delta: stardust_xr_protocol::types::proxied::Vec2F = gluon::Convertable::read(
+                    let __wire_param_delta: stardust_xr_protocol::types::proxied::Vec2F = gluon_ipc::Convertable::read(
                         &mut gluon_data,
                     )?;
-                    let param_source = gluon::Convertable::read(&mut gluon_data)?;
-                    let param_timestamp = gluon::Convertable::read(&mut gluon_data)?;
+                    let param_source = gluon_ipc::Convertable::read(&mut gluon_data)?;
+                    let param_timestamp = gluon_ipc::Convertable::read(&mut gluon_data)?;
                     tracing::trace!(
                         interface = "MouseHandler", method = "scroll_smooth", param_delta
                         = ? __wire_param_delta, ? param_source, ? param_timestamp,
@@ -338,11 +342,11 @@ pub trait MouseHandlerHandler: gluon::Handler + Send + Sync + 'static {
                         .await;
                 }
                 11u32 => {
-                    let __wire_param_delta: stardust_xr_protocol::types::proxied::Vec2F = gluon::Convertable::read(
+                    let __wire_param_delta: stardust_xr_protocol::types::proxied::Vec2F = gluon_ipc::Convertable::read(
                         &mut gluon_data,
                     )?;
-                    let param_source = gluon::Convertable::read(&mut gluon_data)?;
-                    let param_timestamp = gluon::Convertable::read(&mut gluon_data)?;
+                    let param_source = gluon_ipc::Convertable::read(&mut gluon_data)?;
+                    let param_timestamp = gluon_ipc::Convertable::read(&mut gluon_data)?;
                     tracing::trace!(
                         interface = "MouseHandler", method = "scroll_discrete",
                         param_delta = ? __wire_param_delta, ? param_source, ?
@@ -370,20 +374,22 @@ pub trait MouseHandlerHandler: gluon::Handler + Send + Sync + 'static {
     fn to_node(
         self,
     ) -> Result<
-        (gluon::Node<Self>, gluon::LocalRef<MouseHandler, Self>),
-        gluon::NodeError,
+        (gluon_ipc::Node<Self>, gluon_ipc::LocalRef<MouseHandler, Self>),
+        gluon_ipc::NodeError,
     >
     where
         Self: Sized,
     {
-        use gluon::RefExt;
+        use gluon_ipc::RefExt;
         MouseHandler::new_node(self)
     }
-    fn to_service(self) -> Result<gluon::LocalRef<MouseHandler, Self>, gluon::NodeError>
+    fn to_service(
+        self,
+    ) -> Result<gluon_ipc::LocalRef<MouseHandler, Self>, gluon_ipc::NodeError>
     where
         Self: Sized,
     {
-        use gluon::RefExt;
+        use gluon_ipc::RefExt;
         MouseHandler::new_service(self)
     }
 }

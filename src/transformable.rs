@@ -2,7 +2,7 @@ use glam::Vec3;
 
 use std::future::ready;
 
-use gluon::Handler;
+use gluon_ipc::Handler;
 use stardust_xr_fusion::{
 	query::{QueryableExt, QueryableInterface, QueryableObject},
 	spatial::{PartialTransform, Spatial, SpatialRef},
@@ -103,7 +103,7 @@ struct TransformableInner(Spatial);
 impl TransformableHandler for TransformableInner {
 	async fn offset_relative_transform(
 		&self,
-		_ctx: gluon::Context,
+		_ctx: gluon_ipc::Context,
 		reference: SpatialRef,
 		offset_transform: PartialTransform,
 	) {
@@ -116,7 +116,7 @@ impl TransformableHandler for TransformableInner {
 
 	fn set_relative_transform(
 		&self,
-		_ctx: gluon::Context,
+		_ctx: gluon_ipc::Context,
 		reference: SpatialRef,
 		transform: PartialTransform,
 	) -> impl Future<Output = ()> + Send + Sync {
@@ -130,7 +130,7 @@ struct TranslatableInner(Spatial);
 impl TranslatableHandler for TranslatableInner {
 	async fn offset_relative_translation(
 		&self,
-		_ctx: gluon::Context,
+		_ctx: gluon_ipc::Context,
 		reference: SpatialRef,
 		offset: Vec3F,
 	) {
@@ -143,7 +143,7 @@ impl TranslatableHandler for TranslatableInner {
 
 	fn set_relative_translation(
 		&self,
-		_ctx: gluon::Context,
+		_ctx: gluon_ipc::Context,
 		reference: SpatialRef,
 		translation: Vec3F,
 	) -> impl Future<Output = ()> + Send + Sync {
@@ -158,7 +158,7 @@ struct RotatableInner(Spatial);
 impl RotatableHandler for RotatableInner {
 	async fn offset_relative_rotation(
 		&self,
-		_ctx: gluon::Context,
+		_ctx: gluon_ipc::Context,
 		reference: SpatialRef,
 		offset: QuatF,
 	) {
@@ -171,7 +171,7 @@ impl RotatableHandler for RotatableInner {
 
 	fn set_relative_rotation(
 		&self,
-		_ctx: gluon::Context,
+		_ctx: gluon_ipc::Context,
 		reference: SpatialRef,
 		rotation: QuatF,
 	) -> impl Future<Output = ()> + Send + Sync {
@@ -186,7 +186,7 @@ struct ScalableInner(Spatial);
 impl ScalableHandler for ScalableInner {
 	async fn offset_relative_scale(
 		&self,
-		_ctx: gluon::Context,
+		_ctx: gluon_ipc::Context,
 		reference: SpatialRef,
 		offset: Vec3F,
 	) {
@@ -199,7 +199,7 @@ impl ScalableHandler for ScalableInner {
 
 	fn set_relative_scale(
 		&self,
-		_ctx: gluon::Context,
+		_ctx: gluon_ipc::Context,
 		reference: SpatialRef,
 		scale: Vec3F,
 	) -> impl Future<Output = ()> + Send + Sync {
@@ -214,7 +214,7 @@ struct PoseableInner(Spatial);
 impl PoseableHandler for PoseableInner {
 	async fn offset_relative_pse(
 		&self,
-		_ctx: gluon::Context,
+		_ctx: gluon_ipc::Context,
 		reference: SpatialRef,
 		offset: Posef,
 	) {
@@ -228,7 +228,7 @@ impl PoseableHandler for PoseableInner {
 
 	fn set_relative_pose(
 		&self,
-		_ctx: gluon::Context,
+		_ctx: gluon_ipc::Context,
 		reference: SpatialRef,
 		pose: Posef,
 	) -> impl Future<Output = ()> + Send + Sync {

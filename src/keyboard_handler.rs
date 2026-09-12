@@ -1,4 +1,4 @@
-use gluon::{Context, Interface, Node, RefExt};
+use gluon_ipc::{Context, Interface, Node, RefExt};
 use stardust_xr_fusion::{
 	Result,
 	client::{Client, ClientHandler},
@@ -14,7 +14,7 @@ pub mod protocol {
 use stardust_xr_molecules_protocols::keyboard_handler::{
 	KeyEvent, KeyboardHandler as KeyboardHandlerProxy, KeyboardHandlerHandler,
 };
-#[derive(gluon::Handler)]
+#[derive(gluon_ipc::Handler)]
 struct KeyboardHandlerInner {
 	on_key: Box<dyn Fn(KeyEvent, Option<Timestamp>) + Send + Sync>,
 }

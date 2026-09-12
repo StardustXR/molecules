@@ -1,4 +1,4 @@
-use gluon::{Context, Interface, Node, RefExt};
+use gluon_ipc::{Context, Interface, Node, RefExt};
 use stardust_xr_fusion::{
 	Result,
 	client::{Client, ClientHandler},
@@ -16,7 +16,7 @@ use stardust_xr_molecules_protocols::mouse_handler::{
 };
 use std::any::Any;
 
-#[derive(gluon::Handler)]
+#[derive(gluon_ipc::Handler)]
 struct MouseHandlerInner {
 	on_button: Box<dyn Fn(u32, bool, Option<Timestamp>) + Send + Sync>,
 	on_motion: Box<dyn Fn(Vec2F, Option<Timestamp>) + Send + Sync>,

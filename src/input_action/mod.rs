@@ -7,7 +7,7 @@ mod multi_action;
 pub use multi_action::*;
 
 use glam::Vec3;
-use gluon::{Context, Handler, Node, RefExt};
+use gluon_ipc::{Context, Handler, Node, RefExt};
 use rustc_hash::{FxHashMap, FxHashSet};
 use stardust_xr_fusion::{
 	Result,
@@ -189,7 +189,7 @@ impl InputQueue {
 	pub async fn request_capture(
 		&self,
 		method: &InputMethod,
-	) -> std::result::Result<Option<InputMethodCapture>, gluon::SendError> {
+	) -> std::result::Result<Option<InputMethodCapture>, gluon_ipc::SendError> {
 		method.request_capture(self.1.clone()).await
 	}
 }

@@ -1,4 +1,4 @@
-use gluon::{Interface, Node, RefExt};
+use gluon_ipc::{Interface, Node, RefExt};
 use rustc_hash::FxHashMap;
 use stardust_xr_fusion::{
 	Result,
@@ -19,7 +19,7 @@ use std::sync::{
 };
 use tokio::sync::Mutex;
 
-#[derive(gluon::Handler)]
+#[derive(gluon_ipc::Handler)]
 pub struct Container(OnceLock<QueryableInterface>);
 impl ContainerHandler for Container {}
 impl Container {
@@ -84,7 +84,7 @@ impl Containable {
 type Containers = FxHashMap<QueryableId, (FieldSample, SpatialRef)>;
 type Evaluator = Box<dyn Fn(&Containers) -> Option<SpatialRef> + Send + Sync>;
 
-#[derive(gluon::Handler)]
+#[derive(gluon_ipc::Handler)]
 struct ContainableInner {
 	original_parent: SpatialRef,
 	spatial: Spatial,
@@ -116,7 +116,7 @@ impl ContainableInner {
 impl PointsQueryHandlerHandler for ContainableInner {
 	async fn entered(
 		&self,
-		_ctx: gluon::Context,
+		_ctx: gluon_ipc::Context,
 		id: QueryableId,
 		_field: FieldRef,
 		spatial: SpatialRef,
@@ -132,13 +132,13 @@ impl PointsQueryHandlerHandler for ContainableInner {
 
 	async fn interfaces_changed(
 		&self,
-		_ctx: gluon::Context,
+		_ctx: gluon_ipc::Context,
 		_obj: QueryableId,
 		_interfaces: Vec<QueriedInterface>,
 	) {
 	}
 
-	async fn moved(&self, _ctx: gluon::Context, id: QueryableId, spatial_info: FieldSample) {
+	async fn moved(&self, _ctx: gluon_ipc::Context, id: QueryableId, spatial_info: FieldSample) {
 		let mut containers_guard = self.containers.lock().await;
 		let Some(container) = containers_guard.get_mut(&id) else {
 			return;
@@ -148,7 +148,7 @@ impl PointsQueryHandlerHandler for ContainableInner {
 		self.attempt_reparent().await;
 	}
 
-	async fn left(&self, _ctx: gluon::Context, id: QueryableId) {
+	async fn left(&self, _ctx: gluon_ipc::Context, id: QueryableId) {
 		let left = self
 			.containers
 			.lock()

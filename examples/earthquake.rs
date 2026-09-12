@@ -1,5 +1,5 @@
 use glam::Vec3;
-use gluon::{Interface, RefExt};
+use gluon_ipc::{Interface, RefExt};
 use rustc_hash::FxHashMap;
 use stardust_xr_fusion::{
 	client::Client,
@@ -164,12 +164,12 @@ impl Movable {
 	}
 }
 
-#[derive(gluon::Handler)]
+#[derive(gluon_ipc::Handler)]
 struct Epicenter(Mutex<FxHashMap<QueryableId, Movable>>);
 impl ZoneQueryHandlerHandler for Epicenter {
 	async fn entered(
 		&self,
-		_ctx: gluon::Context,
+		_ctx: gluon_ipc::Context,
 		obj: QueryableId,
 		_field: FieldRef,
 		_spatial: SpatialRef,
@@ -195,7 +195,7 @@ impl ZoneQueryHandlerHandler for Epicenter {
 
 	async fn interfaces_changed(
 		&self,
-		_ctx: gluon::Context,
+		_ctx: gluon_ipc::Context,
 		_obj: QueryableId,
 		_interfaces: Vec<QueriedInterface>,
 	) {
@@ -203,14 +203,14 @@ impl ZoneQueryHandlerHandler for Epicenter {
 
 	async fn moved(
 		&self,
-		_ctx: gluon::Context,
+		_ctx: gluon_ipc::Context,
 		_obj: QueryableId,
 		_relative_position: Vec3F,
 		_spatial_info: FieldSample,
 	) {
 	}
 
-	async fn left(&self, _ctx: gluon::Context, _obj: QueryableId) {}
+	async fn left(&self, _ctx: gluon_ipc::Context, _obj: QueryableId) {}
 }
 
 #[tokio::main(flavor = "current_thread")]
