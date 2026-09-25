@@ -1,0 +1,5 @@
+/// Something with text a client can read, like a label, a sign or a document
+interface Legible {
+	/// the text exactly as it's currently shown
+	text() -> (text: String)
+}

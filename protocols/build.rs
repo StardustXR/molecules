@@ -18,6 +18,10 @@ fn main() {
 				Path::new("./gluon/org.stardustxr.Environment.gluon"),
 			),
 			(
+				"legible",
+				Path::new("./gluon/org.stardustxr.Legible.gluon"),
+			),
+			(
 				"keyboard_handler",
 				Path::new("./gluon/org.stardustxr.KeyboardHandler.gluon"),
 			),
