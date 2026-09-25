@@ -13,13 +13,14 @@ use stardust_xr_fusion::{
 		AlphaMode, DmatexFormat, DmatexPlane, DmatexPlanes, DmatexSize, DmatexSubmitRelease,
 		DmatexSubmitReleaseHandler,
 	},
+	drawable::{Line, LinePoint, Lines},
 	fields::{FieldRef, FieldSample},
 	query::{InterfaceDependency, QueriedInterface, QueryableId},
-	spatial::{BoundingBox, PartialTransform, SpatialRef, Transform},
+	spatial::{BoundingBox, CreatedSpatial, PartialTransform, SpatialRef, Transform},
 	spatial_query::{
 		Point, PointsQuery, PointsQueryHandle, PointsQueryHandler, PointsQueryHandlerHandler,
 	},
-	types::{Posef, Vec3F},
+	types::{Posef, Vec3F, rgba_linear},
 };
 use stardust_xr_molecules_protocols::{
 	container, derezzable, environment, keyboard_handler, legible,
@@ -175,6 +176,32 @@ enum Command {
 		#[arg(long, default_value_t = 720)]
 		height: u32,
 	},
+	/// draw a polyline through x y z triples relative to the root
+	///
+	/// lines last as long as this client, so draw them in a shell, or run this on its own and
+	/// it holds them up until ctrl-c
+	#[command(allow_negative_numbers = true)]
+	Line {
+		#[arg(num_args = 6.., required = true)]
+		points: Vec<f32>,
+		/// linear rgb with an optional alpha, 0 to 1
+		#[arg(long, num_args = 3..=4, value_names = ["R", "G", "B", "A"])]
+		color: Option<Vec<f32>>,
+		/// in meters
+		#[arg(long, default_value_t = 0.005)]
+		thickness: f32,
+		/// fade into this color by the last point
+		#[arg(long, num_args = 3..=4, value_names = ["R", "G", "B", "A"])]
+		fade: Option<Vec<f32>>,
+		/// thin or thicken to this by the last point
+		#[arg(long)]
+		taper: Option<f32>,
+		/// join the last point back to the first
+		#[arg(long)]
+		cyclic: bool,
+	},
+	/// remove every line this client drew
+	Erase,
 }
 
 #[derive(Subcommand, Clone)]
@@ -206,7 +233,11 @@ enum MouseAction {
 impl Command {
 	fn needs(&self) -> Option<&'static str> {
 		Some(match self {
-			Command::List | Command::Shell | Command::Photo { .. } => return None,
+			Command::List
+			| Command::Shell
+			| Command::Photo { .. }
+			| Command::Line { .. }
+			| Command::Erase => return None,
 			Command::Read { .. } => legible::Legible::ID,
 			Command::Derez { .. } => derezzable::Derezzable::ID,
 			Command::Translate { .. } => tf::Translatable::ID,
@@ -261,13 +292,58 @@ async fn main() -> ExitCode {
 
 async fn run(cli: Cli) -> Result<(), String> {
 	let (client, root) = Client::connect(&[]).await.map_err(|e| e.to_string())?;
-	if let Some(Command::Photo { .. }) = cli.command {
-		return execute(&client, &root, &mut BTreeMap::new(), &cli).await;
+	let mut sketch = Sketch::default();
+	match cli.command {
+		Some(Command::Photo { .. } | Command::Erase) => {
+			return execute(&client, &root, &mut BTreeMap::new(), &mut sketch, &cli).await;
+		}
+		Some(Command::Line { .. }) => {
+			execute(&client, &root, &mut BTreeMap::new(), &mut sketch, &cli).await?;
+			println!("holding it up until ctrl-c");
+			let _ = tokio::signal::ctrl_c().await;
+			return Ok(());
+		}
+		_ => (),
 	}
 	let (_queries, events, mut found) = collect(&client, &root, &cli).await?;
 	match cli.command {
 		Some(Command::Shell) => shell(&client, &root, found, events).await,
-		_ => execute(&client, &root, &mut found, &cli).await,
+		_ => execute(&client, &root, &mut found, &mut sketch, &cli).await,
+	}
+}
+
+// a drawable per line, since each message has to fit in gluon's 8 KiB
+#[derive(Default)]
+struct Sketch {
+	spatial: Option<CreatedSpatial>,
+	drawn: Vec<Lines>,
+}
+impl Sketch {
+	async fn draw(
+		&mut self,
+		client: &Client<DefaultHandler>,
+		root: &SpatialRef,
+		line: Line,
+	) -> Result<(), String> {
+		let spatial = match &self.spatial {
+			Some(s) => s,
+			None => self.spatial.insert(
+				client
+					.spatial_interface()
+					.create_spatial(root.clone(), identity())
+					.await
+					.map_err(|e| e.to_string())?
+					.map_err(|e| format!("couldn't make the lines' spatial: {e:?}"))?,
+			),
+		};
+		let lines = client
+			.lines_interface()
+			.create_lines(spatial.spatial.clone(), vec![line])
+			.await
+			.map_err(|e| e.to_string())?
+			.map_err(|e| format!("couldn't make lines: {e:?}"))?;
+		self.drawn.push(lines);
+		Ok(())
 	}
 }
 
@@ -275,6 +351,7 @@ async fn execute(
 	client: &Client<DefaultHandler>,
 	root: &SpatialRef,
 	found: &mut BTreeMap<u64, Found>,
+	sketch: &mut Sketch,
 	cli: &Cli,
 ) -> Result<(), String> {
 	match cli.command.clone().unwrap_or(Command::List) {
@@ -340,6 +417,44 @@ async fn execute(
 			photo(client, root, transform, fov, width, height, &out).await?;
 			println!("saved {}", out.display());
 		}
+		Command::Line {
+			points,
+			color,
+			thickness,
+			fade,
+			taper,
+			cyclic,
+		} => {
+			if points.len() % 3 != 0 {
+				return Err("points come in x y z triples".to_string());
+			}
+			let rgba = |c: &[f32]| [c[0], c[1], c[2], c.get(3).copied().unwrap_or(1.0)];
+			let from = color.as_deref().map_or([1.0; 4], rgba);
+			let to = fade.as_deref().map_or(from, rgba);
+			let n = (points.len() / 3 - 1) as f32;
+			let line = Line {
+				points: points
+					.chunks_exact(3)
+					.enumerate()
+					.map(|(i, p)| {
+						let t = i as f32 / n;
+						let [r, g, b, a] = [0, 1, 2, 3].map(|c| from[c] + (to[c] - from[c]) * t);
+						LinePoint {
+							point: Vec3::from_slice(p).into(),
+							thickness: thickness + (taper.unwrap_or(thickness) - thickness) * t,
+							color: rgba_linear!(r, g, b, a),
+						}
+					})
+					.collect(),
+				cyclic,
+			};
+			sketch.draw(client, root, line).await?;
+			println!("drew line {}", sketch.drawn.len());
+		}
+		Command::Erase => {
+			sketch.drawn.clear();
+			println!("erased");
+		}
 		command => println!("{}", call(root, found, command)?),
 	}
 	Ok(())
@@ -353,6 +468,7 @@ async fn shell(
 ) -> Result<(), String> {
 	let mut lines = BufReader::new(tokio::io::stdin()).lines();
 	let mut watching = false;
+	let mut sketch = Sketch::default();
 	loop {
 		tokio::select! {
 			Some(event) = events.recv() => {
@@ -386,7 +502,7 @@ async fn shell(
 								}
 								apply(&mut found, event);
 							}
-							execute(client, root, &mut found, &cli).await
+							execute(client, root, &mut found, &mut sketch, &cli).await
 						}
 						Err(e) if matches!(e.kind(), ErrorKind::DisplayHelp | ErrorKind::DisplayVersion) => {
 							print!("{}", e.render());
@@ -607,7 +723,9 @@ fn call(
 		| Command::Shell
 		| Command::Read { .. }
 		| Command::Animate { .. }
-		| Command::Photo { .. } => unreachable!(),
+		| Command::Photo { .. }
+		| Command::Line { .. }
+		| Command::Erase => unreachable!(),
 		Command::Derez { id } => {
 			sent(proxy::<derezzable::Derezzable>(found, id)?.derez())?;
 			Ok(format!("derezzed {id}"))
@@ -902,11 +1020,7 @@ async fn photo(
 					0.01,
 				)
 				.into(),
-				camera_relative_transform: Transform {
-					translation: Vec3::ZERO.into(),
-					rotation: Quat::IDENTITY.into(),
-					scale: Vec3::ONE.into(),
-				},
+				camera_relative_transform: identity(),
 			}],
 		)
 		.map_err(|e| e.to_string())?;
@@ -1113,6 +1227,13 @@ fn degrees(t: &Transform) -> String {
 }
 fn short(id: &str) -> &str {
 	id.rsplit('.').next().unwrap_or(id)
+}
+fn identity() -> Transform {
+	Transform {
+		translation: Vec3::ZERO.into(),
+		rotation: Quat::IDENTITY.into(),
+		scale: Vec3::ONE.into(),
+	}
 }
 fn euler(degrees: &[f32]) -> Quat {
 	let [x, y, z] = [degrees[0], degrees[1], degrees[2]].map(f32::to_radians);
