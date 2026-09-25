@@ -3,10 +3,16 @@
 //! `cargo run --example scan -- --help`
 
 use clap::{Parser, Subcommand, error::ErrorKind};
-use glam::{EulerRot, Quat, Vec3};
+use gbm::{BufferObjectFlags, Format, Modifier};
+use glam::{EulerRot, Quat, Vec3, camera::rh::proj::directx};
 use gluon_ipc::{Context, Handler, Interface, Node, Ref, RefExt};
 use stardust_xr_fusion::{
+	camera::{CameraInterface, View},
 	client::{Client, DefaultHandler},
+	dmatex::{
+		AlphaMode, DmatexFormat, DmatexPlane, DmatexPlanes, DmatexSize, DmatexSubmitRelease,
+		DmatexSubmitReleaseHandler,
+	},
 	fields::{FieldRef, FieldSample},
 	query::{InterfaceDependency, QueriedInterface, QueryableId},
 	spatial::{BoundingBox, PartialTransform, SpatialRef, Transform},
@@ -20,12 +26,15 @@ use stardust_xr_molecules_protocols::{
 	mouse_handler::{self, ScrollSource},
 	transformable as tf,
 };
+use stardust_xr_protocol::dir::find_ref_file;
 use std::{
 	collections::BTreeMap,
 	f32::consts::{PI, TAU},
+	path::{Path, PathBuf},
 	process::ExitCode,
 	time::Duration,
 };
+use timeline_syncobj::{render_node::DrmRenderNode, timeline_syncobj::TimelineSyncObj};
 use tokio::{
 	io::{AsyncBufReadExt, BufReader},
 	sync::mpsc,
@@ -147,6 +156,25 @@ enum Command {
 		#[command(subcommand)]
 		action: MouseAction,
 	},
+	/// have the server render a camera and save what it saw as a png
+	#[command(allow_negative_numbers = true)]
+	Photo {
+		#[arg(default_value = "photo.png")]
+		out: PathBuf,
+		/// relative to the root
+		#[arg(long, num_args = 3, value_names = ["X", "Y", "Z"])]
+		pos: Option<Vec<f32>>,
+		/// xyz euler degrees, the camera looks down -Z
+		#[arg(long, num_args = 3, value_names = ["X", "Y", "Z"])]
+		rot: Option<Vec<f32>>,
+		/// vertical, in degrees
+		#[arg(long, default_value_t = 90.0)]
+		fov: f32,
+		#[arg(long, default_value_t = 1280)]
+		width: u32,
+		#[arg(long, default_value_t = 720)]
+		height: u32,
+	},
 }
 
 #[derive(Subcommand, Clone)]
@@ -178,7 +206,7 @@ enum MouseAction {
 impl Command {
 	fn needs(&self) -> Option<&'static str> {
 		Some(match self {
-			Command::List | Command::Shell => return None,
+			Command::List | Command::Shell | Command::Photo { .. } => return None,
 			Command::Read { .. } => legible::Legible::ID,
 			Command::Derez { .. } => derezzable::Derezzable::ID,
 			Command::Translate { .. } => tf::Translatable::ID,
@@ -233,6 +261,9 @@ async fn main() -> ExitCode {
 
 async fn run(cli: Cli) -> Result<(), String> {
 	let (client, root) = Client::connect(&[]).await.map_err(|e| e.to_string())?;
+	if let Some(Command::Photo { .. }) = cli.command {
+		return execute(&client, &root, &mut BTreeMap::new(), &cli).await;
+	}
 	let (_queries, events, mut found) = collect(&client, &root, &cli).await?;
 	match cli.command {
 		Some(Command::Shell) => shell(&client, &root, found, events).await,
@@ -292,6 +323,22 @@ async fn execute(
 		Command::Animate { id, seconds } => {
 			animate(client, root, found, id, seconds).await?;
 			println!("animated {id} for {seconds}s, back where it started");
+		}
+		Command::Photo {
+			out,
+			pos,
+			rot,
+			fov,
+			width,
+			height,
+		} => {
+			let transform = Transform {
+				translation: pos.map_or(Vec3::ZERO, |p| Vec3::from_slice(&p)).into(),
+				rotation: rot.map_or(Quat::IDENTITY, |r| euler(&r)).into(),
+				scale: Vec3::ONE.into(),
+			};
+			photo(client, root, transform, fov, width, height, &out).await?;
+			println!("saved {}", out.display());
 		}
 		command => println!("{}", call(root, found, command)?),
 	}
@@ -556,9 +603,11 @@ fn call(
 	let root = root.clone();
 	let sent = |r: Result<(), gluon_ipc::SendError>| r.map_err(|e| e.to_string());
 	match command {
-		Command::List | Command::Shell | Command::Read { .. } | Command::Animate { .. } => {
-			unreachable!()
-		}
+		Command::List
+		| Command::Shell
+		| Command::Read { .. }
+		| Command::Animate { .. }
+		| Command::Photo { .. } => unreachable!(),
 		Command::Derez { id } => {
 			sent(proxy::<derezzable::Derezzable>(found, id)?.derez())?;
 			Ok(format!("derezzed {id}"))
@@ -725,6 +774,167 @@ async fn animate(
 		}
 	}
 	Ok(())
+}
+
+#[derive(Debug, Handler)]
+struct Release(u64);
+impl DmatexSubmitReleaseHandler for Release {
+	async fn consume(&self, _ctx: Context) -> u64 {
+		self.0
+	}
+}
+
+async fn photo(
+	client: &Client<DefaultHandler>,
+	root: &SpatialRef,
+	transform: Transform,
+	fov: f32,
+	w: u32,
+	h: u32,
+	out: &Path,
+) -> Result<(), String> {
+	let cameras = CameraInterface::connect(
+		find_ref_file("stardust-camera").ok_or("the server isn't exposing stardust-camera")?,
+	)
+	.await
+	.map_err(|e| e.to_string())?;
+	let dmatex = client.dmatex_interface();
+	let node_id = dmatex
+		.primary_render_node_id()
+		.await
+		.map_err(|e| e.to_string())?;
+	let node = DrmRenderNode::new(node_id).map_err(|e| e.to_string())?;
+
+	let formats: Vec<_> = dmatex
+		.enumerate_formats(node_id)
+		.await
+		.map_err(|e| e.to_string())?
+		.ok_or("the server couldn't list its dmatex formats")?
+		.into_iter()
+		// the server maps rgba8888 onto vulkan's R8G8B8A8, so the bytes come out r g b a
+		.filter(|f| f.drm_fourcc == Format::Rgba8888 as u32 && f.supports_rendering)
+		.collect();
+	let srgb = formats.iter().any(|f| f.supports_srgb);
+	// linear keeps the cpu readback a plain copy, anything else gets detiled by the gbm map
+	let linear = u64::from(Modifier::Linear);
+	let modifiers: Vec<_> = if formats.iter().any(|f| f.drm_modifier == linear) {
+		vec![Modifier::Linear]
+	} else {
+		formats
+			.iter()
+			.map(|f| Modifier::from(f.drm_modifier))
+			.collect()
+	};
+	if modifiers.is_empty() {
+		return Err("the server can't render into rgba8888".to_string());
+	}
+	let gbm = gbm::Device::new(node.clone()).map_err(|e| format!("couldn't open gbm: {e}"))?;
+	let bo = gbm
+		// gbm doesn't know rgba8888, but every 32 bit fourcc lays the same bytes out
+		.create_buffer_object_with_modifiers2::<()>(
+			w,
+			h,
+			Format::Abgr8888,
+			modifiers.into_iter(),
+			BufferObjectFlags::RENDERING,
+		)
+		.map_err(|e| format!("couldn't allocate the photo buffer: {e}"))?;
+	let planes = (0..bo.plane_count() as i32)
+		.map(|i| DmatexPlane {
+			offset: bo.offset(i) as u64,
+			row_size: bo.stride_for_plane(i) as u64,
+			array_element_size: 0,
+			depth_slice_size: 0,
+		})
+		.collect();
+	let timeline = TimelineSyncObj::new(&node).map_err(|e| e.to_string())?;
+	let target = dmatex
+		.import_dmatex(
+			DmatexSize::Size2D {
+				size: [w, h].into(),
+			},
+			DmatexFormat {
+				drm_fourcc: Format::Rgba8888 as u32,
+				drm_modifier: bo.modifier().into(),
+				is_srgb: srgb,
+				alpha_mode: AlphaMode::PremultipliedOptical,
+				ycbcr_info: None,
+			},
+			1u32,
+			DmatexPlanes::Simple {
+				dmabuf_fd: bo.fd().map_err(|e| e.to_string())?,
+				planes,
+			},
+			timeline.export().map_err(|e| e.to_string())?,
+		)
+		.await
+		.map_err(|e| e.to_string())?
+		.map_err(|e| format!("the server wouldn't import the photo buffer: {e:?}"))?;
+
+	let spatial = client
+		.spatial_interface()
+		.create_spatial(root.clone(), transform)
+		.await
+		.map_err(|e| e.to_string())?
+		.map_err(|e| format!("couldn't make the camera's spatial: {e:?}"))?;
+	let camera = cameras
+		.create_camera(spatial.spatial.clone())
+		.await
+		.map_err(|e| e.to_string())?
+		.map_err(|e| format!("couldn't make a camera: {e:?}"))?;
+
+	// the server drops a draw on the floor if the dmatex hasn't reached bevy yet
+	let mut frames = client.frame_receiver();
+	for _ in 0..3 {
+		let _ = frames.recv().await;
+	}
+	unsafe { timeline.signal(1) }.map_err(|e| e.to_string())?;
+	let release = DmatexSubmitRelease::new_service(Release(2)).map_err(|e| e.to_string())?;
+	camera
+		.request_draw(
+			target,
+			1u64,
+			release.into_proxy(),
+			vec![View {
+				projection_matrix: directx::perspective_infinite_reverse(
+					fov.to_radians(),
+					w as f32 / h as f32,
+					0.01,
+				)
+				.into(),
+				camera_relative_transform: Transform {
+					translation: Vec3::ZERO.into(),
+					rotation: Quat::IDENTITY.into(),
+					scale: Vec3::ONE.into(),
+				},
+			}],
+		)
+		.map_err(|e| e.to_string())?;
+	tokio::time::timeout(
+		Duration::from_secs(5),
+		timeline.wait_async(2).map_err(|e| e.to_string())?,
+	)
+	.await
+	.map_err(|_| "the server never finished rendering")?;
+
+	let rgb = bo
+		.map(0, 0, w, h, |m| {
+			let stride = m.stride() as usize;
+			(0..h as usize)
+				.flat_map(|y| m.buffer()[y * stride..][..w as usize * 4].chunks_exact(4))
+				.flat_map(|p| [p[0], p[1], p[2]])
+				.collect::<Vec<u8>>()
+		})
+		.map_err(|e| e.to_string())?;
+	let mut png = png::Encoder::new(
+		std::io::BufWriter::new(std::fs::File::create(out).map_err(|e| e.to_string())?),
+		w,
+		h,
+	);
+	png.set_color(png::ColorType::Rgb);
+	png.write_header()
+		.and_then(|mut p| p.write_image_data(&rgb))
+		.map_err(|e| e.to_string())
 }
 
 async fn fetch_text(found: &mut BTreeMap<u64, Found>) {

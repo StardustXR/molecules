@@ -47,6 +47,10 @@ path = "protocols"
 
 [dev-dependencies]
 clap = { version = "4.6.7", features = ["derive"] }
+gbm = { version = "0.18.0", default-features = false }
+png = "0.18.1"
+stardust-xr-protocol = "0.52.0"
+timeline_syncobj = { version = "0.2", features = ["tokio"] }
 tokio = { version = "1.38.0", features = ["full"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 tracing-tracy = "0.11.4"
