@@ -2,15 +2,17 @@
 //!
 //! `cargo run --example scan -- --help`
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, error::ErrorKind};
 use glam::{EulerRot, Quat, Vec3};
-use gluon_ipc::{Context, Handler, Interface, Ref, RefExt};
+use gluon_ipc::{Context, Handler, Interface, Node, Ref, RefExt};
 use stardust_xr_fusion::{
 	client::{Client, DefaultHandler},
 	fields::{FieldRef, FieldSample},
 	query::{InterfaceDependency, QueriedInterface, QueryableId},
 	spatial::{BoundingBox, PartialTransform, SpatialRef, Transform},
-	spatial_query::{Point, PointsQuery, PointsQueryHandler, PointsQueryHandlerHandler},
+	spatial_query::{
+		Point, PointsQuery, PointsQueryHandle, PointsQueryHandler, PointsQueryHandlerHandler,
+	},
 	types::{Posef, Vec3F},
 };
 use stardust_xr_molecules_protocols::{
@@ -24,7 +26,10 @@ use std::{
 	process::ExitCode,
 	time::Duration,
 };
-use tokio::sync::mpsc;
+use tokio::{
+	io::{AsyncBufReadExt, BufReader},
+	sync::mpsc,
+};
 use tracing_subscriber::EnvFilter;
 
 /// look at and poke the molecules queryables in the running stardust scene
@@ -33,28 +38,28 @@ use tracing_subscriber::EnvFilter;
 #[derive(Parser)]
 struct Cli {
 	/// print the listing as json
-	#[arg(long)]
+	#[arg(global = true, long)]
 	json: bool,
 	/// how long to collect queryables before acting, in ms
-	#[arg(long, default_value_t = 500)]
+	#[arg(global = true, long, default_value_t = 500)]
 	wait: u64,
 	/// how far from the root to look, in meters
-	#[arg(long, default_value_t = 1000.0)]
+	#[arg(global = true, long, default_value_t = 1000.0)]
 	radius: f32,
 	/// only look for these interfaces, by short name like derezzable or poseable
 	///
 	/// every queried object sends its refs over as fds, so fewer queries means less fd traffic,
 	/// commands already only look for the interface they need
-	#[arg(long = "interface", short, value_name = "NAME")]
+	#[arg(global = true, long = "interface", short, value_name = "NAME")]
 	interfaces: Vec<String>,
 	/// also get each object's bounding box relative to the root, covering its children too
-	#[arg(long)]
+	#[arg(global = true, long)]
 	bounds: bool,
 	/// also get each object's transform relative to the root, rotation as xyz euler degrees
-	#[arg(long)]
+	#[arg(global = true, long)]
 	transforms: bool,
 	/// also read the text of everything legible
-	#[arg(long)]
+	#[arg(global = true, long)]
 	text: bool,
 	#[command(subcommand)]
 	command: Option<Command>,
@@ -64,6 +69,11 @@ struct Cli {
 enum Command {
 	/// list everything in reach (the default)
 	List,
+	/// stay connected and run commands from stdin, one per line, same syntax minus `scan`
+	///
+	/// `watch on|off` streams query events, `quit` leaves, every command ends with a
+	/// `--- ok` or `--- error: ...` line so whatever's driving this knows it finished
+	Shell,
 	/// print the text of something legible
 	Read { id: u64 },
 	/// ask an object to derez itself, for most apps this closes it
@@ -168,7 +178,7 @@ enum MouseAction {
 impl Command {
 	fn needs(&self) -> Option<&'static str> {
 		Some(match self {
-			Command::List => return None,
+			Command::List | Command::Shell => return None,
 			Command::Read { .. } => legible::Legible::ID,
 			Command::Derez { .. } => derezzable::Derezzable::ID,
 			Command::Translate { .. } => tf::Translatable::ID,
@@ -223,38 +233,149 @@ async fn main() -> ExitCode {
 
 async fn run(cli: Cli) -> Result<(), String> {
 	let (client, root) = Client::connect(&[]).await.map_err(|e| e.to_string())?;
-	let mut found = collect(&client, &root, &cli).await?;
+	let (_queries, events, mut found) = collect(&client, &root, &cli).await?;
+	match cli.command {
+		Some(Command::Shell) => shell(&client, &root, found, events).await,
+		_ => execute(&client, &root, &mut found, &cli).await,
+	}
+}
+
+async fn execute(
+	client: &Client<DefaultHandler>,
+	root: &SpatialRef,
+	found: &mut BTreeMap<u64, Found>,
+	cli: &Cli,
+) -> Result<(), String> {
 	match cli.command.clone().unwrap_or(Command::List) {
+		Command::Shell => return Err("already in a shell".to_string()),
 		Command::List => {
+			for f in found.values_mut() {
+				f.bounds = None;
+				f.transform = None;
+				f.text = None;
+			}
+			let shown = |f: &Found| {
+				cli.interfaces.is_empty()
+					|| f.refs.keys().any(|id| {
+						cli.interfaces
+							.iter()
+							.any(|i| i.eq_ignore_ascii_case(short(id)))
+					})
+			};
+			let (mut listed, rest): (BTreeMap<_, _>, BTreeMap<_, _>) = std::mem::take(found)
+				.into_iter()
+				.partition(|(_, f)| shown(f));
 			if cli.bounds {
-				fetch_bounds(&client, &root, &mut found).await;
+				fetch_bounds(client, root, &mut listed).await;
 			}
 			if cli.transforms {
-				fetch_transforms(&client, &root, &mut found).await;
+				fetch_transforms(client, root, &mut listed).await;
 			}
 			if cli.text {
-				fetch_text(&mut found).await;
+				fetch_text(&mut listed).await;
 			}
 			if cli.json {
-				print_json(&found);
+				print_json(&listed);
 			} else {
-				print_table(&found, &cli);
+				print_table(&listed, cli);
 			}
+			*found = rest;
+			found.append(&mut listed);
 		}
 		Command::Read { id } => {
-			let text = proxy::<legible::Legible>(&found, id)?
+			let text = proxy::<legible::Legible>(found, id)?
 				.text()
 				.await
 				.map_err(|e| e.to_string())?;
 			println!("{text}");
 		}
 		Command::Animate { id, seconds } => {
-			animate(&client, &root, &found, id, seconds).await?;
+			animate(client, root, found, id, seconds).await?;
 			println!("animated {id} for {seconds}s, back where it started");
 		}
-		command => println!("{}", call(&root, &found, command)?),
+		command => println!("{}", call(root, found, command)?),
 	}
 	Ok(())
+}
+
+async fn shell(
+	client: &Client<DefaultHandler>,
+	root: &SpatialRef,
+	mut found: BTreeMap<u64, Found>,
+	mut events: mpsc::UnboundedReceiver<Event>,
+) -> Result<(), String> {
+	let mut lines = BufReader::new(tokio::io::stdin()).lines();
+	let mut watching = false;
+	loop {
+		tokio::select! {
+			Some(event) = events.recv() => {
+				if watching {
+					print_event(&event);
+				}
+				apply(&mut found, event);
+			}
+			line = lines.next_line() => {
+				let Some(line) = line.map_err(|e| e.to_string())? else {
+					break;
+				};
+				let words: Vec<&str> = line.split_whitespace().collect();
+				let result = match words.as_slice() {
+					[] => continue,
+					[w, ..] if w.starts_with('#') => continue,
+					["quit" | "exit"] => break,
+					["watch", "on"] => {
+						watching = true;
+						Ok(())
+					}
+					["watch", "off"] => {
+						watching = false;
+						Ok(())
+					}
+					words => match Cli::try_parse_from(std::iter::once("scan").chain(words.iter().copied())) {
+						Ok(cli) => {
+							while let Ok(event) = events.try_recv() {
+								if watching {
+									print_event(&event);
+								}
+								apply(&mut found, event);
+							}
+							execute(client, root, &mut found, &cli).await
+						}
+						Err(e) if matches!(e.kind(), ErrorKind::DisplayHelp | ErrorKind::DisplayVersion) => {
+							print!("{}", e.render());
+							Ok(())
+						}
+						Err(e) => Err(e.render().to_string()),
+					},
+				};
+				match result {
+					Ok(()) => println!("--- ok"),
+					Err(e) => println!("--- error: {}", e.trim().replace('\n', " ")),
+				}
+			}
+		}
+	}
+	Ok(())
+}
+
+fn print_event(event: &Event) {
+	match event {
+		Event::Entered(id, _, interfaces, sample) => {
+			let names: Vec<_> = interfaces.iter().map(|i| short(&i.interface_id)).collect();
+			println!(
+				"event entered {} {:.3} m {}",
+				id.id,
+				sample.distance,
+				names.join(",")
+			);
+		}
+		Event::InterfacesChanged(id, interfaces) => {
+			let names: Vec<_> = interfaces.iter().map(|i| short(&i.interface_id)).collect();
+			println!("event interfaces {} {}", id.id, names.join(","));
+		}
+		Event::Moved(id, sample) => println!("event moved {} {:.3} m", id.id, sample.distance),
+		Event::Left(id, interface) => println!("event left {} {}", id.id, short(interface)),
+	}
 }
 
 struct Found {
@@ -309,11 +430,20 @@ impl PointsQueryHandlerHandler for Probe {
 }
 
 // one query per interface since a query needs a required interface, merged by queryable id
+type Queries = Vec<(Node<Probe>, PointsQueryHandle)>;
+
 async fn collect(
 	client: &Client<DefaultHandler>,
 	root: &SpatialRef,
 	cli: &Cli,
-) -> Result<BTreeMap<u64, Found>, String> {
+) -> Result<
+	(
+		Queries,
+		mpsc::UnboundedReceiver<Event>,
+		BTreeMap<u64, Found>,
+	),
+	String,
+> {
 	let needed = cli.command.as_ref().and_then(Command::needs);
 	let wanted = |id: &str| match needed {
 		Some(needed) => id == needed,
@@ -364,7 +494,7 @@ async fn collect(
 	while let Ok(event) = rx.try_recv() {
 		apply(&mut found, event);
 	}
-	Ok(found)
+	Ok((queries, rx, found))
 }
 
 fn apply(found: &mut BTreeMap<u64, Found>, event: Event) {
@@ -426,7 +556,9 @@ fn call(
 	let root = root.clone();
 	let sent = |r: Result<(), gluon_ipc::SendError>| r.map_err(|e| e.to_string());
 	match command {
-		Command::List | Command::Read { .. } | Command::Animate { .. } => unreachable!(),
+		Command::List | Command::Shell | Command::Read { .. } | Command::Animate { .. } => {
+			unreachable!()
+		}
 		Command::Derez { id } => {
 			sent(proxy::<derezzable::Derezzable>(found, id)?.derez())?;
 			Ok(format!("derezzed {id}"))
