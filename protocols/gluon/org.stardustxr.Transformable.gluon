@@ -36,7 +36,7 @@ interface Scalable {
 /// Interface for moving other objects
 interface Poseable {
 	/// Offset the pose of this object by this offset relative to the provided spatialref (adds to the existing transform)
-	offset_relative_pse(reference: Ref<spatial::SpatialRef>, offset: types::Posef)
+	offset_relative_pose(reference: Ref<spatial::SpatialRef>, offset: types::Posef)
 	/// Set the pose of this object relative to the provided spatialref
 	set_relative_pose(reference: Ref<spatial::SpatialRef>, pose: types::Posef)
 }

@@ -899,7 +899,7 @@ impl gluon_ipc::RefExt for Poseable {
 }
 impl Poseable {
     ///Offset the pose of this object by this offset relative to the provided spatialref (adds to the existing transform)
-    pub fn offset_relative_pse(
+    pub fn offset_relative_pose(
         &self,
         reference: impl Into<stardust_xr_protocol::spatial::SpatialRef>,
         offset: impl Into<stardust_xr_protocol::types::Posef>,
@@ -907,7 +907,7 @@ impl Poseable {
         let reference: stardust_xr_protocol::spatial::SpatialRef = reference.into();
         let offset: stardust_xr_protocol::types::Posef = offset.into();
         tracing::trace!(
-            interface = "Poseable", method = "offset_relative_pse", ? reference, ?
+            interface = "Poseable", method = "offset_relative_pose", ? reference, ?
             offset, "→"
         );
         let mut gluon_builder = gluon_ipc::DataBuilder::new();
@@ -967,7 +967,7 @@ impl PartialEq for Poseable {
 impl Eq for Poseable {}
 pub trait PoseableHandler: gluon_ipc::Handler + Send + Sync + 'static {
     ///Offset the pose of this object by this offset relative to the provided spatialref (adds to the existing transform)
-    fn offset_relative_pse(
+    fn offset_relative_pose(
         &self,
         _ctx: gluon_ipc::Context,
         reference: stardust_xr_protocol::spatial::SpatialRef,
@@ -992,15 +992,15 @@ pub trait PoseableHandler: gluon_ipc::Handler + Send + Sync + 'static {
                     let param_reference = gluon_ipc::Convertable::read(&mut gluon_data)?;
                     let param_offset = gluon_ipc::Convertable::read(&mut gluon_data)?;
                     tracing::trace!(
-                        interface = "Poseable", method = "offset_relative_pse", ?
+                        interface = "Poseable", method = "offset_relative_pose", ?
                         param_reference, ? param_offset, "dispatching"
                     );
                     drop(gluon_data);
-                    self.offset_relative_pse(ctx, param_reference, param_offset)
+                    self.offset_relative_pose(ctx, param_reference, param_offset)
                         .instrument(
                             tracing::trace_span!(
                                 "dispatching", interface = "Poseable", method =
-                                "offset_relative_pse", method_id = 8u32
+                                "offset_relative_pose", method_id = 8u32
                             ),
                         )
                         .await;
