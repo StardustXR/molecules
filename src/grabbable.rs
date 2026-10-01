@@ -160,7 +160,11 @@ impl Grabbable {
 		} else {
 			None
 		};
-
+		let pose = Affine3A::from_scale_rotation_translation(
+			content_transform.scale.into(),
+			content_transform.rotation.into(),
+			content_transform.translation.into(),
+		);
 		Ok(Grabbable {
 			parent,
 			content_parent,
@@ -170,9 +174,9 @@ impl Grabbable {
 			content_lines,
 			root_lines,
 			settings,
-			prev_pose: Affine3A::IDENTITY,
+			prev_pose: pose,
 			relative_transform: Affine3A::IDENTITY,
-			pose: Affine3A::IDENTITY,
+			pose,
 			linear_velocity: None,
 			angular_velocity: None,
 			containable,
