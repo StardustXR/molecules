@@ -79,6 +79,14 @@ impl Containable {
 	pub async fn reparent(&self) {
 		self.0.reparent().await;
 	}
+	/// the tightest container the point is actually inside of, the default pick for a [`Containable`]
+	pub fn eval_innermost_container(containers: &Containers) -> Option<SpatialRef> {
+        containers
+			.values()
+			.filter(|(sample, _)| sample.distance < 0.0)
+			.max_by(|(a, _), (b, _)| a.distance.total_cmp(&b.distance))
+			.map(|(_, spatial)| spatial.clone())
+	}
 }
 
 type Containers = FxHashMap<QueryableId, (FieldSample, SpatialRef)>;

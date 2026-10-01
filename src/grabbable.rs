@@ -1,7 +1,9 @@
 use crate::{
 	FrameSensitive, UIElement, VisualDebug,
+	container::Containable,
 	input_action::{InputQueue, InputSnapshot, SingleAction, grab_pinch_interact},
 	lines::{LineExt, axes, bounding_box},
+	transformable::TransformableInterfaces,
 };
 use glam::{Affine3A, Quat, Vec3, vec3};
 use stardust_xr_fusion::{
@@ -9,10 +11,11 @@ use stardust_xr_fusion::{
 	client::{Client, ClientHandler, FrameInfo},
 	drawable::{Lines, LinesExt},
 	fields::Field,
+	query::{QueryableExt, QueryableObject},
 	spatial::{Spatial, SpatialExt, SpatialRef, Transform},
 	suis::InputDataType,
 };
-use std::f32::consts::PI;
+use std::{f32::consts::PI, sync::Arc};
 use tracing::{debug, trace};
 
 fn swing_direction(direction: Vec3) -> Quat {
@@ -40,20 +43,26 @@ pub struct GrabbableSettings {
 	pub linear_momentum: Option<MomentumSettings>,
 	pub angular_momentum: Option<MomentumSettings>,
 	pub pointer_mode: PointerMode,
+	pub containable: bool,
+	pub poseable: bool,
 }
 impl Default for GrabbableSettings {
 	fn default() -> Self {
 		Self {
 			max_distance: 0.05,
-			linear_momentum: Some(MomentumSettings {
-				drag: 8.0,
-				threshold: 0.01,
-			}),
-			angular_momentum: Some(MomentumSettings {
-				drag: 15.0,
-				threshold: 0.2,
-			}),
+			// MomentumSettings {
+			// 	drag: 8.0,
+			// 	threshold: 0.01,
+			// }
+			linear_momentum: None,
+			// MomentumSettings {
+			// 	drag: 15.0,
+			// 	threshold: 0.2,
+			// }
+			angular_momentum: None,
 			pointer_mode: PointerMode::Parent,
+			containable: true,
+			poseable: true,
 		}
 	}
 }
@@ -73,8 +82,15 @@ pub struct Grabbable {
 	relative_transform: Affine3A,
 	pose: Affine3A,
 
+	containable: Option<ContainableState>,
+	poseable: Option<(TransformableInterfaces, QueryableObject)>,
+
 	linear_velocity: Option<Vec3>,
 	angular_velocity: Option<(Vec3, f32)>,
+}
+struct ContainableState {
+	containable: Arc<Containable>,
+	anchor_ref: SpatialRef,
 }
 impl Grabbable {
 	pub async fn new<H: ClientHandler>(
@@ -84,16 +100,66 @@ impl Grabbable {
 		field: Field,
 		settings: GrabbableSettings,
 	) -> Result<Self> {
-		let (content_parent, _) = Spatial::new(client, &parent, content_transform).await?;
+		let (content_parent, content_parent_ref) =
+			Spatial::new(client, &parent, content_transform).await?;
+
+		let containable = if settings.containable {
+			let (anchor, anchor_ref) = Spatial::new(client, &parent, Transform::IDENTITY).await?;
+			let containable = Arc::new(
+				Containable::new(
+					client,
+					anchor.clone(),
+					parent.clone(),
+					content_parent_ref.clone(),
+					Containable::eval_innermost_container,
+				)
+				.await?,
+			);
+			content_parent.set_parent(anchor_ref.clone())?;
+			Some(ContainableState {
+				containable,
+				anchor_ref,
+			})
+		} else {
+			None
+		};
+		let pose_space = if let Some(containable) = &containable {
+			&containable.anchor_ref
+		} else {
+			&parent
+		};
 		let input = InputQueue::new(
 			client,
 			content_parent.clone(),
 			field.clone(),
-			parent.clone(),
+			pose_space.clone(),
 		)
 		.await?;
 		let content_lines = Lines::new(client, &content_parent, vec![]).await?;
 		let root_lines = Lines::new(client, &content_parent, vec![]).await?;
+
+		if let Some(containable) = containable.as_ref() {
+			containable.containable.set_auto_reparent(false);
+		}
+		let poseable = if settings.poseable {
+			let queryable =
+				QueryableObject::new(client, content_parent.clone(), field.clone()).await?;
+			Some((
+				TransformableInterfaces::new(
+					client,
+					&queryable,
+					&content_parent_ref,
+					pose_space,
+					true,
+					true,
+					false,
+				)
+				.await,
+				queryable,
+			))
+		} else {
+			None
+		};
 
 		Ok(Grabbable {
 			parent,
@@ -109,6 +175,8 @@ impl Grabbable {
 			pose: Affine3A::IDENTITY,
 			linear_velocity: None,
 			angular_velocity: None,
+			containable,
+			poseable,
 		})
 	}
 
@@ -182,20 +250,56 @@ impl Grabbable {
 		&self.content_parent
 	}
 
+	/// the reference space that poses are relative to, an internal anchor if containable is
+	/// enabled, and the parent otherwise
+	pub fn pose_ref_space(&self) -> &SpatialRef {
+		if let Some(containable) = &self.containable {
+			&containable.anchor_ref
+		} else {
+			&self.parent
+		}
+	}
+	/// this pose is relative to the spatial returned by [`Self::pose_ref_space`]
 	pub fn pose(&self) -> (Vec3, Quat) {
 		let (_, rot, pos) = self.pose.to_scale_rotation_translation();
 		(pos, rot)
 	}
+	/// this pose is relative to the spatial returned by [`Self::pose_ref_space`]
 	pub fn set_pose(&mut self, pos: Vec3, rot: Quat) {
 		self.pose = Affine3A::from_rotation_translation(rot, pos);
 		let _ = self.content_parent.set_relative_transform(
-			self.parent.clone(),
+			self.pose_ref_space().clone(),
 			Transform::from_translation_rotation(pos, rot),
 		);
 	}
 }
 impl UIElement for Grabbable {
 	fn handle_events(&mut self) -> bool {
+		let mut events_handled = false;
+		let grabbable_events = self.handle_grabbable_events();
+		events_handled |= grabbable_events;
+		if let Some((poseable, _)) = &mut self.poseable
+			&& let Some(transform) = poseable.try_recv()
+		{
+			if !self.grab_action().actor_acting() {
+				events_handled = true;
+				// scale shouldn't be changed by poseable anyway
+				self.set_pose(transform.translation.into(), transform.rotation.into());
+			}
+		}
+		if grabbable_events
+			&& self.grab_action().actor_stopped()
+			&& let Some(containable) = self.containable.as_ref().map(|c| c.containable.clone())
+		{
+			tokio::spawn(async move {
+				containable.clone().reparent().await;
+			});
+		}
+		events_handled
+	}
+}
+impl Grabbable {
+	fn handle_grabbable_events(&mut self) -> bool {
 		if !self.input.handle_events() {
 			return false;
 		}
@@ -253,7 +357,7 @@ impl UIElement for Grabbable {
 
 			let (_, new_rotation, new_position) = self.pose.to_scale_rotation_translation();
 			let _ = self.content_parent.set_relative_transform(
-				self.parent.clone(),
+				self.pose_ref_space().clone(),
 				Transform::from_translation_rotation(new_position, new_rotation),
 			);
 		}
@@ -299,7 +403,7 @@ impl FrameSensitive for Grabbable {
 				self.prev_pose = self.pose;
 				let (_, rotation, translation) = self.pose.to_scale_rotation_translation();
 				let _ = self.content_parent.set_relative_transform(
-					self.parent.clone(),
+					self.pose_ref_space().clone(),
 					Transform::from_translation_rotation(translation, rotation),
 				);
 			}
