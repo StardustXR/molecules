@@ -1,6 +1,6 @@
 [package]
 name = "stardust-xr-molecules"
-version = "0.52.0"
+version = "0.53.0-rc.1"
 edition = "2024"
 
 authors = ["Nova King <technobaboo@proton.me>"]
@@ -34,22 +34,22 @@ zbus = { version = "5.11.0", features = ["tokio"] }
 futures = { version = "0.3.32", default-features = false, features = ["alloc", "async-await"] }
 
 [dependencies.gluon-ipc]
-version = "0.1.0"
+version = "0.1.1"
 # git = "https://github.com/StardustXR/gluon-ipc"
 
 [dependencies.stardust-xr-fusion]
-version = "0.52.0"
+version = "0.53.0-rc.1"
 # git = "https://github.com/StardustXR/core.git"
 
 [dependencies.stardust-xr-molecules-protocols]
-version = "0.52.0"
+version = "0.53.0-rc.1"
 path = "protocols"
 
 [dev-dependencies]
 clap = { version = "4.6.7", features = ["derive"] }
 gbm = { version = "0.18.0", default-features = false }
 png = "0.18.1"
-stardust-xr-protocol = "0.52.0"
+stardust-xr-protocol = "0.53.0-rc.1"
 timeline_syncobj = { version = "0.2", features = ["tokio"] }
 tokio = { version = "1.38.0", features = ["full"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }

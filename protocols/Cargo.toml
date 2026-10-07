@@ -1,6 +1,6 @@
 [package]
 name = "stardust-xr-molecules-protocols"
-version = "0.52.0"
+version = "0.53.0-rc.1"
 edition = "2024"
 
 authors = ["Nova King <technobaboo@proton.me>"]
@@ -18,17 +18,17 @@ serde = { version = "1.0.228", optional = true }
 tracing = "0.1.44"
 
 [dependencies.gluon-ipc]
-version = "0.1.0"
+version = "0.1.1"
 # git = "https://github.com/StardustXR/gluon"
 
 [dependencies.stardust-xr-protocol]
-version = "0.52.0"
+version = "0.53.0-rc.1"
 # git = "https://github.com/StardustXR/core.git"
 
 
 [build-dependencies.gluon-ipc-codegen]
-version = "0.1.0"
+version = "0.1.1"
 # git = "https://github.com/technobaboo/gluon"
 [build-dependencies.stardust-xr-protocol]
-version = "0.52.0"
+version = "0.53.0-rc.1"
 # git = "https://github.com/StardustXR/core.git"
