@@ -84,13 +84,17 @@ impl Button {
 		self.touch_plane.set_size(size);
 		if let Some(visuals) = &mut self.visuals {
 			visuals.size = size;
+			visuals.update(&self.touch_plane, &self.settings);
 		}
 	}
 
 	pub fn set_visual_settings(&mut self, visual_settings: Option<ButtonVisualSettings>) {
 		self.settings.visuals = visual_settings;
 		match (&mut self.visuals, visual_settings) {
-			(Some(visuals), Some(vs)) => visuals.visual_settings = vs,
+			(Some(visuals), Some(vs)) => {
+				visuals.visual_settings = vs;
+				visuals.update(&self.touch_plane, &self.settings);
+			}
 			(Some(visuals), None) => {
 				let _ = visuals.lines.set_lines(vec![]);
 				self.visuals = None;

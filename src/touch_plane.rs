@@ -28,6 +28,7 @@ pub struct TouchPlane {
 	action: MultiAction,
 
 	debug_lines: Lines,
+	debug: Option<DebugSettings>,
 }
 impl TouchPlane {
 	pub async fn new<H: ClientHandler>(
@@ -68,6 +69,7 @@ impl TouchPlane {
 			input,
 			action: Default::default(),
 			debug_lines,
+			debug: None,
 		})
 	}
 
@@ -128,6 +130,7 @@ impl TouchPlane {
 		let _ = self.field.set_shape(Shape::Box {
 			size: [size.x, size.y, self.thickness].into(),
 		});
+		self.set_debug(self.debug);
 	}
 	pub fn set_thickness(&mut self, thickness: f32) {
 		self.thickness = thickness;
@@ -137,6 +140,7 @@ impl TouchPlane {
 		let _ = self.field.set_shape(Shape::Box {
 			size: [self.size.x, self.size.y, thickness].into(),
 		});
+		self.set_debug(self.debug);
 	}
 }
 impl UIElement for TouchPlane {
@@ -171,6 +175,7 @@ impl UIElement for TouchPlane {
 }
 impl VisualDebug for TouchPlane {
 	fn set_debug(&mut self, settings: Option<DebugSettings>) {
+		self.debug = settings;
 		let lines = if let Some(settings) = settings {
 			let line_front = lines::rounded_rectangle(
 				self.size.x,
