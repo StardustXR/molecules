@@ -18,6 +18,8 @@ pub mod multi;
 pub mod spatial_input_beam;
 pub mod touch_plane;
 pub mod transformable;
+pub mod entity;
+pub mod event;
 
 pub use derezzable::Derezzable;
 pub use exposure::Exposure;
