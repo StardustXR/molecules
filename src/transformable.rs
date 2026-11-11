@@ -6,8 +6,8 @@ use std::sync::Arc;
 use gluon_ipc::Handler;
 use stardust_xr_fusion::{
 	client::{Client, ClientHandler},
-	query::{QueryableExt, QueryableInterface, QueryableObject},
-	spatial::{PartialTransform, Spatial, SpatialInterface, SpatialRef, Transform},
+	query::{QueryableExt, QueryableInterface},
+	spatial::{PartialTransform, SpatialInterface, SpatialRef, Transform},
 	types::{Posef, QuatF, Vec3F},
 };
 use stardust_xr_molecules_protocols::transformable::{
@@ -15,7 +15,7 @@ use stardust_xr_molecules_protocols::transformable::{
 };
 use tracing::error;
 
-use crate::drop_handlers::AbortOnDrop;
+use crate::entity::Component;
 
 pub mod protocol {
 	pub use stardust_xr_molecules_protocols::transformable::*;
@@ -30,119 +30,101 @@ pub struct TransformableInterfaces {
 	transform: Arc<Mutex<Option<Transform>>>,
 	transform_updated: Arc<Notify>,
 }
-pub struct TransformableSpatialInterfaces {
-	_task: AbortOnDrop,
-}
-impl TransformableSpatialInterfaces {
-	pub async fn new(
-		client: &Client<impl ClientHandler>,
-		obj: &QueryableObject,
-		spatial: &Spatial,
-		translation: bool,
-		rotation: bool,
-		scale: bool,
-	) -> Self {
-		// TODO: maybe figure out something better than the client root here?
-		Self::new_with_ref_space(
-			client.spatial_interface(),
-			obj,
-			spatial,
-			client.root(),
-			translation,
-			rotation,
-			scale,
-		)
-		.await
-	}
-	pub async fn new_with_ref_space(
-		spatial_interface: &SpatialInterface,
-		obj: &QueryableObject,
-		spatial: &Spatial,
-		reference_space: &SpatialRef,
-		translation: bool,
-		rotation: bool,
-		scale: bool,
-	) -> Self {
-		// TODO: remove this unwrap
-		let spatial_ref = spatial.spatial_ref().await.unwrap();
-		let mut interfaces = TransformableInterfaces::new_with_interface(
-			spatial_interface,
-			obj,
-			&spatial_ref,
-			reference_space,
-			translation,
-			rotation,
-			scale,
-		)
-		.await;
-		let ref_space = reference_space.clone();
-		let spatial = spatial.clone();
-		let _task = tokio::spawn(async move {
-			loop {
-				let t = interfaces.recv().await;
-				_ = spatial.set_relative_transform(ref_space.clone(), t);
-			}
-		})
-		.into();
-		Self { _task }
-	}
-}
+// pub struct TransformableSpatialInterfaces {
+// 	_task: AbortOnDrop,
+// }
+// impl TransformableSpatialInterfaces {
+// 	pub async fn new(
+// 		client: &Client<impl ClientHandler>,
+// 		obj: &QueryableObject,
+// 		spatial: &Spatial,
+// 		options: TransformableOptions,
+// 	) -> Self {
+// 		// TODO: maybe figure out something better than the client root here?
+// 		Self::new_with_ref_space(
+// 			client,
+// 			obj,
+// 			spatial,
+// 			client.root(),
+// 			translation,
+// 			rotation,
+// 			scale,
+// 		)
+// 		.await
+// 	}
+// 	pub async fn new_with_ref_space(
+// 		client: &Client<impl ClientHandler>,
+// 		obj: &QueryableObject,
+// 		spatial: &Spatial,
+// 		reference_space: &SpatialRef,
+// 		options: TransformableOptions,
+// 	) -> Self {
+// 		// TODO: remove this unwrap
+// 		let spatial_ref = spatial.spatial_ref().await.unwrap();
+// 		let ctx = ComponentContext {
+// 			queryable: obj.clone(),
+// 			spatial: spatial_ref,
+// 			reference_space,
+// 			field: todo!(),
+// 			field_shape: todo!(),
+// 		};
+// 		let mut interfaces = TransformableInterfaces::new_component(&ctx, client, options);
+// 		let mut interfaces = TransformableInterfaces::new_with_interface(
+// 			spatial_interface,
+// 			obj,
+// 			&spatial_ref,
+// 			reference_space,
+// 			translation,
+// 			rotation,
+// 			scale,
+// 		)
+// 		.await;
+// 		let ref_space = reference_space.clone();
+// 		let spatial = spatial.clone();
+// 		let _task = tokio::spawn(async move {
+// 			loop {
+// 				let t = interfaces.recv().await;
+// 				_ = spatial.set_relative_transform(ref_space.clone(), t);
+// 			}
+// 		})
+// 		.into();
+// 		Self { _task }
+// 	}
+// }
 
-impl TransformableInterfaces {
-	pub async fn new(
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TransformableOptions {
+	pub translation: bool,
+	pub rotation: bool,
+	pub scale: bool,
+}
+impl Component for TransformableInterfaces {
+	type Args = TransformableOptions;
+
+	type Err = stardust_xr_fusion::Error;
+
+	async fn new_component(
+		ctx: &crate::entity::ComponentContext,
 		client: &Client<impl ClientHandler>,
-		obj: &QueryableObject,
-		spatial: &SpatialRef,
-		reference_space: &SpatialRef,
-		translation: bool,
-		rotation: bool,
-		scale: bool,
-	) -> Self {
-		Self::new_with_interface(
-			client.spatial_interface(),
-			obj,
-			spatial,
-			reference_space,
-			translation,
-			rotation,
-			scale,
-		)
-		.await
-	}
-	pub fn try_recv(&mut self) -> Option<Transform> {
-		let lock = self.transform.try_lock().ok();
-		// consume any remainding permits on the notify
-		tokio::task::unconstrained(self.transform_updated.notified()).now_or_never();
-		lock.map(|mut v| v.take()).flatten()
-	}
-	pub async fn recv(&mut self) -> Transform {
-		self.transform_updated.notified().await;
-		// this unwrap should be fine since we only trigger the notify after setting the transform,
-		// and we never unset it except in try_recv and this recv, which both consume permits
-		self.transform.lock().await.unwrap()
-	}
-	pub async fn new_with_interface(
-		spatial_interface: &SpatialInterface,
-		obj: &QueryableObject,
-		spatial: &SpatialRef,
-		reference_space: &SpatialRef,
-		translation: bool,
-		rotation: bool,
-		scale: bool,
-	) -> Self {
+		args: impl Into<Self::Args> + Send,
+	) -> Result<Self, Self::Err> {
 		let core = TransformableCore {
 			transform: Arc::new(Mutex::new(None)),
-			target_spatial: spatial.clone(),
-			reference_space: reference_space.clone(),
-			si: spatial_interface.clone(),
+			target_spatial: ctx.spatial.clone(),
+			reference_space: ctx.reference_space.clone(),
+			si: client.spatial_interface().clone(),
 			transform_updated: Arc::default(),
 		};
-		// let _transformable_node = todo!();
+		let TransformableOptions {
+			translation,
+			rotation,
+			scale,
+		} = args.into();
 		let _transformable_node = if translation
 			&& rotation
 			&& scale && let Ok(v) =
 			TransformableInner(core.clone()).to_service()
-			&& let Ok(v) = QueryableExt::add_interface(obj, v.proxy())
+			&& let Ok(v) = QueryableExt::add_interface(&ctx.queryable, v.proxy())
 				.await
 				.inspect_err(|err| error!("failed to create Transformable node: {err}"))
 		{
@@ -154,7 +136,7 @@ impl TransformableInterfaces {
 			&& rotation
 			&& scale && let Ok(v) =
 			TranslatableInner(core.clone()).to_service()
-			&& let Ok(v) = QueryableExt::add_interface(obj, v.proxy())
+			&& let Ok(v) = QueryableExt::add_interface(&ctx.queryable, v.proxy())
 				.await
 				.inspect_err(|err| error!("failed to create Translatable node: {err}"))
 		{
@@ -164,7 +146,7 @@ impl TransformableInterfaces {
 		};
 		let _rotatable_node = if rotation
 			&& let Ok(v) = RotatableInner(core.clone()).to_service()
-			&& let Ok(v) = QueryableExt::add_interface(obj, v.proxy())
+			&& let Ok(v) = QueryableExt::add_interface(&ctx.queryable, v.proxy())
 				.await
 				.inspect_err(|err| error!("failed to create Rotatable node: {err}"))
 		{
@@ -174,7 +156,7 @@ impl TransformableInterfaces {
 		};
 		let _scalable_node = if scale
 			&& let Ok(v) = ScalableInner(core.clone()).to_service()
-			&& let Ok(v) = QueryableExt::add_interface(obj, v.proxy())
+			&& let Ok(v) = QueryableExt::add_interface(&ctx.queryable, v.proxy())
 				.await
 				.inspect_err(|err| error!("failed to create Scalable node: {err}"))
 		{
@@ -185,7 +167,7 @@ impl TransformableInterfaces {
 		let _poseable_node = if translation
 			&& rotation
 			&& let Ok(v) = PoseableInner(core.clone()).to_service()
-			&& let Ok(v) = QueryableExt::add_interface(obj, v.proxy())
+			&& let Ok(v) = QueryableExt::add_interface(&ctx.queryable, v.proxy())
 				.await
 				.inspect_err(|err| error!("failed to create Poseable node: {err}"))
 		{
@@ -193,7 +175,7 @@ impl TransformableInterfaces {
 		} else {
 			None
 		};
-		Self {
+		Ok(Self {
 			_transformable_node,
 			_translatable_node,
 			_rotatable_node,
@@ -201,7 +183,28 @@ impl TransformableInterfaces {
 			_poseable_node,
 			transform: core.transform.clone(),
 			transform_updated: core.transform_updated.clone(),
-		}
+		})
+	}
+
+	fn handle_events(&mut self) -> bool {
+		false
+	}
+
+	fn frame(&mut self, _info: &stardust_xr_fusion::client::FrameInfo) {}
+}
+
+impl TransformableInterfaces {
+	pub fn try_recv(&mut self) -> Option<Transform> {
+		let lock = self.transform.try_lock().ok();
+		// consume any remainding permits on the notify
+		tokio::task::unconstrained(self.transform_updated.notified()).now_or_never();
+		lock.map(|mut v| v.take()).flatten()
+	}
+	pub async fn recv(&mut self) -> Transform {
+		self.transform_updated.notified().await;
+		// this unwrap should be fine since we only trigger the notify after setting the transform,
+		// and we never unset it except in try_recv and this recv, which both consume permits
+		self.transform.lock().await.unwrap()
 	}
 }
 

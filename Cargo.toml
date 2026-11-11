@@ -32,6 +32,7 @@ lerp = "0.5.0"
 shiva-color-rs = "0.0.1"
 zbus = { version = "5.11.0", features = ["tokio"] }
 futures = { version = "0.3.32", default-features = false, features = ["alloc", "async-await"] }
+variadics_please = "2.0.0"
 
 [dependencies.gluon-ipc]
 version = "0.1.1"

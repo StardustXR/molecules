@@ -1,9 +1,10 @@
 use crate::{
 	FrameSensitive, UIElement, VisualDebug,
 	container::Containable,
+	entity::Entity,
 	input_action::{InputQueue, InputSnapshot, SingleAction, grab_pinch_interact},
 	lines::{LineExt, axes, bounding_box},
-	transformable::TransformableInterfaces,
+	transformable::{TransformableInterfaces, TransformableOptions},
 };
 use glam::{Affine3A, Quat, Vec3, vec3};
 use stardust_xr_fusion::{
@@ -11,7 +12,6 @@ use stardust_xr_fusion::{
 	client::{Client, ClientHandler, FrameInfo},
 	drawable::{Lines, LinesExt},
 	fields::Field,
-	query::{QueryableExt, QueryableObject},
 	spatial::{Spatial, SpatialExt, SpatialRef, Transform},
 	suis::InputDataType,
 };
@@ -82,8 +82,9 @@ pub struct Grabbable {
 	relative_transform: Affine3A,
 	pose: Affine3A,
 
+	entity: Entity,
 	containable: Option<ContainableState>,
-	poseable: Option<(TransformableInterfaces, QueryableObject)>,
+	poseable: bool,
 
 	linear_velocity: Option<Vec3>,
 	angular_velocity: Option<(Vec3, f32)>,
@@ -141,24 +142,18 @@ impl Grabbable {
 		if let Some(containable) = containable.as_ref() {
 			containable.containable.set_auto_reparent(false);
 		}
-		let poseable = if settings.poseable {
-			let queryable =
-				QueryableObject::new(client, content_parent.clone(), field.clone()).await?;
-			Some((
-				TransformableInterfaces::new(
+		let mut entity = Entity::new(client, &content_parent, pose_space, &field).await?;
+		if settings.poseable {
+			entity
+				.add_component::<TransformableInterfaces>(
 					client,
-					&queryable,
-					&content_parent_ref,
-					pose_space,
-					true,
-					true,
-					false,
+					TransformableOptions {
+						translation: true,
+						rotation: true,
+						scale: false,
+					},
 				)
-				.await,
-				queryable,
-			))
-		} else {
-			None
+				.await?;
 		};
 		let pose = Affine3A::from_scale_rotation_translation(
 			content_transform.scale.into(),
@@ -177,10 +172,11 @@ impl Grabbable {
 			prev_pose: pose,
 			relative_transform: Affine3A::IDENTITY,
 			pose,
+			entity,
+			containable,
+			poseable: settings.poseable,
 			linear_velocity: None,
 			angular_velocity: None,
-			containable,
-			poseable,
 		})
 	}
 
@@ -282,7 +278,8 @@ impl UIElement for Grabbable {
 		let mut events_handled = false;
 		let grabbable_events = self.handle_grabbable_events();
 		events_handled |= grabbable_events;
-		if let Some((poseable, _)) = &mut self.poseable
+		if self.poseable
+			&& let Some(poseable) = self.entity.get_mut::<TransformableInterfaces>()
 			&& let Some(transform) = poseable.try_recv()
 		{
 			if !self.grab_action().actor_acting() {
