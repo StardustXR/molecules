@@ -129,11 +129,14 @@ async fn main() {
 
 		let angle = elapsed / PERIOD * std::f32::consts::TAU;
 		let position = [angle.cos() * RADIUS, 0.0, angle.sin() * RADIUS];
-		let _ = spatial.set_local_transform(PartialTransform {
-			translation: Some(position.into()),
-			rotation: None,
-			scale: None,
-		});
+		let _ = spatial.set_relative_transform(
+			root.clone(),
+			PartialTransform {
+				translation: Some(position.into()),
+				rotation: None,
+				scale: None,
+			},
+		);
 		let _ = query.update(vec![Point {
 			point: position.into(),
 			margin: 0.5,

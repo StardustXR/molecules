@@ -423,7 +423,13 @@ impl VisualDebug for Grabbable {
 			let content_lines = self.content_lines.clone();
 			let content_parent = self.content_parent.clone();
 			tokio::task::spawn(async move {
-				if let Ok(bounds) = content_parent.get_local_bounding_box().await {
+				let Ok(content_parent_ref) = content_parent.spatial_ref().await else {
+					return;
+				};
+				if let Ok(Ok(bounds)) = content_parent
+					.get_relative_bounding_box(content_parent_ref)
+					.await
+				{
 					let _ = content_lines.set_lines(
 						bounding_box(bounds)
 							.into_iter()

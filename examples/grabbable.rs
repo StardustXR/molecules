@@ -25,7 +25,7 @@ async fn main() {
 		.await
 		.unwrap();
 
-	let (content_spatial, _) = Spatial::new(&client, &root_ref, Transform::IDENTITY)
+	let (content_spatial, content_ref) = Spatial::new(&client, &root_ref, Transform::IDENTITY)
 		.await
 		.unwrap();
 
@@ -40,7 +40,11 @@ async fn main() {
 	.await
 	.unwrap();
 
-	let bounds = content_spatial.get_local_bounding_box().await.unwrap();
+	let bounds = content_spatial
+		.get_relative_bounding_box(content_ref)
+		.await
+		.unwrap()
+		.unwrap();
 
 	let (field, _) = Field::new(
 		&client,

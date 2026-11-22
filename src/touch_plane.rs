@@ -22,6 +22,7 @@ pub struct TouchPlane {
 	thickness: f32,
 
 	root: Spatial,
+	root_ref: SpatialRef,
 	field_spatial: Spatial,
 	field: Field,
 	input: InputQueue,
@@ -64,6 +65,7 @@ impl TouchPlane {
 			y_range,
 			thickness,
 			root,
+			root_ref,
 			field_spatial,
 			field,
 			input,
@@ -134,9 +136,10 @@ impl TouchPlane {
 	}
 	pub fn set_thickness(&mut self, thickness: f32) {
 		self.thickness = thickness;
-		let _ = self
-			.field_spatial
-			.set_local_transform(Transform::from_translation([0.0, 0.0, thickness * -0.5]));
+		let _ = self.field_spatial.set_relative_transform(
+			self.root_ref.clone(),
+			Transform::from_translation([0.0, 0.0, thickness * -0.5]),
+		);
 		let _ = self.field.set_shape(Shape::Box {
 			size: [self.size.x, self.size.y, thickness].into(),
 		});
