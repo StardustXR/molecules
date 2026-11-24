@@ -22,7 +22,6 @@ members = ["protocols"]
 
 [dependencies]
 glam = { version = "0.33.7", features = ["mint"] }
-lazy_static = "1.4.0"
 rustc-hash = "2.1.1"
 serde = { version = "1.0.203", features = ["derive"] }
 tokio = { version = "1.38.0", features = ["rt"] }

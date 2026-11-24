@@ -284,13 +284,11 @@ impl UIElement for Grabbable {
 		events_handled |= grabbable_events;
 		if let Some((poseable, _)) = &mut self.poseable
 			&& let Some(transform) = poseable.try_recv()
-		{
-			if !self.grab_action().actor_acting() {
+			&& !self.grab_action().actor_acting() {
 				events_handled = true;
 				// scale shouldn't be changed by poseable anyway
 				self.set_pose(transform.translation.into(), transform.rotation.into());
 			}
-		}
 		if grabbable_events
 			&& self.grab_action().actor_stopped()
 			&& let Some(containable) = self.containable.as_ref().map(|c| c.containable.clone())

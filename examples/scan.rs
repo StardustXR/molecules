@@ -434,7 +434,9 @@ async fn execute(
 			let n = (points.len() / 3 - 1) as f32;
 			let line = Line {
 				points: points
-					.chunks_exact(3)
+					.as_chunks::<3>()
+					.0
+					.iter()
 					.enumerate()
 					.map(|(i, p)| {
 						let t = i as f32 / n;

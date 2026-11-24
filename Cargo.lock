@@ -1374,7 +1374,6 @@ dependencies = [
  "gbm",
  "glam",
  "gluon-ipc",
- "lazy_static",
  "lerp",
  "png",
  "rustc-hash",

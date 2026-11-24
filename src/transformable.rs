@@ -113,7 +113,7 @@ impl TransformableInterfaces {
 		let lock = self.transform.try_lock().ok();
 		// consume any remainding permits on the notify
 		tokio::task::unconstrained(self.transform_updated.notified()).now_or_never();
-		lock.map(|mut v| v.take()).flatten()
+		lock.and_then(|mut v| v.take())
 	}
 	pub async fn recv(&mut self) -> Transform {
 		self.transform_updated.notified().await;
